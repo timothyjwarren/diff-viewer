@@ -16,4 +16,13 @@ describe("ReviewBar", () => {
     expect(screen.getByText("Comment")).toBeInTheDocument();
     expect(screen.getByText("Request changes")).toBeInTheDocument();
   });
+
+  it("clears the summary field and shows a confirmation after submitting", () => {
+    render(<ReviewBar onSubmit={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Leave a summary (optional)") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "please fix this" } });
+    fireEvent.click(screen.getByText("Request changes"));
+    expect(textarea.value).toBe("");
+    expect(screen.getByText(/Request changes submitted/)).toBeInTheDocument();
+  });
 });

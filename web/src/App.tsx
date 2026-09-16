@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
-import { DiffView } from "./components/DiffView";
+import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
@@ -8,15 +8,17 @@ import {
 import { selectionReducer } from "./lib/selection";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType } from "./types";
 
-interface Selection {
-  file: DiffFile;
-  repoPath: string;
-  repoName: string;
+function fileAnchorId(file: DiffFile): string {
+  const name = file.newPath || file.oldPath;
+  return `file-${(file.repoPath + "-" + name).replace(/[^a-zA-Z0-9]+/g, "-")}`;
+}
+
+function fileName(file: DiffFile): string {
+  return file.newPath || file.oldPath;
 }
 
 export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
-  const [selection, setSelection] = useState<Selection | null>(null);
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
 
@@ -32,44 +34,39 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  function selectFile(file: DiffFile) {
-    const repo = repos.find(r => r.repoPath === file.repoPath);
-    if (!repo) return;
-    setSelection({ file, repoPath: repo.repoPath, repoName: repo.repo });
-    dispatchLineSelection({ type: "clear" });
+  function scrollToFile(file: DiffFile) {
+    document.getElementById(fileAnchorId(file))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const currentFileName = selection ? (selection.file.newPath || selection.file.oldPath) : null;
-  const currentThreads = currentFileName
-    ? threads.filter(t => t.repoPath === selection!.repoPath && t.file === currentFileName)
-    : [];
-  const currentSelection = lineSelection && lineSelection.file === currentFileName ? lineSelection : null;
-
-  async function handleCreateThread(side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) {
-    if (!selection || !currentFileName || !body.trim()) return;
-    await createThread({
-      repoPath: selection.repoPath, file: currentFileName, lineStart, lineEnd, side, body, pending,
-    });
-    dispatchLineSelection({ type: "clear" });
-    setThreads(await fetchThreads());
-  }
-
-  async function handleReply(threadId: string, body: string, pending: boolean) {
-    if (!body.trim()) return;
-    await addReply(threadId, body, pending);
-    setThreads(await fetchThreads());
-  }
-
-  async function handleEdit(threadId: string, commentId: string, body: string) {
-    const next = window.prompt("Edit comment", body);
-    if (next == null) return;
-    await editComment(threadId, commentId, next);
-    setThreads(await fetchThreads());
-  }
-
-  async function handleDelete(threadId: string, commentId: string) {
-    await deleteComment(threadId, commentId);
-    setThreads(await fetchThreads());
+  function commentHandlersFor(file: DiffFile): CommentHandlers {
+    const name = fileName(file);
+    return {
+      threads: threads.filter(t => t.repoPath === file.repoPath && t.file === name),
+      selection: lineSelection && lineSelection.file === name ? lineSelection : null,
+      onLineClick: (side, line) => dispatchLineSelection({ type: "click", file: name, side, line }),
+      onLineShiftClick: (side, line) => dispatchLineSelection({ type: "shiftClick", file: name, side, line }),
+      onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
+        if (!body.trim()) return;
+        await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });
+        dispatchLineSelection({ type: "clear" });
+        setThreads(await fetchThreads());
+      },
+      onReply: async (threadId, body, pending) => {
+        if (!body.trim()) return;
+        await addReply(threadId, body, pending);
+        setThreads(await fetchThreads());
+      },
+      onEdit: async (threadId, commentId, body) => {
+        const next = window.prompt("Edit comment", body);
+        if (next == null) return;
+        await editComment(threadId, commentId, next);
+        setThreads(await fetchThreads());
+      },
+      onDelete: async (threadId, commentId) => {
+        await deleteComment(threadId, commentId);
+        setThreads(await fetchThreads());
+      },
+    };
   }
 
   async function handleSubmitVerdict(type: VerdictType, summary?: string) {
@@ -79,28 +76,20 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar repos={repos} onSelectFile={selectFile} />
+      <Sidebar repos={repos} onSelectFile={scrollToFile} />
       <main>
-        {selection && currentFileName ? (
-          <DiffView
-            file={selection.file}
-            repoPath={selection.repoPath}
-            repoName={selection.repoName}
-            baseRef=""
-            comments={{
-              threads: currentThreads,
-              selection: currentSelection,
-              onLineClick: (side, line) => dispatchLineSelection({ type: "click", file: currentFileName, side, line }),
-              onLineShiftClick: (side, line) => dispatchLineSelection({ type: "shiftClick", file: currentFileName, side, line }),
-              onCreateThread: handleCreateThread,
-              onReply: handleReply,
-              onEdit: handleEdit,
-              onDelete: handleDelete,
-            }}
-          />
-        ) : (
-          "Select a file to review"
-        )}
+        {repos.length === 0 && <p className="empty-state">No changes to review.</p>}
+        {repos.map(repo => repo.files.map(file => (
+          <div key={fileAnchorId(file)} id={fileAnchorId(file)} className="file-anchor">
+            <DiffView
+              file={file}
+              repoPath={repo.repoPath}
+              repoName={repo.repo}
+              baseRef=""
+              comments={commentHandlersFor(file)}
+            />
+          </div>
+        )))}
       </main>
       <ReviewBar onSubmit={handleSubmitVerdict} />
     </div>

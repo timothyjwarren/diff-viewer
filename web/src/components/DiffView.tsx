@@ -39,7 +39,7 @@ function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
   );
 }
 
-interface CommentHandlers {
+export interface CommentHandlers {
   threads: CommentThreadData[];
   selection: SelectionState;
   onLineClick: (side: "old" | "new", line: number) => void;
