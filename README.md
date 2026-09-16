@@ -34,15 +34,17 @@ tell it you're done.
 
 ## Installation
 
-Tell your agent to install the plugin straight from GitHub:
+This repo is its own plugin marketplace. Add it, then install from it:
 
-> Install the diff-viewer plugin from `https://github.com/timothyjwarren/diff-viewer`
+```
+/plugin marketplace add timothyjwarren/diff-viewer
+/plugin install diff-viewer@diff-viewer
+```
 
-Point it at wherever this repo ends up living once it's pushed. For local
-development, or before a remote exists, point Claude Code at the repo
-directory directly as a local plugin instead (see the [Claude Code plugin
-docs](https://docs.claude.com/en/docs/claude-code/plugins) for adding a
-local plugin path).
+For local development, point Claude Code at the repo directory directly
+as a local plugin instead (see the [Claude Code plugin
+docs](https://code.claude.com/docs/en/plugins) for adding a local plugin
+path).
 
 Either way, once installed you get one new slash command:
 `/diff-viewer:review`.

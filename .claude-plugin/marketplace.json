@@ -1,0 +1,13 @@
+{
+  "name": "diff-viewer",
+  "owner": {
+    "name": "Timothy Warren"
+  },
+  "plugins": [
+    {
+      "name": "diff-viewer",
+      "description": "Local, GitHub-PR-style diff viewer for reviewing changes across multiple repos/worktrees before opening individual PRs.",
+      "source": "."
+    }
+  ]
+}
