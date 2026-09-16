@@ -211,6 +211,19 @@ main {
   overflow-x: auto;
   user-select: text;
   border-left: 1px solid var(--border);
+  /*
+   * Each row (.diff-line) is a plain block element, sized to 100% of this
+   * pane's own layout width. Without this, a row's background only extends
+   * to the *visible* pane width, not the scrollable content width — so once
+   * a longer sibling line triggers horizontal scroll, shorter lines' add/del
+   * tinting stops short of the right edge instead of extending with them.
+   * display:table (shrink-to-fit, like inline-block) lets .diff-pane grow to
+   * its widest line, and min-width:100% floors it at the visible cell width;
+   * block children (.diff-hunk, .diff-line) then stretch to match that
+   * table-computed width via normal width:auto block layout.
+   */
+  display: table;
+  min-width: 100%;
 }
 
 .diff-pane:first-child {

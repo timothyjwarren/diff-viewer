@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Wrapper so `diff-viewer` is invokable as a bare command once this plugin's
 # bin/ is on PATH (the Claude Code harness adds it automatically while the
-# plugin is enabled — no npm link / global install needed). Resolves its own
-# location via $(dirname "$0") rather than ${CLAUDE_PLUGIN_ROOT}, since that
-# variable isn't exported into a general Bash tool subprocess's environment.
+# plugin is enabled — no npm link / global install needed).
+#
+# Self-location: ${CLAUDE_PLUGIN_ROOT} isn't exported into a Bash-tool
+# subprocess's environment (only into hook/MCP/LSP subprocesses), and a
+# bin/ script can be invoked through a symlink rather than run directly
+# from its real location, so a bare `dirname "$0"` isn't reliable —
+# readlink -f resolves the symlink first. This is the pattern documented
+# for plugin self-location in Claude Code's plugins-reference docs.
 #
 # dist/ isn't committed (compiled output in source control goes stale and
 # bloats the repo), so this builds it on first run instead — a few extra
 # seconds once, rather than shipping ~300 compiled/vendor files forever.
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PLUGIN_ROOT="$SCRIPT_DIR/.."
 
 if [ ! -f "$PLUGIN_ROOT/dist/bin/diff-viewer.js" ] || [ ! -d "$PLUGIN_ROOT/web/dist" ]; then

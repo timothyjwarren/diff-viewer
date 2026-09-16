@@ -97,14 +97,13 @@ process per review session, bound to `127.0.0.1`), a bundled `diff-viewer`
 CLI that's the agent's only interface to it (via Bash), and a React/Vite
 frontend served as static assets by that same server.
 
-`bin/diff-viewer` is a thin wrapper that execs into `dist/bin/diff-viewer.js`
--- Claude Code adds a plugin's `bin/` directory to the agent's `PATH`
+`bin/diff-viewer` is a thin wrapper that execs into `dist/bin/diff-viewer.js`.
+Claude Code adds a plugin's `bin/` directory to the agent's `PATH`
 automatically while it's enabled, so the CLI is invokable as a bare
-command (`diff-viewer ...`) with no global npm link step. `dist/` isn't
-committed (compiled/vendored output in source control goes stale and
-bloats the repo); the wrapper builds it on first run instead, installing
-dependencies and running `npm run build` if `dist/` is missing, then
-runs normally on every call after that.
+command (`diff-viewer ...`) with no global npm link step. `dist/` is
+gitignored; the wrapper installs dependencies and runs `npm run build`
+the first time it's called if `dist/` doesn't exist yet, then runs
+normally on every call after that.
 
 There's no websocket layer -- the browser polls for new comments, and the
 agent's live notifications come from `diff-viewer wait`, a long-polling
