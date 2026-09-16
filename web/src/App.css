@@ -14,3 +14,17 @@ main {
   overflow-y: auto;
   padding: 8px;
 }
+
+.diff-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.diff-view-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+.diff-pane { overflow-x: auto; user-select: text; }
+
+.diff-line { white-space: pre; font-family: monospace; }
+.diff-line-add { background: rgba(46, 160, 67, 0.15); }
+.diff-line-del { background: rgba(248, 81, 73, 0.15); }
