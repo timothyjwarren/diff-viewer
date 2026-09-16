@@ -1,5 +1,4 @@
 import express from "express";
-import path from "node:path";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff } from "../git/diff.js";
 import { readWorkingTreeFile, readFileAtRef } from "../git/fileContent.js";
@@ -104,7 +103,7 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
 
   if (webDistDir) {
     app.use(express.static(webDistDir));
-    app.get("/session/:id", (_req, res) => res.sendFile(path.join(webDistDir, "index.html")));
+    app.get("/session/:id", (_req, res) => res.sendFile("index.html", { root: webDistDir }));
   }
 
   return app;
