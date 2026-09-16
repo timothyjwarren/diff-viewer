@@ -26,11 +26,11 @@ async function highlightLineInner(content: string, lang: string): Promise<string
 
 const MARKERS: Record<DiffLine["type"], string> = { add: "+", del: "-", context: "" };
 
-function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
+function Line({ line, lang, repoName, side, selected, onGutterMouseDown, onGutterMouseEnter }: {
   line: DiffLine; lang: string; repoName: string; side: "old" | "new";
   selected: boolean;
-  onClick: (line: number, shift: boolean) => void;
-  onShiftClick: (line: number) => void;
+  onGutterMouseDown: (line: number) => void;
+  onGutterMouseEnter: (line: number) => void;
 }) {
   const [html, setHtml] = useState<string>(() => escapeHtml(line.content));
   useEffect(() => {
@@ -47,23 +47,23 @@ function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
     <div
       className={`diff-line diff-line-${line.type}${selected ? " diff-line-selected" : ""}`}
       data-line-number={lineNumber}
-      onMouseDown={e => {
-        // mousedown (not click): `.diff-pane` has user-select:text for copy/paste,
-        // and shift+click on selectable text competes with the browser's native
-        // "extend text selection" gesture — some browsers suppress the click event
-        // entirely when the mouseup follows a selection change, making shift-click
-        // range selection flaky. mousedown always fires, and preventDefault on the
-        // shift case stops the native selection from hijacking the gesture.
-        if (lineNumber == null) return;
-        if (e.shiftKey) {
-          e.preventDefault();
-          onShiftClick(lineNumber);
-        } else {
-          onClick(lineNumber, false);
-        }
-      }}
     >
-      <span className="diff-line-number">{lineNumber ?? ""}</span>
+      {/*
+       * Selecting/commenting is driven entirely from the gutter, never the code
+       * text itself — that keeps .diff-pane's user-select:text (copy/paste)
+       * completely unaffected by our click handling. A plain gutter
+       * mousedown+mouseup (no drag) opens a single-line comment; mousedown then
+       * dragging into other lines' gutters before releasing extends the range,
+       * opening a multi-line comment on release.
+       */}
+      <span
+        className="diff-line-gutter"
+        onMouseDown={() => { if (lineNumber != null) onGutterMouseDown(lineNumber); }}
+        onMouseEnter={() => { if (lineNumber != null) onGutterMouseEnter(lineNumber); }}
+      >
+        <span className="diff-line-number">{lineNumber ?? ""}</span>
+        <span className="diff-line-add-icon">+</span>
+      </span>
       <span className="diff-line-marker">{MARKERS[line.type]}</span>
       <span className="diff-line-code" dangerouslySetInnerHTML={{ __html: html }} data-repo={repoName} />
     </div>
@@ -78,27 +78,13 @@ export interface CommentHandlers {
   threads: CommentThreadData[];
   selection: SelectionState;
   composerArmed: boolean;
-  onLineClick: (side: "old" | "new", line: number) => void;
-  onLineShiftClick: (side: "old" | "new", line: number) => void;
-  onArmComposer: () => void;
+  onGutterMouseDown: (side: "old" | "new", line: number) => void;
+  onGutterMouseEnter: (side: "old" | "new", line: number) => void;
   onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void;
   onCancelSelection: () => void;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
-}
-
-// A bare click/shift-click only highlights a range — it must NOT pop the
-// composer open immediately, or the textarea's autoFocus + the layout shift
-// from inserting it would interfere with the next shift-click needed to
-// extend a multi-line selection. This small trigger is shown instead until
-// the user explicitly asks to comment on the selected range.
-function AddCommentTrigger({ onClick }: { onClick: () => void }) {
-  return (
-    <div className="comment-add-trigger">
-      <button onClick={onClick}>Add comment</button>
-    </div>
-  );
 }
 
 function Composer({ onSubmit, onCancel }: {
@@ -160,16 +146,16 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
               const threadsHere = comments.threads.filter(
                 t => t.side === side && lineNumber != null && t.lineEnd === lineNumber,
               );
-              const isSelectionEnd = Boolean(
-                comments.selection && comments.selection.side === side && lineNumber === comments.selection.end &&
-                threadsHere.length === 0,
+              const showComposer = Boolean(
+                comments.composerArmed && comments.selection && comments.selection.side === side &&
+                lineNumber === comments.selection.end && threadsHere.length === 0,
               );
               return (
                 <div key={ri}>
                   <Line
                     line={l} lang={lang} repoName={repoName} side={side} selected={selected}
-                    onClick={(line) => comments.onLineClick(side, line)}
-                    onShiftClick={(line) => comments.onLineShiftClick(side, line)}
+                    onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
+                    onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
                   />
                   {threadsHere.map(thread => (
                     <CommentThread
@@ -177,10 +163,7 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
                       onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
                     />
                   ))}
-                  {isSelectionEnd && !comments.composerArmed && (
-                    <AddCommentTrigger onClick={comments.onArmComposer} />
-                  )}
-                  {isSelectionEnd && comments.composerArmed && comments.selection && (
+                  {showComposer && comments.selection && (
                     <Composer
                       onSubmit={(body, pending) => comments.onCreateThread(
                         side, comments.selection!.start, comments.selection!.end, body, pending,

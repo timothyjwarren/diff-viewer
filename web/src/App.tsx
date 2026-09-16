@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
@@ -17,11 +17,18 @@ function fileName(file: DiffFile): string {
   return file.newPath || file.oldPath;
 }
 
+interface DragState {
+  file: string;
+  side: "old" | "new";
+  anchor: number;
+}
+
 export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
+  const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
     fetchDiffs().then(setRepos);
@@ -35,6 +42,19 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    // A gutter mousedown starts tracking a drag; releasing anywhere (not just
+    // back over a gutter cell) must finalize it, so this listens globally
+    // rather than relying on a mouseup handler on the line elements themselves.
+    function onWindowMouseUp() {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      setComposerArmed(true);
+    }
+    window.addEventListener("mouseup", onWindowMouseUp);
+    return () => window.removeEventListener("mouseup", onWindowMouseUp);
+  }, []);
+
   function scrollToFile(file: DiffFile) {
     document.getElementById(fileAnchorId(file))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -45,15 +65,19 @@ export function App() {
       threads: threads.filter(t => t.repoPath === file.repoPath && t.file === name),
       selection: lineSelection && lineSelection.file === name ? lineSelection : null,
       composerArmed,
-      onLineClick: (side, line) => {
+      onGutterMouseDown: (side, line) => {
+        dragRef.current = { file: name, side, anchor: line };
         setComposerArmed(false);
-        dispatchLineSelection({ type: "click", file: name, side, line });
+        dispatchLineSelection({ type: "anchor", file: name, side, line });
       },
-      onLineShiftClick: (side, line) => {
-        setComposerArmed(false);
-        dispatchLineSelection({ type: "shiftClick", file: name, side, line });
+      onGutterMouseEnter: (side, line) => {
+        const drag = dragRef.current;
+        if (!drag || drag.file !== name || drag.side !== side) return;
+        dispatchLineSelection({
+          type: "setRange", file: name, side,
+          start: Math.min(drag.anchor, line), end: Math.max(drag.anchor, line),
+        });
       },
-      onArmComposer: () => setComposerArmed(true),
       onCancelSelection: () => {
         setComposerArmed(false);
         dispatchLineSelection({ type: "clear" });

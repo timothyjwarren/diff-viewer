@@ -263,7 +263,6 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 20px;
-  cursor: pointer;
   tab-size: 4;
 }
 
@@ -278,14 +277,34 @@ main {
   background: rgba(110, 118, 129, 0.04);
 }
 
-.diff-line-number {
+.diff-line-gutter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex: 0 0 40px;
-  text-align: right;
   padding: 0 8px 0 4px;
-  color: var(--text-muted);
   user-select: none;
-  opacity: 0.75;
   border-right: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.diff-line-number {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.diff-line-add-icon {
+  display: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.diff-line-gutter:hover .diff-line-number {
+  display: none;
+}
+
+.diff-line-gutter:hover .diff-line-add-icon {
+  display: inline;
 }
 
 .diff-line-marker {
@@ -334,26 +353,11 @@ main {
 }
 
 .comment-thread,
-.comment-composer,
-.comment-add-trigger {
+.comment-composer {
   border-top: 1px solid var(--border);
   padding: 8px 12px;
   background: var(--bg-elevated);
   font-size: 13px;
-}
-
-.comment-add-trigger button {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--accent);
-  background: transparent;
-  color: var(--accent);
-  cursor: pointer;
-}
-
-.comment-add-trigger button:hover {
-  background: rgba(88, 166, 255, 0.15);
 }
 
 .comment {

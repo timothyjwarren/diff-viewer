@@ -4,25 +4,25 @@ import { selectionReducer, type SelectionState } from "./selection";
 const initial: SelectionState = null;
 
 describe("selectionReducer", () => {
-  it("selects a single line on click", () => {
-    const state = selectionReducer(initial, { type: "click", file: "a.ts", side: "new", line: 5 });
+  it("anchors a single-line selection", () => {
+    const state = selectionReducer(initial, { type: "anchor", file: "a.ts", side: "new", line: 5 });
     expect(state).toEqual({ file: "a.ts", side: "new", start: 5, end: 5 });
   });
 
-  it("extends the range on shift-click within the same file/side", () => {
-    const afterClick = selectionReducer(initial, { type: "click", file: "a.ts", side: "new", line: 5 });
-    const state = selectionReducer(afterClick, { type: "shiftClick", file: "a.ts", side: "new", line: 8 });
+  it("setRange replaces the selection with an explicit range", () => {
+    const anchored = selectionReducer(initial, { type: "anchor", file: "a.ts", side: "new", line: 5 });
+    const state = selectionReducer(anchored, { type: "setRange", file: "a.ts", side: "new", start: 5, end: 8 });
     expect(state).toEqual({ file: "a.ts", side: "new", start: 5, end: 8 });
   });
 
-  it("shift-click on a different file/side starts a fresh single-line selection", () => {
-    const afterClick = selectionReducer(initial, { type: "click", file: "a.ts", side: "new", line: 5 });
-    const state = selectionReducer(afterClick, { type: "shiftClick", file: "b.ts", side: "new", line: 2 });
-    expect(state).toEqual({ file: "b.ts", side: "new", start: 2, end: 2 });
+  it("setRange shrinks the range when dragging back past the anchor", () => {
+    const grown = selectionReducer(initial, { type: "setRange", file: "a.ts", side: "new", start: 5, end: 8 });
+    const shrunk = selectionReducer(grown, { type: "setRange", file: "a.ts", side: "new", start: 5, end: 6 });
+    expect(shrunk).toEqual({ file: "a.ts", side: "new", start: 5, end: 6 });
   });
 
   it("clears the selection", () => {
-    const afterClick = selectionReducer(initial, { type: "click", file: "a.ts", side: "new", line: 5 });
-    expect(selectionReducer(afterClick, { type: "clear" })).toBeNull();
+    const anchored = selectionReducer(initial, { type: "anchor", file: "a.ts", side: "new", line: 5 });
+    expect(selectionReducer(anchored, { type: "clear" })).toBeNull();
   });
 });
