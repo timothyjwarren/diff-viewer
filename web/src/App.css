@@ -110,9 +110,16 @@ main {
 .diff-view {
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
   scroll-margin-top: 16px;
 }
+
+/*
+ * .diff-view itself must NOT have overflow:hidden — that would make it
+ * (rather than the actual scrolling element, `main`) the sticky
+ * positioning reference for .diff-view-header, and since .diff-view
+ * never literally scrolls, the header would never stick. Corner
+ * clipping is done on the header/body individually instead.
+ */
 
 .diff-view-header {
   display: flex;
@@ -123,6 +130,7 @@ main {
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
+  border-radius: 6px 6px 0 0;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -172,6 +180,8 @@ main {
 .diff-view-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border-radius: 0 0 6px 6px;
 }
 
 .diff-pane {
@@ -235,6 +245,12 @@ main {
 }
 
 .diff-line-empty {
+  /* An empty flex container has no line box, so it collapses to 0
+   * height unless given one explicitly — without this, placeholder
+   * rows (padding the shorter side of an unbalanced add/del run) are
+   * shorter than real lines, and the two panes drift out of alignment
+   * over the length of the file. */
+  height: 20px;
   cursor: default;
   background: rgba(110, 118, 129, 0.04);
 }
