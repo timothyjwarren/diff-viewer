@@ -129,54 +129,56 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
 }) {
   return (
     <div className="diff-pane" data-side={side}>
-      {hunks.map((hunk, hi) => {
-        const rows: PairedRow[] = pairHunkLines(hunk.lines);
-        return (
-          <div key={hi} className="diff-hunk">
-            {showHeaders && <HunkHeader hunk={hunk} hunkIndex={hi} onExpand={onExpand} />}
-            {rows.map((row, ri) => {
-              const l = row[side];
-              if (!l) return <EmptyLine key={ri} />;
+      <div className="diff-pane-content">
+        {hunks.map((hunk, hi) => {
+          const rows: PairedRow[] = pairHunkLines(hunk.lines);
+          return (
+            <div key={hi} className="diff-hunk">
+              {showHeaders && <HunkHeader hunk={hunk} hunkIndex={hi} onExpand={onExpand} />}
+              {rows.map((row, ri) => {
+                const l = row[side];
+                if (!l) return <EmptyLine key={ri} />;
 
-              const lineNumber = side === "old" ? l.oldLineNumber : l.newLineNumber;
-              const selected = Boolean(
-                comments.selection && comments.selection.side === side && lineNumber != null &&
-                lineNumber >= comments.selection.start && lineNumber <= comments.selection.end,
-              );
-              const threadsHere = comments.threads.filter(
-                t => t.side === side && lineNumber != null && t.lineEnd === lineNumber,
-              );
-              const showComposer = Boolean(
-                comments.composerArmed && comments.selection && comments.selection.side === side &&
-                lineNumber === comments.selection.end && threadsHere.length === 0,
-              );
-              return (
-                <div key={ri}>
-                  <Line
-                    line={l} lang={lang} repoName={repoName} side={side} selected={selected}
-                    onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
-                    onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
-                  />
-                  {threadsHere.map(thread => (
-                    <CommentThread
-                      key={thread.id} thread={thread}
-                      onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
+                const lineNumber = side === "old" ? l.oldLineNumber : l.newLineNumber;
+                const selected = Boolean(
+                  comments.selection && comments.selection.side === side && lineNumber != null &&
+                  lineNumber >= comments.selection.start && lineNumber <= comments.selection.end,
+                );
+                const threadsHere = comments.threads.filter(
+                  t => t.side === side && lineNumber != null && t.lineEnd === lineNumber,
+                );
+                const showComposer = Boolean(
+                  comments.composerArmed && comments.selection && comments.selection.side === side &&
+                  lineNumber === comments.selection.end && threadsHere.length === 0,
+                );
+                return (
+                  <div key={ri}>
+                    <Line
+                      line={l} lang={lang} repoName={repoName} side={side} selected={selected}
+                      onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
+                      onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
                     />
-                  ))}
-                  {showComposer && comments.selection && (
-                    <Composer
-                      onSubmit={(body, pending) => comments.onCreateThread(
-                        side, comments.selection!.start, comments.selection!.end, body, pending,
-                      )}
-                      onCancel={comments.onCancelSelection}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                    {threadsHere.map(thread => (
+                      <CommentThread
+                        key={thread.id} thread={thread}
+                        onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
+                      />
+                    ))}
+                    {showComposer && comments.selection && (
+                      <Composer
+                        onSubmit={(body, pending) => comments.onCreateThread(
+                          side, comments.selection!.start, comments.selection!.end, body, pending,
+                        )}
+                        onCancel={comments.onCancelSelection}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

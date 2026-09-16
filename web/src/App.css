@@ -211,17 +211,27 @@ main {
   overflow-x: auto;
   user-select: text;
   border-left: 1px solid var(--border);
-  /*
-   * Each row (.diff-line) is a plain block element, sized to 100% of this
-   * pane's own layout width. Without this, a row's background only extends
-   * to the *visible* pane width, not the scrollable content width — so once
-   * a longer sibling line triggers horizontal scroll, shorter lines' add/del
-   * tinting stops short of the right edge instead of extending with them.
-   * display:table (shrink-to-fit, like inline-block) lets .diff-pane grow to
-   * its widest line, and min-width:100% floors it at the visible cell width;
-   * block children (.diff-hunk, .diff-line) then stretch to match that
-   * table-computed width via normal width:auto block layout.
-   */
+}
+
+/*
+ * Each row (.diff-line) is a plain block element, sized to 100% of its
+ * parent's layout width. Without this wrapper, a row's background only
+ * extends to the *visible* pane width, not the scrollable content width —
+ * so once a longer sibling line triggers horizontal scroll, shorter lines'
+ * add/del tinting stops short of the right edge instead of extending with
+ * them. display:table (shrink-to-fit, like inline-block) lets this wrapper
+ * grow to its widest line, and min-width:100% floors it at the visible
+ * pane width; block children (.diff-hunk, .diff-line) then stretch to
+ * match that table-computed width via normal width:auto block layout.
+ *
+ * This has to be a child of .diff-pane, not .diff-pane itself — .diff-pane
+ * is a CSS grid item (see .diff-view-body), and display:table there fights
+ * the grid's own column-sizing algorithm: an empty pane (the "old" side of
+ * an added file, with zero lines) reports a near-zero intrinsic size, which
+ * collapses its 1fr column and, since .diff-pane no longer has a plain
+ * block box to stretch, breaks its own horizontal scrolling too.
+ */
+.diff-pane-content {
   display: table;
   min-width: 100%;
 }
