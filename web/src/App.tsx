@@ -1,11 +1,12 @@
 import { useEffect, useReducer, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { DiffView } from "./components/DiffView";
+import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment,
+  fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
 } from "./api/client";
 import { selectionReducer } from "./lib/selection";
-import type { DiffFile, RepoDiff, CommentThread } from "./types";
+import type { DiffFile, RepoDiff, CommentThread, VerdictType } from "./types";
 
 interface Selection {
   file: DiffFile;
@@ -71,6 +72,11 @@ export function App() {
     setThreads(await fetchThreads());
   }
 
+  async function handleSubmitVerdict(type: VerdictType, summary?: string) {
+    await submitVerdict(type, summary);
+    setThreads(await fetchThreads());
+  }
+
   return (
     <div className="app">
       <Sidebar repos={repos} onSelectFile={selectFile} />
@@ -96,6 +102,7 @@ export function App() {
           "Select a file to review"
         )}
       </main>
+      <ReviewBar onSubmit={handleSubmitVerdict} />
     </div>
   );
 }
