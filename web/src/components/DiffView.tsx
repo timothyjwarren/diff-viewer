@@ -167,6 +167,7 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
   const [viewingFullFile, setViewingFullFile] = useState(false);
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const lang = detectLanguage(file.newPath || file.oldPath);
 
   useEffect(() => setHunks(file.hunks), [file]);
@@ -200,22 +201,31 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
   return (
     <div className="diff-view">
       <div className="diff-view-header">
-        <span>{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
+        <button
+          className="diff-view-collapse-toggle"
+          aria-label={collapsed ? "Expand file" : "Collapse file"}
+          onClick={() => setCollapsed(c => !c)}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
+        <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
         <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
       </div>
-      <div className="diff-view-body">
-        {viewingFullFile && fullFileLines ? (
-          <Pane
-            hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} comments={comments}
-            onExpand={expand} showHeaders={false}
-          />
-        ) : (
-          <>
-            <Pane hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
-            <Pane hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
-          </>
-        )}
-      </div>
+      {!collapsed && (
+        <div className="diff-view-body">
+          {viewingFullFile && fullFileLines ? (
+            <Pane
+              hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} comments={comments}
+              onExpand={expand} showHeaders={false}
+            />
+          ) : (
+            <>
+              <Pane hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
+              <Pane hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -116,16 +116,46 @@ main {
 
 .diff-view-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
-.diff-view-header button {
+.diff-view-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-view-collapse-toggle {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.diff-view-collapse-toggle:hover {
+  background: rgba(177, 186, 196, 0.12);
+  color: var(--text);
+}
+
+.diff-view-header button:not(.diff-view-collapse-toggle) {
+  flex: 0 0 auto;
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 6px;
@@ -135,7 +165,7 @@ main {
   cursor: pointer;
 }
 
-.diff-view-header button:hover {
+.diff-view-header button:not(.diff-view-collapse-toggle):hover {
   background: rgba(177, 186, 196, 0.12);
 }
 
