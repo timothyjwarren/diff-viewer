@@ -200,16 +200,18 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
 
   return (
     <div className="diff-view">
-      <div className="diff-view-header">
-        <button
-          className="diff-view-collapse-toggle"
-          aria-label={collapsed ? "Expand file" : "Collapse file"}
-          onClick={() => setCollapsed(c => !c)}
-        >
-          {collapsed ? "▸" : "▾"}
-        </button>
-        <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
-        <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
+      <div className="diff-view-header-sticky">
+        <div className="diff-view-header">
+          <button
+            className="diff-view-collapse-toggle"
+            aria-label={collapsed ? "Expand file" : "Collapse file"}
+            onClick={() => setCollapsed(c => !c)}
+          >
+            {collapsed ? "▸" : "▾"}
+          </button>
+          <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
+          <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
+        </div>
       </div>
       {!collapsed && (
         <div className="diff-view-body">

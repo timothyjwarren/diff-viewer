@@ -130,6 +130,23 @@ main {
  * clipping is done on the header/body individually instead.
  */
 
+/*
+ * The sticky element is this wrapper, not .diff-view-header itself, and it
+ * sticks flush at top:0 with its own opaque background — so the small gap
+ * that reveals .diff-view-header's rounded corner is *part of the sticky
+ * box's own painted area*, not empty space in normal flow. An empty gap
+ * there (e.g. `.diff-view-header { top: 6px }` alone) doesn't stick to
+ * anything and lets the file's own already-scrolled-past content, which
+ * .diff-view can't clip (see the overflow note below), show through it.
+ */
+.diff-view-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding-top: 6px;
+}
+
 .diff-view-header {
   display: flex;
   align-items: center;
@@ -140,13 +157,6 @@ main {
   font-size: 13px;
   font-weight: 600;
   border-radius: 6px 6px 0 0;
-  position: sticky;
-  /* A rounded corner flush against the scrollport's exact top edge reads as
-   * flat — there's no room above it for the curve to show against anything.
-   * Stopping a few px shy of 0 (matching the radius) keeps the corner
-   * visible once stuck instead of it looking clipped off. */
-  top: 6px;
-  z-index: 2;
 }
 
 .diff-view-title {
