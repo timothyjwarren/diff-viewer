@@ -8,6 +8,7 @@ const LABELS: Record<VerdictType, string> = {
 };
 
 export function ReviewBar({ onSubmit }: { onSubmit: (type: VerdictType, summary?: string) => void }) {
+  const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
   const [submitted, setSubmitted] = useState<VerdictType | null>(null);
 
@@ -21,20 +22,30 @@ export function ReviewBar({ onSubmit }: { onSubmit: (type: VerdictType, summary?
     onSubmit(type, summary || undefined);
     setSummary("");
     setSubmitted(type);
+    setOpen(false);
   }
 
   return (
     <div className="review-bar">
-      <textarea
-        placeholder="Leave a summary (optional)"
-        value={summary}
-        onChange={e => setSummary(e.target.value)}
-      />
-      <div className="review-bar-actions">
-        <button onClick={() => submit("comment")}>Comment</button>
-        <button onClick={() => submit("approve")}>Approve</button>
-        <button onClick={() => submit("request_changes")}>Request changes</button>
-        {submitted && <span className="review-submitted-badge">✓ {LABELS[submitted]} submitted</span>}
+      {open && (
+        <div className="review-bar-popover">
+          <textarea
+            placeholder="Leave a summary (optional)"
+            value={summary}
+            onChange={e => setSummary(e.target.value)}
+          />
+          <div className="review-bar-actions">
+            <button onClick={() => submit("comment")}>Comment</button>
+            <button onClick={() => submit("approve")} className="review-bar-primary">Approve</button>
+            <button onClick={() => submit("request_changes")}>Request changes</button>
+          </div>
+        </div>
+      )}
+      <div className="review-bar-footer">
+        {submitted && <span className="review-submitted-badge">&#10003; {LABELS[submitted]} submitted</span>}
+        <button className="review-bar-toggle" onClick={() => setOpen(v => !v)}>
+          {open ? "Cancel" : "Finish your review"}
+        </button>
       </div>
     </div>
   );

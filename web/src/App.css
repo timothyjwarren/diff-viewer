@@ -53,20 +53,46 @@ body {
 }
 
 .sidebar li button {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   text-align: left;
   background: none;
   border: none;
   color: var(--text);
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
 .sidebar li button:hover {
   background: rgba(177, 186, 196, 0.12);
+}
+
+.sidebar-file-status {
+  flex: 0 0 14px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.sidebar-file-status-added { color: #3fb950; }
+.sidebar-file-status-modified { color: #d29922; }
+.sidebar-file-status-deleted { color: #f85149; }
+.sidebar-file-status-renamed { color: var(--accent); }
+
+.sidebar-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-file-dir {
+  color: var(--text-muted);
 }
 
 main {
@@ -128,8 +154,44 @@ main {
   border-left: none;
 }
 
-.diff-hunk + .diff-hunk {
-  border-top: 1px dashed var(--border);
+.diff-hunk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 22px;
+  padding: 0 8px 0 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-hunk:first-child .diff-hunk-header {
+  border-top: none;
+}
+
+.diff-hunk-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.diff-hunk-header-actions button {
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.diff-hunk-header-actions button:hover {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
 }
 
 .diff-line {
@@ -139,21 +201,34 @@ main {
   font-size: 12px;
   line-height: 20px;
   cursor: pointer;
+  tab-size: 4;
+}
+
+.diff-line-empty {
+  cursor: default;
+  background: rgba(110, 118, 129, 0.04);
 }
 
 .diff-line-number {
   flex: 0 0 40px;
   text-align: right;
-  padding-right: 8px;
+  padding: 0 8px 0 4px;
   color: var(--text-muted);
   user-select: none;
-  opacity: 0.6;
+  opacity: 0.75;
+  border-right: 1px solid var(--border);
+}
+
+.diff-line-marker {
+  flex: 0 0 16px;
+  text-align: center;
+  user-select: none;
+  opacity: 0.85;
 }
 
 .diff-line-code {
   flex: 1 1 auto;
-  padding-right: 8px;
-  overflow: hidden;
+  padding-right: 12px;
 }
 
 .diff-line:hover {
@@ -189,47 +264,59 @@ main {
   padding: 0;
 }
 
-.diff-expand-controls {
-  display: flex;
-  gap: 8px;
-  padding: 4px 12px;
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--border);
-}
-
-.diff-expand-controls button {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.diff-expand-controls button:hover {
-  color: var(--text);
-}
-
 .comment-thread,
 .comment-composer {
   border-top: 1px solid var(--border);
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: var(--bg-elevated);
   font-size: 13px;
 }
 
 .comment {
-  padding: 4px 0;
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.comment-avatar {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.comment-avatar-user { background: #388bfd; }
+.comment-avatar-agent { background: #8957e5; }
+
+.comment-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
 }
 
 .comment-author {
   font-weight: 600;
-  margin-right: 6px;
+  color: var(--text);
+}
+
+.comment-time {
+  color: var(--text-muted);
 }
 
 .comment-pending-badge {
-  margin-left: 6px;
   font-size: 0.75em;
   background: #9e6a03;
   color: #fff;
@@ -238,7 +325,7 @@ main {
 }
 
 .comment p {
-  margin: 4px 0;
+  margin: 4px 0 2px;
   white-space: pre-wrap;
 }
 
@@ -263,7 +350,7 @@ main {
 .comment-composer textarea,
 .review-bar textarea {
   width: 100%;
-  min-height: 50px;
+  min-height: 32px;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -273,13 +360,45 @@ main {
   font-size: 13px;
   resize: vertical;
   margin-bottom: 6px;
+  transition: min-height 0.1s ease;
+}
+
+.comment-thread textarea.comment-reply-expanded {
+  min-height: 60px;
 }
 
 .review-bar {
   grid-column: 1 / -1;
   border-top: 1px solid var(--border);
-  padding: 10px 16px;
   background: var(--bg-elevated);
+}
+
+.review-bar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.review-bar-toggle {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: #238636;
+  color: #fff;
+}
+
+.review-bar-toggle:hover {
+  background: #2ea043;
+}
+
+.review-bar-popover {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -303,6 +422,11 @@ main {
 
 .review-bar-actions button:hover {
   background: rgba(177, 186, 196, 0.12);
+}
+
+.review-bar-primary {
+  border-color: #2ea043 !important;
+  color: #3fb950;
 }
 
 .review-submitted-badge {

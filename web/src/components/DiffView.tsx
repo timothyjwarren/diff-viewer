@@ -3,6 +3,7 @@ import { codeToHtml } from "shiki";
 import type { CommentThread as CommentThreadData, DiffFile, DiffHunk, DiffLine } from "../types";
 import { detectLanguage } from "../lib/language";
 import { expandHunkContext } from "../lib/expandContext";
+import { pairHunkLines, type PairedRow } from "../lib/pairLines";
 import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
@@ -22,6 +23,8 @@ async function highlightLineInner(content: string, lang: string): Promise<string
   const match = LINE_SPAN_RE.exec(html);
   return match ? match[1] : escapeHtml(content);
 }
+
+const MARKERS: Record<DiffLine["type"], string> = { add: "+", del: "-", context: "" };
 
 function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
   line: DiffLine; lang: string; repoName: string; side: "old" | "new";
@@ -51,9 +54,14 @@ function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
       }}
     >
       <span className="diff-line-number">{lineNumber ?? ""}</span>
+      <span className="diff-line-marker">{MARKERS[line.type]}</span>
       <span className="diff-line-code" dangerouslySetInnerHTML={{ __html: html }} data-repo={repoName} />
     </div>
   );
+}
+
+function EmptyLine() {
+  return <div className="diff-line diff-line-empty" />;
 }
 
 export interface CommentHandlers {
@@ -80,16 +88,36 @@ function Composer({ onSubmit }: { onSubmit: (body: string, pending: boolean) => 
   );
 }
 
-function Pane({ hunks, side, lang, repoName, comments }: {
+function HunkHeader({ hunk, hunkIndex, onExpand }: {
+  hunk: DiffHunk; hunkIndex: number; onExpand: (hunkIndex: number, direction: "up" | "down") => void;
+}) {
+  return (
+    <div className="diff-hunk-header">
+      <span>@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
+      <span className="diff-hunk-header-actions">
+        <button aria-label="Expand above" onClick={() => onExpand(hunkIndex, "up")}>&#8963;</button>
+        <button aria-label="Expand below" onClick={() => onExpand(hunkIndex, "down")}>&#8964;</button>
+      </span>
+    </div>
+  );
+}
+
+function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = true }: {
   hunks: DiffHunk[]; side: "old" | "new"; lang: string; repoName: string; comments: CommentHandlers;
+  onExpand: (hunkIndex: number, direction: "up" | "down") => void;
+  showHeaders?: boolean;
 }) {
   return (
     <div className="diff-pane" data-side={side}>
-      {hunks.map((hunk, hi) => (
-        <div key={hi} className="diff-hunk">
-          {hunk.lines
-            .filter(l => side === "old" ? l.type !== "add" : l.type !== "del")
-            .map((l, li) => {
+      {hunks.map((hunk, hi) => {
+        const rows: PairedRow[] = pairHunkLines(hunk.lines);
+        return (
+          <div key={hi} className="diff-hunk">
+            {showHeaders && <HunkHeader hunk={hunk} hunkIndex={hi} onExpand={onExpand} />}
+            {rows.map((row, ri) => {
+              const l = row[side];
+              if (!l) return <EmptyLine key={ri} />;
+
               const lineNumber = side === "old" ? l.oldLineNumber : l.newLineNumber;
               const selected = Boolean(
                 comments.selection && comments.selection.side === side && lineNumber != null &&
@@ -103,7 +131,7 @@ function Pane({ hunks, side, lang, repoName, comments }: {
                 threadsHere.length === 0,
               );
               return (
-                <div key={li}>
+                <div key={ri}>
                   <Line
                     line={l} lang={lang} repoName={repoName} side={side} selected={selected}
                     onClick={(line) => comments.onLineClick(side, line)}
@@ -125,8 +153,9 @@ function Pane({ hunks, side, lang, repoName, comments }: {
                 </div>
               );
             })}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -159,6 +188,15 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
     setViewingFullFile(v => !v);
   }
 
+  const fullFileHunks: DiffHunk[] = fullFileLines
+    ? [{
+      oldStart: 1, oldLines: fullFileLines.length, newStart: 1, newLines: fullFileLines.length,
+      lines: fullFileLines.map((content, idx) => (
+        { type: "context" as const, oldLineNumber: idx + 1, newLineNumber: idx + 1, content }
+      )),
+    }]
+    : [];
+
   return (
     <div className="diff-view">
       <div className="diff-view-header">
@@ -168,23 +206,16 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
       <div className="diff-view-body">
         {viewingFullFile && fullFileLines ? (
           <Pane
-            hunks={[{ oldStart: 1, oldLines: fullFileLines.length, newStart: 1, newLines: fullFileLines.length,
-              lines: fullFileLines.map((content, idx) => ({ type: "context", oldLineNumber: idx + 1, newLineNumber: idx + 1, content })) }]}
-            side="new" lang={lang} repoName={repoName} comments={comments}
+            hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} comments={comments}
+            onExpand={expand} showHeaders={false}
           />
         ) : (
           <>
-            <Pane hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments} />
-            <Pane hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments} />
+            <Pane hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
+            <Pane hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
           </>
         )}
       </div>
-      {!viewingFullFile && hunks.map((_, hi) => (
-        <div key={hi} className="diff-expand-controls">
-          <button onClick={() => expand(hi, "up")}>Expand above</button>
-          <button onClick={() => expand(hi, "down")}>Expand below</button>
-        </div>
-      ))}
     </div>
   );
 }
