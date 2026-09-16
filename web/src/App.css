@@ -141,7 +141,11 @@ main {
   font-weight: 600;
   border-radius: 6px 6px 0 0;
   position: sticky;
-  top: 0;
+  /* A rounded corner flush against the scrollport's exact top edge reads as
+   * flat — there's no room above it for the curve to show against anything.
+   * Stopping a few px shy of 0 (matching the radius) keeps the corner
+   * visible once stuck instead of it looking clipped off. */
+  top: 6px;
   z-index: 2;
 }
 
