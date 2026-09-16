@@ -97,10 +97,19 @@ body {
 
 main {
   overflow-y: auto;
-  padding: 16px;
+  /* No top padding: sticky headers use `top: 0` relative to main's
+   * scrollport, so any top padding here would leave a gap above the
+   * stuck header that isn't covered by anything — letting the file's
+   * own already-scrolled-past content peek through it. Top spacing is
+   * applied to the first file card instead (see .file-anchor). */
+  padding: 0 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.file-anchor:first-child {
+  margin-top: 16px;
 }
 
 .empty-state {
