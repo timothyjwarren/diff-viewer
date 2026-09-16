@@ -46,8 +46,12 @@ as a local plugin instead (see the [Claude Code plugin
 docs](https://code.claude.com/docs/en/plugins) for adding a local plugin
 path).
 
-Either way, once installed you get one new slash command:
-`/diff-viewer:review`.
+Either way, once installed you get one new slash command,
+`/diff-viewer:review`, plus a `diff-viewer` CLI command -- nothing to put
+on `PATH` yourself. The plugin's `bin/diff-viewer` is added to the
+agent's `PATH` automatically while it's enabled; the first time it runs
+it installs dependencies and builds (a few seconds, once), and every run
+after that is instant.
 
 ## Usage
 
@@ -92,6 +96,15 @@ The plugin has three parts: a Node/TypeScript + Express server (one
 process per review session, bound to `127.0.0.1`), a bundled `diff-viewer`
 CLI that's the agent's only interface to it (via Bash), and a React/Vite
 frontend served as static assets by that same server.
+
+`bin/diff-viewer` is a thin wrapper that execs into `dist/bin/diff-viewer.js`
+-- Claude Code adds a plugin's `bin/` directory to the agent's `PATH`
+automatically while it's enabled, so the CLI is invokable as a bare
+command (`diff-viewer ...`) with no global npm link step. `dist/` isn't
+committed (compiled/vendored output in source control goes stale and
+bloats the repo); the wrapper builds it on first run instead, installing
+dependencies and running `npm run build` if `dist/` is missing, then
+runs normally on every call after that.
 
 There's no websocket layer -- the browser polls for new comments, and the
 agent's live notifications come from `diff-viewer wait`, a long-polling
