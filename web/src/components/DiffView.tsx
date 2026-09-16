@@ -7,18 +7,34 @@ import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
 
+const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function highlightLineInner(content: string, lang: string): Promise<string> {
+  // shiki's codeToHtml always wraps a single line in its own <pre><code>...</code></pre>.
+  // Keeping that wrapper makes every diff line render as its own boxed/margined block
+  // (browser default `pre { margin }` plus shiki's own per-<pre> background-color), so
+  // we discard the <pre>/<code> shell and keep only the highlighted <span> content.
+  const html = await codeToHtml(content || " ", { lang, theme: "github-dark" });
+  const match = LINE_SPAN_RE.exec(html);
+  return match ? match[1] : escapeHtml(content);
+}
+
 function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
   line: DiffLine; lang: string; repoName: string; side: "old" | "new";
   selected: boolean;
   onClick: (line: number, shift: boolean) => void;
   onShiftClick: (line: number) => void;
 }) {
-  const [html, setHtml] = useState<string>(line.content);
+  const [html, setHtml] = useState<string>(() => escapeHtml(line.content));
   useEffect(() => {
     let cancelled = false;
-    codeToHtml(line.content || " ", { lang, theme: "github-dark" }).then(result => {
+    highlightLineInner(line.content, lang).then(result => {
       if (!cancelled) setHtml(result);
-    }).catch(() => setHtml(line.content));
+    }).catch(() => setHtml(escapeHtml(line.content)));
     return () => { cancelled = true; };
   }, [line.content, lang]);
 
@@ -34,7 +50,8 @@ function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
         else onClick(lineNumber, false);
       }}
     >
-      <span dangerouslySetInnerHTML={{ __html: html }} data-repo={repoName} />
+      <span className="diff-line-number">{lineNumber ?? ""}</span>
+      <span className="diff-line-code" dangerouslySetInnerHTML={{ __html: html }} data-repo={repoName} />
     </div>
   );
 }
