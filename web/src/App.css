@@ -25,6 +25,23 @@ main {
 .diff-view-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
 .diff-pane { overflow-x: auto; user-select: text; }
 
-.diff-line { white-space: pre; font-family: monospace; }
+.diff-line { white-space: pre; font-family: monospace; cursor: pointer; }
 .diff-line-add { background: rgba(46, 160, 67, 0.15); }
 .diff-line-del { background: rgba(248, 81, 73, 0.15); }
+.diff-line-selected { outline: 1px solid #58a6ff; }
+
+.comment-thread, .comment-composer {
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 6px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+.comment-pending-badge {
+  margin-left: 6px;
+  font-size: 0.75em;
+  background: #9e6a03;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.comment-author { font-weight: bold; }

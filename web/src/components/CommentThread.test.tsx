@@ -1,0 +1,36 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { CommentThread } from "./CommentThread";
+import type { CommentThread as CommentThreadData } from "../types";
+
+const thread: CommentThreadData = {
+  id: "t1", repoPath: "/r", file: "a.ts", lineStart: 1, lineEnd: 1, side: "new", resolved: false,
+  comments: [
+    { id: "c1", author: "user", body: "why is this here?", pending: false, createdAt: "2026-01-01T00:00:00Z" },
+    { id: "c2", author: "agent", body: "it handles the edge case", pending: false, createdAt: "2026-01-01T00:01:00Z" },
+  ],
+};
+
+describe("CommentThread", () => {
+  it("renders comments and labels the agent's reply distinctly", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByText("why is this here?")).toBeInTheDocument();
+    expect(screen.getByText("it handles the edge case")).toBeInTheDocument();
+    expect(screen.getByText("Agent")).toBeInTheDocument();
+  });
+
+  it("submits a reply with the chosen pending flag", () => {
+    const onReply = vi.fn();
+    render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("Reply..."), { target: { value: "thanks!" } });
+    fireEvent.click(screen.getByText("Add single comment"));
+    expect(onReply).toHaveBeenCalledWith("t1", "thanks!", false);
+  });
+
+  it("calls onDelete for a user's own comment", () => {
+    const onDelete = vi.fn();
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} />);
+    fireEvent.click(screen.getAllByText("Delete")[0]);
+    expect(onDelete).toHaveBeenCalledWith("t1", "c1");
+  });
+});
