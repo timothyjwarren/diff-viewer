@@ -47,10 +47,20 @@ function Line({ line, lang, repoName, side, selected, onClick, onShiftClick }: {
     <div
       className={`diff-line diff-line-${line.type}${selected ? " diff-line-selected" : ""}`}
       data-line-number={lineNumber}
-      onClick={e => {
+      onMouseDown={e => {
+        // mousedown (not click): `.diff-pane` has user-select:text for copy/paste,
+        // and shift+click on selectable text competes with the browser's native
+        // "extend text selection" gesture — some browsers suppress the click event
+        // entirely when the mouseup follows a selection change, making shift-click
+        // range selection flaky. mousedown always fires, and preventDefault on the
+        // shift case stops the native selection from hijacking the gesture.
         if (lineNumber == null) return;
-        if (e.shiftKey) onShiftClick(lineNumber);
-        else onClick(lineNumber, false);
+        if (e.shiftKey) {
+          e.preventDefault();
+          onShiftClick(lineNumber);
+        } else {
+          onClick(lineNumber, false);
+        }
       }}
     >
       <span className="diff-line-number">{lineNumber ?? ""}</span>
@@ -70,19 +80,28 @@ export interface CommentHandlers {
   onLineClick: (side: "old" | "new", line: number) => void;
   onLineShiftClick: (side: "old" | "new", line: number) => void;
   onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void;
+  onCancelSelection: () => void;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
 }
 
-function Composer({ onSubmit }: { onSubmit: (body: string, pending: boolean) => void }) {
+function Composer({ onSubmit, onCancel }: {
+  onSubmit: (body: string, pending: boolean) => void;
+  onCancel: () => void;
+}) {
   const [draft, setDraft] = useState("");
   return (
     <div className="comment-composer">
-      <textarea placeholder="Leave a comment..." value={draft} onChange={e => setDraft(e.target.value)} />
+      <textarea
+        placeholder="Leave a comment..." value={draft} autoFocus
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Escape") onCancel(); }}
+      />
       <div className="comment-reply-actions">
         <button onClick={() => { onSubmit(draft, false); setDraft(""); }}>Add single comment</button>
         <button onClick={() => { onSubmit(draft, true); setDraft(""); }}>Add to review</button>
+        <button className="comment-cancel-button" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -148,6 +167,7 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
                       onSubmit={(body, pending) => comments.onCreateThread(
                         side, comments.selection!.start, comments.selection!.end, body, pending,
                       )}
+                      onCancel={comments.onCancelSelection}
                     />
                   )}
                 </div>

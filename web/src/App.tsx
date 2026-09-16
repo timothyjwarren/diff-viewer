@@ -45,6 +45,7 @@ export function App() {
       selection: lineSelection && lineSelection.file === name ? lineSelection : null,
       onLineClick: (side, line) => dispatchLineSelection({ type: "click", file: name, side, line }),
       onLineShiftClick: (side, line) => dispatchLineSelection({ type: "shiftClick", file: name, side, line }),
+      onCancelSelection: () => dispatchLineSelection({ type: "clear" }),
       onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
         if (!body.trim()) return;
         await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });

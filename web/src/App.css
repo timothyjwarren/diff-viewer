@@ -415,6 +415,16 @@ main {
   background: rgba(177, 186, 196, 0.12);
 }
 
+.comment-cancel-button {
+  border-color: transparent !important;
+  color: var(--text-muted) !important;
+  background: transparent !important;
+}
+
+.comment-cancel-button:hover {
+  color: var(--text) !important;
+}
+
 .comment-thread textarea,
 .comment-composer textarea,
 .review-bar textarea {
