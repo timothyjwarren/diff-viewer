@@ -21,6 +21,7 @@ export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
+  const [composerArmed, setComposerArmed] = useState(false);
 
   useEffect(() => {
     fetchDiffs().then(setRepos);
@@ -43,12 +44,24 @@ export function App() {
     return {
       threads: threads.filter(t => t.repoPath === file.repoPath && t.file === name),
       selection: lineSelection && lineSelection.file === name ? lineSelection : null,
-      onLineClick: (side, line) => dispatchLineSelection({ type: "click", file: name, side, line }),
-      onLineShiftClick: (side, line) => dispatchLineSelection({ type: "shiftClick", file: name, side, line }),
-      onCancelSelection: () => dispatchLineSelection({ type: "clear" }),
+      composerArmed,
+      onLineClick: (side, line) => {
+        setComposerArmed(false);
+        dispatchLineSelection({ type: "click", file: name, side, line });
+      },
+      onLineShiftClick: (side, line) => {
+        setComposerArmed(false);
+        dispatchLineSelection({ type: "shiftClick", file: name, side, line });
+      },
+      onArmComposer: () => setComposerArmed(true),
+      onCancelSelection: () => {
+        setComposerArmed(false);
+        dispatchLineSelection({ type: "clear" });
+      },
       onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
         if (!body.trim()) return;
         await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });
+        setComposerArmed(false);
         dispatchLineSelection({ type: "clear" });
         setThreads(await fetchThreads());
       },

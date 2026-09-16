@@ -77,13 +77,28 @@ function EmptyLine() {
 export interface CommentHandlers {
   threads: CommentThreadData[];
   selection: SelectionState;
+  composerArmed: boolean;
   onLineClick: (side: "old" | "new", line: number) => void;
   onLineShiftClick: (side: "old" | "new", line: number) => void;
+  onArmComposer: () => void;
   onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void;
   onCancelSelection: () => void;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
+}
+
+// A bare click/shift-click only highlights a range — it must NOT pop the
+// composer open immediately, or the textarea's autoFocus + the layout shift
+// from inserting it would interfere with the next shift-click needed to
+// extend a multi-line selection. This small trigger is shown instead until
+// the user explicitly asks to comment on the selected range.
+function AddCommentTrigger({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="comment-add-trigger">
+      <button onClick={onClick}>Add comment</button>
+    </div>
+  );
 }
 
 function Composer({ onSubmit, onCancel }: {
@@ -145,7 +160,7 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
               const threadsHere = comments.threads.filter(
                 t => t.side === side && lineNumber != null && t.lineEnd === lineNumber,
               );
-              const showComposer = Boolean(
+              const isSelectionEnd = Boolean(
                 comments.selection && comments.selection.side === side && lineNumber === comments.selection.end &&
                 threadsHere.length === 0,
               );
@@ -162,7 +177,10 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
                       onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
                     />
                   ))}
-                  {showComposer && comments.selection && (
+                  {isSelectionEnd && !comments.composerArmed && (
+                    <AddCommentTrigger onClick={comments.onArmComposer} />
+                  )}
+                  {isSelectionEnd && comments.composerArmed && comments.selection && (
                     <Composer
                       onSubmit={(body, pending) => comments.onCreateThread(
                         side, comments.selection!.start, comments.selection!.end, body, pending,

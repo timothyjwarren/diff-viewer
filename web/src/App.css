@@ -334,11 +334,26 @@ main {
 }
 
 .comment-thread,
-.comment-composer {
+.comment-composer,
+.comment-add-trigger {
   border-top: 1px solid var(--border);
   padding: 8px 12px;
   background: var(--bg-elevated);
   font-size: 13px;
+}
+
+.comment-add-trigger button {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.comment-add-trigger button:hover {
+  background: rgba(88, 166, 255, 0.15);
 }
 
 .comment {
