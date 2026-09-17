@@ -17,9 +17,10 @@ export interface CommitInfo {
 export interface CommitRange { from: string; to: string; }
 
 export type CommentAuthor = "user" | "agent";
+export type CommentAgentStatus = "seen" | "acked" | "cleared";
 export interface Comment {
   id: string; author: CommentAuthor; body: string; suggestion?: string;
-  pending: boolean; verdictId?: string; createdAt: string;
+  pending: boolean; verdictId?: string; agentStatus?: CommentAgentStatus; createdAt: string;
 }
 export interface CommentThread {
   id: string; repoPath: string; file: string; lineStart: number; lineEnd: number;

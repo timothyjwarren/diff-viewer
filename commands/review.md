@@ -74,19 +74,54 @@ Steps:
    act on everything currently pending before returning to the conversation:
    - `type: "comment"` — an individual, immediately-posted comment (the
      "Add single comment" button, not "Add to review" — pending comments
-     stay invisible to you until bundled into a verdict below). Read it with
-     `diff-viewer review <sessionId>`. It may be a question *or* a requested
-     change — either way, **do not edit code from this alone**, even if it
-     reads like an unambiguous instruction. Reply in the viewer with
-     `diff-viewer reply <sessionId> <threadId> "<text>"` and/or in chat:
-     answer it if it's a question; if it's a change request, acknowledge
-     that you've noted it and will apply it once they finish reviewing —
-     e.g. "Noted — I'll make this change once you finish your review" — but
-     take no other action yet. This mirrors how a human reviewer's individual
-     PR comments don't each trigger a push; the requested changes land once
-     as a batch. Only two things authorize actually making the change: a
+     stay invisible to you until bundled into a verdict below, and are never
+     ack'd since they aren't processed individually at all).
+
+     Every comment carries a one-way, browser-visible status: untouched
+     (no badge) → **seen** (a muted dot, automatic — `diff-viewer review`
+     marks everything it returns as seen the moment you read it, no
+     separate call needed) → **acked** (a pulsing "agent is working on
+     this" dot, manual — only `ack` sets it) → **cleared** (no badge again,
+     manual — only `unack` sets it, once you're done and about to reply).
+     `unack` moves straight to "cleared", *not* back to "seen" — it's a
+     distinct terminal state (badge-less, like untouched, but meaning
+     "fully handled" rather than "not yet looked at"), and re-fetching via
+     `review` later never resurrects a cleared comment's badge.
+
+     **Ack every single comment before doing anything else in response to
+     it — no exceptions.** This applies even when the comment feels like a
+     quick continuation of an already-open conversation (e.g. the user
+     replying to your own reply) — it is easy to skip ack on those because
+     they don't feel like a fresh request, but the user can't tell the
+     difference between "the agent is about to respond" and "the agent
+     hasn't looked at this yet" unless you ack it every time. If you catch
+     yourself about to call `reply` for a single comment without having
+     just called `ack` for that exact comment, stop and ack first. Work
+     through each one in this order:
+     1. **Ack it immediately**: `diff-viewer ack <sessionId> <threadId>
+        <commentId>` (the notification itself carries `threadId` and
+        `commentId`) — before you've done anything else.
+     2. **Process it**, without editing code: read it with `diff-viewer
+        review <sessionId>`. It may be a question *or* a requested change —
+        either way, **do not edit code from this alone**, even if it reads
+        like an unambiguous instruction. If it's a question, work out the
+        answer. If it's a change request, just note it (mentally / in your
+        own task tracking) so it's ready to apply later — this mirrors how
+        a human reviewer's individual PR comments don't each trigger a push;
+        the requested changes land once, as a batch, when the review
+        finishes.
+     3. **Unack it**: `diff-viewer unack <sessionId> <threadId>
+        <commentId>`, now that processing is done — *before* replying, not
+        after, so the "working" indicator disappears cleanly instead of
+        overlapping with the reply that's about to appear.
+     4. **Reply**: `diff-viewer reply <sessionId> <threadId> "<text>"`
+        and/or in chat — answer the question, or for a change request,
+        acknowledge it plainly, e.g. "Noted — I'll make this change once you
+        finish your review." Take no other action yet regardless of how the
+        comment reads.
+     Only two things authorize actually making a noted change: a
      `changes_requested` verdict (below), or the user explicitly saying in
-     chat that they're done / to go ahead now — either overrides this
+     chat that they're done / to go ahead now — either overrides the
      deferral, including for comments noted earlier in the same session.
    - `type: "verdict"` — the user submitted a review. Run
      `diff-viewer review <sessionId>` to see all verdicts (each with a

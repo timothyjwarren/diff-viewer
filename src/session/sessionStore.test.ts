@@ -74,6 +74,63 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads[0].comments).toHaveLength(1);
   });
 
+  it("ackComment sets agentStatus to acked; unackComment clears it to a terminal cleared state", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "please rename this", pending: false,
+    });
+    const commentId = thread.comments[0].id;
+
+    store.ackComment(thread.id, commentId);
+    expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("acked");
+
+    store.unackComment(thread.id, commentId);
+    expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("cleared");
+  });
+
+  it("markAllSeen marks every untouched comment as seen, without resurrecting acked or cleared ones", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const t1 = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "one", pending: false,
+    });
+    store.addThread({
+      repoPath: "/repo", file: "b.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "two", pending: false,
+    });
+    expect(store.snapshot.threads.flatMap(t => t.comments).every(c => !c.agentStatus)).toBe(true);
+
+    store.markAllSeen();
+    expect(store.snapshot.threads.flatMap(t => t.comments).every(c => c.agentStatus === "seen")).toBe(true);
+
+    // A new reply is untouched (no agentStatus) until the next markAllSeen.
+    store.addReply(t1.id, "user", "still here?");
+    expect(store.snapshot.threads.find(t => t.id === t1.id)!.comments.at(-1)!.agentStatus).toBeUndefined();
+
+    // ack + unack the first comment, then re-run markAllSeen: neither should be
+    // touched, since both already have an agentStatus.
+    const firstCommentId = t1.comments[0].id;
+    store.ackComment(t1.id, firstCommentId);
+    store.unackComment(t1.id, firstCommentId);
+    store.markAllSeen();
+    expect(store.snapshot.threads.find(t => t.id === t1.id)!.comments[0].agentStatus).toBe("cleared");
+  });
+
+  it("markAllSeen never marks the agent's own comments", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false,
+    });
+    store.addReply(thread.id, "agent", "because");
+
+    store.markAllSeen();
+    const [userComment, agentComment] = store.snapshot.threads[0].comments;
+    expect(userComment.agentStatus).toBe("seen");
+    expect(agentComment.agentStatus).toBeUndefined();
+  });
+
   it("persists and reloads session data", async () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     store.addThread({

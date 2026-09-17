@@ -33,4 +33,49 @@ describe("CommentThread", () => {
     fireEvent.click(screen.getAllByText("Delete")[0]);
     expect(onDelete).toHaveBeenCalledWith("t1", "c1");
   });
+
+  it("shows a working indicator only on an acked comment", () => {
+    const ackedThread: CommentThreadData = {
+      ...thread,
+      comments: [
+        { ...thread.comments[0], agentStatus: "acked" },
+        thread.comments[1],
+      ],
+    };
+    render(<CommentThread thread={ackedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getAllByText("Agent is working on this")).toHaveLength(1);
+    expect(screen.queryByText("Seen")).not.toBeInTheDocument();
+  });
+
+  it("shows a seen indicator on a seen-but-not-acked comment", () => {
+    const seenThread: CommentThreadData = {
+      ...thread,
+      comments: [
+        { ...thread.comments[0], agentStatus: "seen" },
+        thread.comments[1],
+      ],
+    };
+    render(<CommentThread thread={seenThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getAllByText("Seen")).toHaveLength(1);
+    expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
+  });
+
+  it("shows no indicator on an untouched comment", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.queryByText("Seen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
+  });
+
+  it("shows no indicator on a cleared comment (terminal state, not a revert to seen)", () => {
+    const clearedThread: CommentThreadData = {
+      ...thread,
+      comments: [
+        { ...thread.comments[0], agentStatus: "cleared" },
+        thread.comments[1],
+      ],
+    };
+    render(<CommentThread thread={clearedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.queryByText("Seen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
+  });
 });

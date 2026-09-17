@@ -89,6 +89,39 @@ export class SessionStore {
     return comment;
   }
 
+  private findComment(threadId: string, commentId: string): Comment {
+    const thread = this.data.threads.find(t => t.id === threadId);
+    if (!thread) throw new Error(`Thread not found: ${threadId}`);
+    const comment = thread.comments.find(c => c.id === commentId);
+    if (!comment) throw new Error(`Comment not found: ${commentId}`);
+    return comment;
+  }
+
+  ackComment(threadId: string, commentId: string): void {
+    this.findComment(threadId, commentId).agentStatus = "acked";
+  }
+
+  /** Terminal: the agent is done processing and about to reply, so no badge should show anymore. */
+  unackComment(threadId: string, commentId: string): void {
+    this.findComment(threadId, commentId).agentStatus = "cleared";
+  }
+
+  /**
+   * Marks every never-touched *user* comment as seen — called when the
+   * agent fetches the full review state. Only comments with no agentStatus
+   * yet are touched, so this can't resurrect an already-"cleared" comment
+   * back to "seen", nor downgrade an in-progress "acked" one. Agent-authored
+   * comments are never touched — this indicator is for comments the agent
+   * needs to read and react to, not its own outgoing replies.
+   */
+  markAllSeen(): void {
+    for (const thread of this.data.threads) {
+      for (const comment of thread.comments) {
+        if (comment.author === "user" && !comment.agentStatus) comment.agentStatus = "seen";
+      }
+    }
+  }
+
   editComment(threadId: string, commentId: string, body: string): void {
     const thread = this.data.threads.find(t => t.id === threadId);
     if (!thread) throw new Error(`Thread not found: ${threadId}`);

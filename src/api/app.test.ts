@@ -118,4 +118,50 @@ describe("api app", () => {
     expect(detailRes.body.intent).toBe("discussion");
     expect(detailRes.body.threads).toHaveLength(1);
   });
+
+  it("POST/DELETE .../ack moves a comment's agentStatus from acked to cleared", async () => {
+    const app = createApp(await buildStore());
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "please rename this", pending: false,
+    });
+    const commentId = threadRes.body.comments[0].id;
+
+    const ackRes = await request(app).post(`/api/threads/${threadRes.body.id}/comments/${commentId}/ack`);
+    expect(ackRes.status).toBe(204);
+    let threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[0].agentStatus).toBe("acked");
+
+    const unackRes = await request(app).delete(`/api/threads/${threadRes.body.id}/comments/${commentId}/ack`);
+    expect(unackRes.status).toBe(204);
+    threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[0].agentStatus).toBe("cleared");
+  });
+
+  it("ack on an unknown thread/comment returns 404", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads/nope/comments/nope/ack");
+    expect(res.status).toBe(404);
+  });
+
+  it("POST /api/mark-seen marks an untouched comment seen, without downgrading an acked one", async () => {
+    const app = createApp(await buildStore());
+    await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "one", pending: false,
+    });
+    let threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[0].agentStatus).toBeUndefined();
+
+    const res = await request(app).post("/api/mark-seen");
+    expect(res.status).toBe(204);
+    threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[0].agentStatus).toBe("seen");
+
+    const commentId = threads.body[0].comments[0].id;
+    await request(app).post(`/api/threads/${threads.body[0].id}/comments/${commentId}/ack`);
+    await request(app).post("/api/mark-seen");
+    threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[0].agentStatus).toBe("acked");
+  });
 });

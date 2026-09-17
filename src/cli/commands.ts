@@ -101,6 +101,11 @@ export async function reviewCommand(sessionId: string): Promise<unknown> {
   const [threads, verdicts] = await Promise.all([
     fetch(`${url}/api/threads`).then(r => r.json()),
     fetch(`${url}/api/verdicts`).then(r => r.json()),
+    // Fetching via `review` is what the agent uses to read comments, so it's
+    // what should flip their "seen" flag — the frontend's own polling of
+    // /api/threads must NOT trigger this, or every comment would appear
+    // seen instantly (before the agent ever looked at it).
+    fetch(`${url}/api/mark-seen`, { method: "POST" }),
   ]);
   const verdictsWithIntent = (verdicts as Array<{ type: "comment" | "approve" | "request_changes" }>).map(v => ({
     ...v, intent: verdictIntent(v.type),
@@ -116,6 +121,16 @@ export async function replyCommand(sessionId: string, threadId: string, text: st
     body: JSON.stringify({ author: "agent", body: text }),
   });
   return res.json();
+}
+
+export async function ackCommand(sessionId: string, threadId: string, commentId: string): Promise<void> {
+  const url = await baseUrl(sessionId);
+  await fetch(`${url}/api/threads/${threadId}/comments/${commentId}/ack`, { method: "POST" });
+}
+
+export async function unackCommand(sessionId: string, threadId: string, commentId: string): Promise<void> {
+  const url = await baseUrl(sessionId);
+  await fetch(`${url}/api/threads/${threadId}/comments/${commentId}/ack`, { method: "DELETE" });
 }
 
 export async function commentCommand(

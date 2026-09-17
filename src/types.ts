@@ -40,6 +40,16 @@ export interface CommitInfo {
 
 export type CommentAuthor = "user" | "agent";
 
+/**
+ * Agent-activity indicator for a single (non-pending, immediately-posted)
+ * comment. One-way progression, no reverting: unset -> "seen" (automatic,
+ * on `diff-viewer review`) -> "acked" (manual, `diff-viewer ack`) ->
+ * "cleared" (manual, `diff-viewer unack`, once the agent is done and about
+ * to reply). "cleared" is terminal — re-fetching via `review` must not
+ * resurrect it back to "seen".
+ */
+export type CommentAgentStatus = "seen" | "acked" | "cleared";
+
 export interface Comment {
   id: string;
   author: CommentAuthor;
@@ -49,6 +59,7 @@ export interface Comment {
   pending: boolean;
   /** set once this comment is bundled into a submitted verdict */
   verdictId?: string;
+  agentStatus?: CommentAgentStatus;
   createdAt: string;
 }
 

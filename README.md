@@ -123,6 +123,7 @@ Monitor.
 | `diff-viewer review <sessionId>` | Prints all comment threads and verdicts (with computed intent) as JSON. |
 | `diff-viewer reply <sessionId> <threadId> <text>` | Post an agent reply into a thread. |
 | `diff-viewer comment <sessionId> <repoPath> <file> <lineStart> <lineEnd> <old\|new> <text>` | Post a new agent-authored comment (e.g. from `/code-review`). |
+| `diff-viewer ack <sessionId> <threadId> <commentId>` / `unack ...` | Move a single, immediately-posted comment's status from the automatic "seen" indicator (set the moment `diff-viewer review` reads it) to a pulsing "agent is working on this" indicator, then to a cleared/no-badge state once `unack` runs -- a one-way seen -> acked -> cleared progression, never reverting. |
 | `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
 

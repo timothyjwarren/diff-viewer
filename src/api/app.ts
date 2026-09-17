@@ -58,6 +58,12 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
 
   app.get("/api/threads", (_req, res) => res.json(store.snapshot.threads));
 
+  app.post("/api/mark-seen", async (_req, res) => {
+    store.markAllSeen();
+    await store.persist();
+    res.status(204).end();
+  });
+
   app.post("/api/threads", async (req, res) => {
     const thread = store.addThread(req.body as NewThreadInput);
     await store.persist();
@@ -88,6 +94,26 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   app.delete("/api/threads/:threadId/comments/:commentId", async (req, res) => {
     try {
       store.deleteComment(req.params.threadId, req.params.commentId);
+      await store.persist();
+      res.status(204).end();
+    } catch {
+      res.status(404).end();
+    }
+  });
+
+  app.post("/api/threads/:threadId/comments/:commentId/ack", async (req, res) => {
+    try {
+      store.ackComment(req.params.threadId, req.params.commentId);
+      await store.persist();
+      res.status(204).end();
+    } catch {
+      res.status(404).end();
+    }
+  });
+
+  app.delete("/api/threads/:threadId/comments/:commentId/ack", async (req, res) => {
+    try {
+      store.unackComment(req.params.threadId, req.params.commentId);
       await store.persist();
       res.status(204).end();
     } catch {

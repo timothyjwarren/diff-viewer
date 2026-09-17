@@ -5,7 +5,7 @@ import { timeAgo } from "../lib/timeAgo";
 function Avatar({ author }: { author: CommentAuthor }) {
   return (
     <span className={`comment-avatar comment-avatar-${author}`}>
-      {author === "agent" ? "A" : "U"}
+      {author === "agent" ? "A" : "Y"}
     </span>
   );
 }
@@ -23,13 +23,24 @@ export function CommentThread({ thread, onReply, onEdit, onDelete }: {
   return (
     <div className="comment-thread">
       {thread.comments.map(comment => (
-        <div key={comment.id} className={`comment comment-${comment.author}`}>
+        <div key={comment.id} id={`comment-${comment.id}`} className={`comment comment-${comment.author}`}>
           <Avatar author={comment.author} />
           <div className="comment-body">
             <div className="comment-meta">
               <span className="comment-author">{comment.author === "agent" ? "Agent" : "You"}</span>
               <span className="comment-time">{timeAgo(comment.createdAt)}</span>
               {comment.pending && <span className="comment-pending-badge">Pending</span>}
+              {comment.agentStatus === "acked" ? (
+                <span className="comment-acked-badge" title="The agent has read this and is working on it">
+                  <span className="comment-acked-dot" />
+                  Agent is working on this
+                </span>
+              ) : comment.agentStatus === "seen" ? (
+                <span className="comment-seen-badge" title="The agent has seen this comment">
+                  <span className="comment-seen-dot" />
+                  Seen
+                </span>
+              ) : null}
             </div>
             <p>{comment.body}</p>
             {comment.author === "user" && (

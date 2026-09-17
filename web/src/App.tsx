@@ -7,6 +7,7 @@ import {
   fetchCommits, fetchRepoDiff,
 } from "./api/client";
 import { selectionReducer } from "./lib/selection";
+import { newAgentCommentIds } from "./lib/newComments";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
 function fileAnchorId(file: DiffFile): string {
@@ -29,9 +30,48 @@ export function App() {
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
   const [threads, setThreads] = useState<CommentThread[]>([]);
+  const [offscreenNewComments, setOffscreenNewComments] = useState<string[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
   const dragRef = useRef<DragState | null>(null);
+  const threadsRef = useRef<CommentThread[]>([]);
+  const hasLoadedThreadsRef = useRef(false);
+
+  function isCommentInViewport(commentId: string): boolean {
+    const el = document.getElementById(`comment-${commentId}`);
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < window.innerHeight;
+  }
+
+  async function refreshThreads(): Promise<CommentThread[]> {
+    const fresh = await fetchThreads();
+    if (hasLoadedThreadsRef.current) {
+      const arrived = newAgentCommentIds(threadsRef.current, fresh);
+      setOffscreenNewComments(prev => {
+        // Drop any entry the user has since scrolled to themselves, then add
+        // any newly-arrived agent replies that are currently off-screen.
+        const stillOffscreen = prev.filter(id => !isCommentInViewport(id));
+        const newlyOffscreen = arrived.filter(id => !isCommentInViewport(id));
+        return [...new Set([...stillOffscreen, ...newlyOffscreen])];
+      });
+    }
+    hasLoadedThreadsRef.current = true;
+    threadsRef.current = fresh;
+    setThreads(fresh);
+    return fresh;
+  }
+
+  function jumpToNewComment(commentId: string) {
+    document.getElementById(`comment-${commentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setOffscreenNewComments(prev => prev.filter(id => id !== commentId));
+  }
+
+  function directionToComment(commentId: string): "up" | "down" {
+    const el = document.getElementById(`comment-${commentId}`);
+    if (el && el.getBoundingClientRect().top < 0) return "up";
+    return "down";
+  }
 
   useEffect(() => {
     fetchDiffs().then(async loadedRepos => {
@@ -56,9 +96,9 @@ export function App() {
   }
 
   useEffect(() => {
-    fetchThreads().then(setThreads);
+    refreshThreads();
     const interval = setInterval(() => {
-      fetchThreads().then(setThreads);
+      refreshThreads();
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -108,29 +148,29 @@ export function App() {
         await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });
         setComposerArmed(false);
         dispatchLineSelection({ type: "clear" });
-        setThreads(await fetchThreads());
+        await refreshThreads();
       },
       onReply: async (threadId, body, pending) => {
         if (!body.trim()) return;
         await addReply(threadId, body, pending);
-        setThreads(await fetchThreads());
+        await refreshThreads();
       },
       onEdit: async (threadId, commentId, body) => {
         const next = window.prompt("Edit comment", body);
         if (next == null) return;
         await editComment(threadId, commentId, next);
-        setThreads(await fetchThreads());
+        await refreshThreads();
       },
       onDelete: async (threadId, commentId) => {
         await deleteComment(threadId, commentId);
-        setThreads(await fetchThreads());
+        await refreshThreads();
       },
     };
   }
 
   async function handleSubmitVerdict(type: VerdictType, summary?: string) {
     await submitVerdict(type, summary);
-    setThreads(await fetchThreads());
+    await refreshThreads();
   }
 
   return (
@@ -155,6 +195,16 @@ export function App() {
         )))}
       </main>
       <ReviewBar onSubmit={handleSubmitVerdict} />
+      {offscreenNewComments.length > 0 && (
+        <button
+          type="button"
+          className="new-comment-banner"
+          onClick={() => jumpToNewComment(offscreenNewComments[0])}
+        >
+          <span className={`new-comment-banner-arrow new-comment-banner-arrow-${directionToComment(offscreenNewComments[0])}`} />
+          {offscreenNewComments.length === 1 ? "New comment" : `${offscreenNewComments.length} new comments`}
+        </button>
+      )}
     </div>
   );
 }

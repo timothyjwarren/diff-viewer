@@ -7,7 +7,10 @@ import { spawn } from "node:child_process";
 import { createApp } from "../api/app.js";
 import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
-import { waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand } from "./commands.js";
+import {
+  waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
+  stopCommand, sessionsCommand,
+} from "./commands.js";
 
 describe("cli commands", () => {
   let home: string;
@@ -51,10 +54,35 @@ describe("cli commands", () => {
     expect(store.snapshot.threads[0].comments[1].body).toBe("because of X");
   });
 
+  it("ackCommand and unackCommand move a comment's agentStatus from acked to cleared", async () => {
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "please rename this", pending: false,
+    });
+    const commentId = thread.comments[0].id;
+
+    await ackCommand(sessionId, thread.id, commentId);
+    expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("acked");
+
+    await unackCommand(sessionId, thread.id, commentId);
+    expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("cleared");
+  });
+
   it("reviewCommand returns threads and verdicts with computed intent", async () => {
     store.addVerdict("request_changes", "please fix");
     const result = await reviewCommand(sessionId) as any;
     expect(result.verdicts[0].intent).toBe("changes_requested");
+  });
+
+  it("reviewCommand marks comments as seen as a side effect of the agent reading them", async () => {
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false,
+    });
+    expect(store.snapshot.threads[0].comments[0].agentStatus).toBeUndefined();
+
+    await reviewCommand(sessionId);
+    expect(store.snapshot.threads.find(t => t.id === thread.id)!.comments[0].agentStatus).toBe("seen");
   });
 
   it("waitCommand resolves once a verdict is submitted and advances the cursor", async () => {

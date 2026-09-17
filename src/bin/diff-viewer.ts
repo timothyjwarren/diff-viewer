@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { startCommand } from "../cli/start.js";
 import {
-  waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand,
+  waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
+  stopCommand, sessionsCommand,
 } from "../cli/commands.js";
 
 async function main(): Promise<void> {
@@ -32,6 +33,16 @@ async function main(): Promise<void> {
       console.log(JSON.stringify(await commentCommand(
         sessionId, repoPath, file, Number(lineStart), Number(lineEnd), side as "old" | "new", text,
       )));
+      break;
+    }
+    case "ack": {
+      await ackCommand(rest[0], rest[1], rest[2]);
+      console.log(JSON.stringify({ acked: rest[2] }));
+      break;
+    }
+    case "unack": {
+      await unackCommand(rest[0], rest[1], rest[2]);
+      console.log(JSON.stringify({ unacked: rest[2] }));
       break;
     }
     case "stop": {
