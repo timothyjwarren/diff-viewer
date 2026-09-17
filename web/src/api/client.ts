@@ -1,4 +1,4 @@
-import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, Verdict, VerdictType } from "../types";
+import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, Verdict, VerdictType } from "../types";
 
 async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
@@ -6,6 +6,10 @@ async function json<T>(res: Response): Promise<T> {
 
 export async function fetchDiffs(): Promise<RepoDiff[]> {
   return json(await fetch("/api/diffs"));
+}
+
+export async function fetchSession(): Promise<SessionInfo> {
+  return json(await fetch("/api/session"));
 }
 
 export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {

@@ -106,15 +106,20 @@ the first time it's called if `dist/` doesn't exist yet, then runs
 normally on every call after that.
 
 There's no websocket layer -- the browser polls for new comments, and the
-agent's live notifications come from `diff-viewer wait`, a long-polling
-CLI command meant to run with `run_in_background: true` so Claude Code
-wakes the agent up automatically when something happens, without any new
-tool surface.
+agent's live notifications come from `diff-viewer watch`, a long-polling CLI
+command meant to run under Claude Code's `Monitor` tool (`persistent: true`)
+so the agent is woken up automatically every time something happens, for the
+life of the review session, without any new tool surface. It prints one JSON
+line per notification and exits on its own once the session is stopped.
+`diff-viewer wait` is the one-shot primitive `watch` loops on; it resolves
+once, on the next notification, and is meant for scripting rather than
+Monitor.
 
 | Command | Purpose |
 |---|---|
-| `diff-viewer start <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. |
-| `diff-viewer wait <sessionId>` | Long-polls until the next comment or verdict. |
+| `diff-viewer start [--title <text>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. |
+| `diff-viewer watch <sessionId>` | Loops indefinitely, printing one JSON line per comment/verdict notification; built for `Monitor`. |
+| `diff-viewer wait <sessionId>` | Long-polls until the next single comment or verdict, then exits. |
 | `diff-viewer review <sessionId>` | Prints all comment threads and verdicts (with computed intent) as JSON. |
 | `diff-viewer reply <sessionId> <threadId> <text>` | Post an agent reply into a thread. |
 | `diff-viewer comment <sessionId> <repoPath> <file> <lineStart> <lineEnd> <old\|new> <text>` | Post a new agent-authored comment (e.g. from `/code-review`). |

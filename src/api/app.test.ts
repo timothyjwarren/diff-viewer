@@ -43,7 +43,7 @@ describe("api app", () => {
 
   async function buildStore() {
     const baseRef = await resolveBaseRef(repoPath);
-    return SessionStore.create([{ path: repoPath, name: "repo", branch: "feature", baseRef }], "s1", dataDir);
+    return SessionStore.create([{ path: repoPath, name: "repo", branch: "feature", baseRef }], "s1", "test session", dataDir);
   }
 
   it("GET /api/diffs returns parsed diffs for each repo", async () => {

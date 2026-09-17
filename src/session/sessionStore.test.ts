@@ -17,7 +17,7 @@ describe("SessionStore", () => {
   });
 
   it("an immediate (non-pending) user comment notifies right away", () => {
-    const store = SessionStore.create(repos, "s1", dataDir);
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
       author: "user", body: "what does this do?", pending: false,
@@ -29,7 +29,7 @@ describe("SessionStore", () => {
   });
 
   it("a pending user comment does not notify until a verdict is submitted", () => {
-    const store = SessionStore.create(repos, "s1", dataDir);
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
       author: "user", body: "consider renaming this", pending: true,
@@ -50,7 +50,7 @@ describe("SessionStore", () => {
   });
 
   it("agent-authored comments are never pending and never notify", () => {
-    const store = SessionStore.create(repos, "s1", dataDir);
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
     store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
       author: "agent", body: "this could be simplified", pending: true,
@@ -59,7 +59,7 @@ describe("SessionStore", () => {
   });
 
   it("supports replies, edits, and deletes", () => {
-    const store = SessionStore.create(repos, "s1", dataDir);
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
       author: "user", body: "question", pending: false,
@@ -75,7 +75,7 @@ describe("SessionStore", () => {
   });
 
   it("persists and reloads session data", async () => {
-    const store = SessionStore.create(repos, "s1", dataDir);
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
     store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
       author: "user", body: "hi", pending: false,

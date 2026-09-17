@@ -10,18 +10,89 @@ async function baseUrl(sessionId: string): Promise<string> {
   return `http://127.0.0.1:${port}`;
 }
 
+async function registryExists(sessionId: string): Promise<boolean> {
+  try {
+    await readRegistryEntry(sessionId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Thrown by waitCommand when the session's registry entry is gone — i.e. `diff-viewer stop` ran. */
+class SessionEndedError extends Error {}
+
+const MAX_WAIT_RETRIES = 5;
+
 export async function waitCommand(sessionId: string): Promise<{ notifications: unknown[] }> {
-  const url = await baseUrl(sessionId);
+  let url: string;
+  try {
+    url = await baseUrl(sessionId);
+  } catch {
+    throw new SessionEndedError();
+  }
   const since = await readCursor(sessionId);
+  let attempt = 0;
   while (true) {
-    const res = await fetch(`${url}/api/wait?since=${since}`);
+    let res: Response;
+    try {
+      res = await fetch(`${url}/api/wait?since=${since}`);
+    } catch (err) {
+      // Connection failure could mean the server crashed, or that
+      // `diff-viewer stop` killed it intentionally — tell those apart by
+      // checking whether the registry entry it removes is still there.
+      if (!(await registryExists(sessionId))) throw new SessionEndedError();
+      attempt += 1;
+      if (attempt > MAX_WAIT_RETRIES) throw err;
+      await sleep(Math.min(1000 * attempt, 5000));
+      continue;
+    }
     if (res.status === 200) {
       const body = await res.json() as { notifications: unknown[]; cursor: number };
       await writeCursor(sessionId, body.cursor);
       return { notifications: body.notifications };
     }
-    // 204 = server-side long-poll timed out with nothing new; the server holds
-    // again on the next call, so just retry.
+    if (res.status === 204) {
+      // Server-side long-poll timed out with nothing new; the server holds
+      // again on the next call, so just retry immediately.
+      attempt = 0;
+      continue;
+    }
+    // Unexpected status (e.g. a stale/misbehaving server) — back off and retry
+    // a bounded number of times rather than busy-spinning forever.
+    if (!(await registryExists(sessionId))) throw new SessionEndedError();
+    attempt += 1;
+    if (attempt > MAX_WAIT_RETRIES) throw new Error(`diff-viewer wait: unexpected status ${res.status}`);
+    await sleep(Math.min(1000 * attempt, 5000));
+  }
+}
+
+/**
+ * Loops forever, printing one JSON line per notification as it arrives — built
+ * for `Monitor`, which turns each stdout line into a notification. Exits
+ * cleanly (after printing a final session_ended line) once `diff-viewer stop`
+ * has removed the session's registry entry; exits non-zero if the server
+ * becomes unreachable for a reason other than an intentional stop.
+ */
+export async function watchCommand(sessionId: string, log: (line: string) => void = line => console.log(line)): Promise<void> {
+  while (true) {
+    let result: { notifications: unknown[] };
+    try {
+      result = await waitCommand(sessionId);
+    } catch (err) {
+      if (err instanceof SessionEndedError) {
+        log(JSON.stringify({ type: "session_ended" }));
+        return;
+      }
+      throw err;
+    }
+    for (const notification of result.notifications) {
+      log(JSON.stringify(notification));
+    }
   }
 }
 

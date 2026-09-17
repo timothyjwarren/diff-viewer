@@ -3,7 +3,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
+  fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
   fetchCommits, fetchRepoDiff,
 } from "./api/client";
 import { selectionReducer } from "./lib/selection";
@@ -41,6 +41,7 @@ export function App() {
       );
       setCommitsByRepo(Object.fromEntries(entries));
     });
+    fetchSession().then(session => { document.title = session.title; });
   }, []);
 
   async function handleOpenCommits(repoPath: string) {

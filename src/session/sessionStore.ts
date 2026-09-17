@@ -32,9 +32,9 @@ export class SessionStore {
     this.emitter.setMaxListeners(0);
   }
 
-  static create(repos: RepoConfig[], id: string, dataDir: string = getDataDir()): SessionStore {
+  static create(repos: RepoConfig[], id: string, title: string, dataDir: string = getDataDir()): SessionStore {
     const data: SessionData = {
-      id, repos, createdAt: new Date().toISOString(), status: "active",
+      id, title, repos, createdAt: new Date().toISOString(), status: "active",
       threads: [], verdicts: [], notifications: [],
     };
     return new SessionStore(data, path.join(dataDir, `${id}.json`));

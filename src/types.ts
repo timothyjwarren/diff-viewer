@@ -84,6 +84,7 @@ export interface NotificationEvent {
 
 export interface SessionData {
   id: string;
+  title: string;
   repos: RepoConfig[];
   createdAt: string;
   status: "active" | "stopped";

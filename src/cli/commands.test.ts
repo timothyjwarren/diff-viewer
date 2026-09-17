@@ -6,8 +6,8 @@ import type { Server } from "node:http";
 import { spawn } from "node:child_process";
 import { createApp } from "../api/app.js";
 import { SessionStore } from "../session/sessionStore.js";
-import { writeRegistryEntry } from "../registry.js";
-import { waitCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand } from "./commands.js";
+import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
+import { waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand } from "./commands.js";
 
 describe("cli commands", () => {
   let home: string;
@@ -19,7 +19,7 @@ describe("cli commands", () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "dv-cli-"));
     process.env.DIFFVIEWER_HOME = home;
     sessionId = "s1";
-    store = SessionStore.create([{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }], sessionId, path.join(home, "data"));
+    store = SessionStore.create([{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }], sessionId, "test session", path.join(home, "data"));
     const app = createApp(store);
     server = app.listen(0, "127.0.0.1");
     await new Promise<void>(resolve => server.once("listening", resolve));
@@ -70,6 +70,36 @@ describe("cli commands", () => {
     const found = await sessionsCommand("/repo");
     expect(found).toEqual([{ sessionId: "s1", repos: [{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }] }]);
     expect(await sessionsCommand("/nonexistent")).toEqual([]);
+  });
+
+  it("watchCommand prints one line per notification and keeps looping across events", async () => {
+    // A short long-poll timeout so the pending request unblocks quickly once
+    // this test removes the registry entry, instead of waiting out the
+    // production 55s hold.
+    const fastApp = createApp(store, undefined, 50);
+    const fastServer = fastApp.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => fastServer.once("listening", resolve));
+    const fastAddress = fastServer.address();
+    const fastPort = typeof fastAddress === "object" && fastAddress ? fastAddress.port : 0;
+    await writeRegistryEntry(sessionId, { port: fastPort, pid: process.pid });
+
+    const lines: string[] = [];
+    const watchPromise = watchCommand(sessionId, line => lines.push(line));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    store.addVerdict("approve", "lgtm");
+    await new Promise(resolve => setTimeout(resolve, 50));
+    store.addVerdict("comment", "one more thing");
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // Mirror what stopCommand does: remove the registry entry, then take the
+    // server down, so the in-flight long-poll fails with a connection error.
+    await removeRegistryEntry(sessionId);
+    fastServer.close();
+    await watchPromise;
+
+    expect(lines).toHaveLength(3);
+    expect(JSON.parse(lines[0]).type).toBe("verdict");
+    expect(JSON.parse(lines[1]).type).toBe("verdict");
+    expect(JSON.parse(lines[2])).toEqual({ type: "session_ended" });
   });
 
   it("stopCommand kills the process referenced by the registry entry", async () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { startCommand } from "../cli/start.js";
 import {
-  waitCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand,
+  waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, stopCommand, sessionsCommand,
 } from "../cli/commands.js";
 
 async function main(): Promise<void> {
@@ -13,6 +13,10 @@ async function main(): Promise<void> {
     }
     case "wait": {
       console.log(JSON.stringify(await waitCommand(rest[0])));
+      break;
+    }
+    case "watch": {
+      await watchCommand(rest[0]);
       break;
     }
     case "review": {

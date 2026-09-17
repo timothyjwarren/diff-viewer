@@ -9,11 +9,22 @@ import { parseRepoArgs } from "./parseRepoArgs.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function extractFlag(argv: string[], flag: string): { value: string | undefined; rest: string[] } {
+  const idx = argv.indexOf(flag);
+  if (idx === -1) return { value: undefined, rest: argv };
+  return { value: argv[idx + 1], rest: [...argv.slice(0, idx), ...argv.slice(idx + 2)] };
+}
+
+function defaultTitle(repos: Array<{ name: string; branch: string }>): string {
+  if (repos.length === 1) return `${repos[0].name}:${repos[0].branch}`;
+  const [first, ...rest] = repos;
+  return rest.length === 0 ? first.name : `${first.name} (+${rest.length} more)`;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const sessionIdIdx = argv.indexOf("--session-id");
-  const sessionId = argv[sessionIdIdx + 1];
-  const repoArgv = [...argv.slice(0, sessionIdIdx), ...argv.slice(sessionIdIdx + 2)];
+  const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
+  const { value: titleArg, rest: repoArgv } = extractFlag(afterSessionId, "--title");
   const repoArgs = parseRepoArgs(repoArgv);
 
   const repos = await Promise.all(repoArgs.map(async ({ path: repoPath, baseRef }) => {
@@ -26,7 +37,9 @@ async function main(): Promise<void> {
     };
   }));
 
-  const store = SessionStore.create(repos, sessionId);
+  if (!sessionId) throw new Error("Missing required --session-id argument");
+  const title = titleArg ?? defaultTitle(repos);
+  const store = SessionStore.create(repos, sessionId, title);
   await store.persist();
 
   const webDistDir = path.join(__dirname, "../web/dist");
@@ -41,6 +54,11 @@ async function main(): Promise<void> {
 
   process.on("SIGTERM", () => {
     server.close(() => process.exit(0));
+    // `server.close` alone waits for in-flight requests to finish naturally —
+    // including the client's held-open /api/wait long-poll, which can hold a
+    // connection for up to `waitTimeoutMs`. Force those closed so shutdown
+    // (and the watching CLI's session-ended detection) is prompt.
+    server.closeAllConnections();
   });
 }
 
