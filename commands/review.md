@@ -72,15 +72,30 @@ Steps:
    `diff-viewer review <sessionId>` for the full current picture (this keeps
    handling idempotent regardless of notification batching or ordering), then
    act on everything currently pending before returning to the conversation:
-   - `type: "comment"` — the user asked an inline question; read it with
-     `diff-viewer review <sessionId>` and answer it, replying in the viewer
-     with `diff-viewer reply <sessionId> <threadId> "<text>"` and/or in chat.
+   - `type: "comment"` — an individual, immediately-posted comment (the
+     "Add single comment" button, not "Add to review" — pending comments
+     stay invisible to you until bundled into a verdict below). Read it with
+     `diff-viewer review <sessionId>`. It may be a question *or* a requested
+     change — either way, **do not edit code from this alone**, even if it
+     reads like an unambiguous instruction. Reply in the viewer with
+     `diff-viewer reply <sessionId> <threadId> "<text>"` and/or in chat:
+     answer it if it's a question; if it's a change request, acknowledge
+     that you've noted it and will apply it once they finish reviewing —
+     e.g. "Noted — I'll make this change once you finish your review" — but
+     take no other action yet. This mirrors how a human reviewer's individual
+     PR comments don't each trigger a push; the requested changes land once
+     as a batch. Only two things authorize actually making the change: a
+     `changes_requested` verdict (below), or the user explicitly saying in
+     chat that they're done / to go ahead now — either overrides this
+     deferral, including for comments noted earlier in the same session.
    - `type: "verdict"` — the user submitted a review. Run
      `diff-viewer review <sessionId>` to see all verdicts (each with a
      computed `intent`: `"discussion"` for Comment/Approve, or
      `"changes_requested"` for Request Changes) and their bundled comments.
-     Only treat `changes_requested` verdicts as work to do; treat
-     `discussion` verdicts and standalone comments as conversation, not
+     Only treat `changes_requested` verdicts as work to do — this is where
+     you actually implement everything requested, both in this verdict's
+     bundled comments and any single comments noted earlier in the session.
+     Treat `discussion` verdicts (Comment/Approve) as conversation, not
      instructions.
    - `type: "session_ended"` — the session was stopped (step 6 already ran,
      possibly by another agent/thread); nothing to do.
