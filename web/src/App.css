@@ -345,6 +345,9 @@ main {
   overflow-x: auto;
   user-select: text;
   border-left: 1px solid var(--border);
+  /* Lets descendants size themselves against this pane's own (grid-determined,
+   * scroll-independent) width via cqi units — see .comment-thread below. */
+  container-type: inline-size;
 }
 
 /*
@@ -529,6 +532,13 @@ main {
 
 .comment-thread,
 .comment-composer {
+  /* .diff-pane-content is a display:table sized to its widest code line
+   * (see its comment above) so these, as normal-flow children, would
+   * otherwise stretch to that content width instead of the pane's visible
+   * width — pin to the pane's actual width via container query units so
+   * comment text wraps at the panel edge regardless of how long code lines
+   * in the file are. */
+  width: 100cqi;
   border-top: 1px solid var(--border);
   padding: 8px 12px;
   background: var(--bg-elevated);
