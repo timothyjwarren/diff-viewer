@@ -5,11 +5,11 @@ import type { RepoDiff } from "../types";
 
 const repos: RepoDiff[] = [
   {
-    repo: "repoA", repoPath: "/r/a",
+    repo: "repoA", branch: "main", repoPath: "/r/a",
     files: [{ repoPath: "/r/a", oldPath: "x.ts", newPath: "x.ts", status: "modified", hunks: [] }],
   },
   {
-    repo: "repoB", repoPath: "/r/b",
+    repo: "repoB", branch: "feature", repoPath: "/r/b",
     files: [{ repoPath: "/r/b", oldPath: "y.ts", newPath: "y.ts", status: "added", hunks: [] }],
   },
 ];
@@ -17,8 +17,8 @@ const repos: RepoDiff[] = [
 describe("Sidebar", () => {
   it("lists each repo and its changed files", () => {
     render(<Sidebar repos={repos} onSelectFile={() => {}} />);
-    expect(screen.getByText("repoA")).toBeInTheDocument();
-    expect(screen.getByText("repoB")).toBeInTheDocument();
+    expect(screen.getByText("repoA:main")).toBeInTheDocument();
+    expect(screen.getByText("repoB:feature")).toBeInTheDocument();
     expect(screen.getByText("x.ts")).toBeInTheDocument();
     expect(screen.getByText("y.ts")).toBeInTheDocument();
   });

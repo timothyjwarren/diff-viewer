@@ -30,6 +30,12 @@ describe("api app", () => {
     await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\n");
   });
 
+  async function commitAll(message: string) {
+    await git(repoPath, ["commit", "-am", message]);
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    return stdout.trim();
+  }
+
   afterEach(async () => {
     await fs.rm(repoPath, { recursive: true, force: true });
     await fs.rm(dataDir, { recursive: true, force: true });
@@ -37,7 +43,7 @@ describe("api app", () => {
 
   async function buildStore() {
     const baseRef = await resolveBaseRef(repoPath);
-    return SessionStore.create([{ path: repoPath, name: "repo", baseRef }], "s1", dataDir);
+    return SessionStore.create([{ path: repoPath, name: "repo", branch: "feature", baseRef }], "s1", dataDir);
   }
 
   it("GET /api/diffs returns parsed diffs for each repo", async () => {
@@ -46,6 +52,39 @@ describe("api app", () => {
     expect(res.status).toBe(200);
     expect(res.body[0].repo).toBe("repo");
     expect(res.body[0].files[0].newPath).toBe("a.txt");
+  });
+
+  it("GET /api/commits lists commits ahead of baseRef, oldest first", async () => {
+    const app = createApp(await buildStore());
+    const first = await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\n");
+    const second = await commitAll("second");
+
+    const res = await request(app).get("/api/commits").query({ repoPath });
+    expect(res.status).toBe(200);
+    expect(res.body.map((c: { sha: string }) => c.sha)).toEqual([first, second]);
+    expect(res.body.map((c: { subject: string }) => c.subject)).toEqual(["first", "second"]);
+  });
+
+  it("GET /api/repo-diff with no range returns the same as the full baseRef diff", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    const res = await request(app).get("/api/repo-diff").query({ repoPath });
+    expect(res.status).toBe(200);
+    expect(res.body[0].newPath).toBe("a.txt");
+  });
+
+  it("GET /api/repo-diff with a from/to range diffs only that commit range", async () => {
+    const app = createApp(await buildStore());
+    const first = await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\n");
+    await commitAll("second");
+
+    const res = await request(app).get("/api/repo-diff").query({ repoPath, from: first, to: first });
+    expect(res.status).toBe(200);
+    const addedLines = res.body[0].hunks.flatMap((h: { lines: { type: string; content: string }[] }) => h.lines)
+      .filter((l: { type: string }) => l.type === "add").map((l: { content: string }) => l.content);
+    expect(addedLines).toEqual(["two"]);
   });
 
   it("GET /api/file returns working-tree lines", async () => {

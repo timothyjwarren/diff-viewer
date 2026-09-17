@@ -1,7 +1,14 @@
 import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
-import { computeDiff } from "../git/diff.js";
+import { computeDiff, computeRangeDiff } from "../git/diff.js";
+import { listCommits } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef } from "../git/fileContent.js";
+
+function findRepo(store: SessionStore, repoPath: string) {
+  const repo = store.snapshot.repos.find(r => r.path === repoPath);
+  if (!repo) throw new Error(`Unknown repo: ${repoPath}`);
+  return repo;
+}
 
 export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutMs = 55000): express.Express {
   const app = express();
@@ -13,10 +20,32 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const session = store.snapshot;
     const results = await Promise.all(session.repos.map(async repo => ({
       repo: repo.name,
+      branch: repo.branch,
       repoPath: repo.path,
       files: await computeDiff(repo.path, repo.baseRef),
     })));
     res.json(results);
+  });
+
+  app.get("/api/commits", async (req, res) => {
+    const { repoPath } = req.query as Record<string, string>;
+    try {
+      const repo = findRepo(store, repoPath);
+      res.json(await listCommits(repo.path, repo.baseRef));
+    } catch {
+      res.status(404).end();
+    }
+  });
+
+  app.get("/api/repo-diff", async (req, res) => {
+    const { repoPath, from, to } = req.query as Record<string, string | undefined>;
+    try {
+      const repo = findRepo(store, repoPath!);
+      const files = from && to ? await computeRangeDiff(repo.path, from, to) : await computeDiff(repo.path, repo.baseRef);
+      res.json(files);
+    } catch {
+      res.status(404).end();
+    }
   });
 
   app.get("/api/file", async (req, res) => {

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { codeToHtml } from "shiki";
 import type { CommentThread as CommentThreadData, DiffFile, DiffHunk, DiffLine } from "../types";
 import { detectLanguage } from "../lib/language";
-import { expandHunkContext } from "../lib/expandContext";
+import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter } from "../lib/expandContext";
 import { pairHunkLines, type PairedRow } from "../lib/pairLines";
 import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
+import { ExpandStrip } from "./ExpandStrip";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
 
@@ -108,23 +109,10 @@ function Composer({ onSubmit, onCancel }: {
   );
 }
 
-function HunkHeader({ hunk, hunkIndex, onExpand }: {
-  hunk: DiffHunk; hunkIndex: number; onExpand: (hunkIndex: number, direction: "up" | "down") => void;
-}) {
-  return (
-    <div className="diff-hunk-header">
-      <span>@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
-      <span className="diff-hunk-header-actions">
-        <button aria-label="Expand above" onClick={() => onExpand(hunkIndex, "up")}>&#8963;</button>
-        <button aria-label="Expand below" onClick={() => onExpand(hunkIndex, "down")}>&#8964;</button>
-      </span>
-    </div>
-  );
-}
-
-function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = true }: {
+function Pane({ hunks, side, lang, repoName, comments, onExpand, fileLineCount, showHeaders = true }: {
   hunks: DiffHunk[]; side: "old" | "new"; lang: string; repoName: string; comments: CommentHandlers;
-  onExpand: (hunkIndex: number, direction: "up" | "down") => void;
+  onExpand: (hunkIndex: number, direction: "up" | "down", amount?: number) => void;
+  fileLineCount: number | null;
   showHeaders?: boolean;
 }) {
   return (
@@ -132,9 +120,18 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
       <div className="diff-pane-content">
         {hunks.map((hunk, hi) => {
           const rows: PairedRow[] = pairHunkLines(hunk.lines);
+          const gapBefore = showHeaders ? hiddenLinesBefore(hunks, hi) : 0;
           return (
             <div key={hi} className="diff-hunk">
-              {showHeaders && <HunkHeader hunk={hunk} hunkIndex={hi} onExpand={onExpand} />}
+              {gapBefore > 0 && (
+                <ExpandStrip
+                  showUp showDown={hi > 0}
+                  hiddenCount={gapBefore}
+                  onExpandUp={() => onExpand(hi, "up")}
+                  onExpandDown={hi > 0 ? () => onExpand(hi - 1, "down") : undefined}
+                  onExpandAll={() => onExpand(hi, "up", gapBefore)}
+                />
+              )}
               {rows.map((row, ri) => {
                 const l = row[side];
                 if (!l) return <EmptyLine key={ri} />;
@@ -178,6 +175,19 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, showHeaders = t
             </div>
           );
         })}
+        {showHeaders && hunks.length > 0 && (() => {
+          const lastIndex = hunks.length - 1;
+          const gapAfter = hiddenLinesAfter(hunks, lastIndex, fileLineCount);
+          if (gapAfter === 0) return null;
+          return (
+            <ExpandStrip
+              showUp={false} showDown
+              hiddenCount={gapAfter}
+              onExpandDown={() => onExpand(lastIndex, "down")}
+              onExpandAll={() => onExpand(lastIndex, "down", gapAfter ?? undefined)}
+            />
+          );
+        })()}
       </div>
     </div>
   );
@@ -202,9 +212,9 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
     return lines;
   }
 
-  async function expand(hunkIndex: number, direction: "up" | "down") {
+  async function expand(hunkIndex: number, direction: "up" | "down", amount?: number) {
     const lines = fullFileLines ?? await loadFullFile();
-    setHunks(prev => expandHunkContext(prev, lines, hunkIndex, direction));
+    setHunks(prev => expandHunkContext(prev, lines, hunkIndex, direction, amount));
   }
 
   async function toggleViewFile() {
@@ -230,7 +240,7 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
             aria-label={collapsed ? "Expand file" : "Collapse file"}
             onClick={() => setCollapsed(c => !c)}
           >
-            {collapsed ? "▸" : "▾"}
+            <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
           </button>
           <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
           <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
@@ -241,12 +251,18 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
           {viewingFullFile && fullFileLines ? (
             <Pane
               hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} comments={comments}
-              onExpand={expand} showHeaders={false}
+              onExpand={expand} fileLineCount={fullFileLines.length} showHeaders={false}
             />
           ) : (
             <>
-              <Pane hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
-              <Pane hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments} onExpand={expand} />
+              <Pane
+                hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments}
+                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+              />
+              <Pane
+                hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments}
+                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+              />
             </>
           )}
         </div>

@@ -1,18 +1,38 @@
-import type { DiffFile, FileStatus, RepoDiff } from "../types";
+import type { CommitInfo, CommitRange, DiffFile, FileStatus, RepoDiff } from "../types";
+import { CommitChooser } from "./CommitChooser";
 
 const STATUS_LETTER: Record<FileStatus, string> = {
   added: "A", modified: "M", deleted: "D", renamed: "R",
 };
 
-export function Sidebar({ repos, onSelectFile }: {
+export function Sidebar({
+  repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
+}: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
+  commitsByRepo?: Record<string, CommitInfo[]>;
+  rangeByRepo?: Record<string, CommitRange | null>;
+  onRangeChange?: (repoPath: string, range: CommitRange | null) => void;
+  onOpenCommits?: (repoPath: string) => void;
 }) {
   return (
     <nav className="sidebar">
       {repos.map(repo => (
-        <div key={repo.repoPath} className="sidebar-repo">
-          <div className="sidebar-repo-name">{repo.repo}</div>
+        <div
+          key={repo.repoPath}
+          className={`sidebar-repo${rangeByRepo[repo.repoPath] ? " sidebar-repo-narrowed" : ""}`}
+        >
+          <div className="sidebar-repo-header">
+            <span className="sidebar-repo-name" title={`${repo.repo}:${repo.branch}`}>
+              {repo.repo}:{repo.branch}
+            </span>
+            <CommitChooser
+              commits={commitsByRepo[repo.repoPath] ?? []}
+              range={rangeByRepo[repo.repoPath] ?? null}
+              onChange={range => onRangeChange(repo.repoPath, range)}
+              onOpen={() => onOpenCommits(repo.repoPath)}
+            />
+          </div>
           <ul>
             {repo.files.map(file => {
               const name = file.newPath || file.oldPath;

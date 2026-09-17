@@ -6,7 +6,7 @@ import { SessionStore } from "./sessionStore.js";
 
 describe("SessionStore", () => {
   let dataDir: string;
-  const repos = [{ path: "/repo", name: "repo", baseRef: "abc123" }];
+  const repos = [{ path: "/repo", name: "repo", branch: "main", baseRef: "abc123" }];
 
   beforeEach(async () => {
     dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "dv-session-"));

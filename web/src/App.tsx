@@ -4,9 +4,10 @@ import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
+  fetchCommits, fetchRepoDiff,
 } from "./api/client";
 import { selectionReducer } from "./lib/selection";
-import type { DiffFile, RepoDiff, CommentThread, VerdictType } from "./types";
+import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
 function fileAnchorId(file: DiffFile): string {
   const name = file.newPath || file.oldPath;
@@ -25,14 +26,33 @@ interface DragState {
 
 export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
+  const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
+  const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
   const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
-    fetchDiffs().then(setRepos);
+    fetchDiffs().then(async loadedRepos => {
+      setRepos(loadedRepos);
+      const entries = await Promise.all(
+        loadedRepos.map(r => fetchCommits(r.repoPath).then(commits => [r.repoPath, commits] as const)),
+      );
+      setCommitsByRepo(Object.fromEntries(entries));
+    });
   }, []);
+
+  async function handleOpenCommits(repoPath: string) {
+    const commits = await fetchCommits(repoPath);
+    setCommitsByRepo(prev => ({ ...prev, [repoPath]: commits }));
+  }
+
+  async function handleRangeChange(repoPath: string, range: CommitRange | null) {
+    setRangeByRepo(prev => ({ ...prev, [repoPath]: range }));
+    const files = await fetchRepoDiff(repoPath, range ?? undefined);
+    setRepos(prev => prev.map(r => (r.repoPath === repoPath ? { ...r, files } : r)));
+  }
 
   useEffect(() => {
     fetchThreads().then(setThreads);
@@ -114,7 +134,11 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar repos={repos} onSelectFile={scrollToFile} />
+      <Sidebar
+        repos={repos} onSelectFile={scrollToFile}
+        commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
+        onOpenCommits={handleOpenCommits}
+      />
       <main>
         {repos.length === 0 && <p className="empty-state">No changes to review.</p>}
         {repos.map(repo => repo.files.map(file => (
@@ -122,7 +146,7 @@ export function App() {
             <DiffView
               file={file}
               repoPath={repo.repoPath}
-              repoName={repo.repo}
+              repoName={`${repo.repo}:${repo.branch}`}
               baseRef=""
               comments={commentHandlersFor(file)}
             />

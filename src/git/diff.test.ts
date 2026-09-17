@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { computeDiff } from "./diff.js";
+import { computeDiff, computeRangeDiff } from "./diff.js";
 import { resolveBaseRef } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
@@ -41,5 +41,23 @@ describe("computeDiff", () => {
     expect(files).toHaveLength(1);
     const addedLines = files[0].hunks.flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content);
     expect(addedLines).toEqual(["committed", "uncommitted"]);
+  });
+
+  it("computeRangeDiff diffs only the given inclusive commit range, ignoring uncommitted changes", async () => {
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\n");
+    await git(repoPath, ["commit", "-am", "first"]);
+    const { stdout: firstSha } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\nfour\n");
+    await git(repoPath, ["commit", "-am", "second"]);
+    const { stdout: secondSha } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\nfour\nuncommitted\n");
+
+    const onlyFirst = await computeRangeDiff(repoPath, firstSha.trim(), firstSha.trim());
+    expect(onlyFirst[0].hunks.flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content))
+      .toEqual(["three"]);
+
+    const both = await computeRangeDiff(repoPath, firstSha.trim(), secondSha.trim());
+    expect(both[0].hunks.flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content))
+      .toEqual(["three", "four"]);
   });
 });

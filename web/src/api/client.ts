@@ -1,4 +1,4 @@
-import type { RepoDiff, CommentThread, Verdict, VerdictType } from "../types";
+import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, Verdict, VerdictType } from "../types";
 
 async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
@@ -6,6 +6,20 @@ async function json<T>(res: Response): Promise<T> {
 
 export async function fetchDiffs(): Promise<RepoDiff[]> {
   return json(await fetch("/api/diffs"));
+}
+
+export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {
+  const params = new URLSearchParams({ repoPath });
+  return json(await fetch(`/api/commits?${params}`));
+}
+
+export async function fetchRepoDiff(repoPath: string, range?: CommitRange): Promise<DiffFile[]> {
+  const params = new URLSearchParams({ repoPath });
+  if (range) {
+    params.set("from", range.from);
+    params.set("to", range.to);
+  }
+  return json(await fetch(`/api/repo-diff?${params}`));
 }
 
 export async function fetchFile(repoPath: string, filePath: string, ref: string): Promise<string[]> {

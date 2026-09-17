@@ -1,6 +1,7 @@
 export interface RepoConfig {
   path: string;
   name: string;
+  branch: string;
   baseRef: string;
 }
 
@@ -27,6 +28,14 @@ export interface DiffFile {
   newPath: string;
   status: FileStatus;
   hunks: DiffHunk[];
+}
+
+export interface CommitInfo {
+  sha: string;
+  shortSha: string;
+  subject: string;
+  author: string;
+  date: string;
 }
 
 export type CommentAuthor = "user" | "agent";

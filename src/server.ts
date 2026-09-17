@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./api/app.js";
 import { SessionStore } from "./session/sessionStore.js";
-import { resolveBaseRef } from "./git/gitRepo.js";
+import { resolveBaseRef, getCurrentBranch } from "./git/gitRepo.js";
 import { writeRegistryEntry } from "./registry.js";
 import { parseRepoArgs } from "./parseRepoArgs.js";
 
@@ -16,11 +16,15 @@ async function main(): Promise<void> {
   const repoArgv = [...argv.slice(0, sessionIdIdx), ...argv.slice(sessionIdIdx + 2)];
   const repoArgs = parseRepoArgs(repoArgv);
 
-  const repos = await Promise.all(repoArgs.map(async ({ path: repoPath, baseRef }) => ({
-    path: path.resolve(repoPath),
-    name: path.basename(repoPath),
-    baseRef: await resolveBaseRef(repoPath, baseRef),
-  })));
+  const repos = await Promise.all(repoArgs.map(async ({ path: repoPath, baseRef }) => {
+    const resolvedPath = path.resolve(repoPath);
+    return {
+      path: resolvedPath,
+      name: path.basename(resolvedPath),
+      branch: await getCurrentBranch(repoPath),
+      baseRef: await resolveBaseRef(repoPath, baseRef),
+    };
+  }));
 
   const store = SessionStore.create(repos, sessionId);
   await store.persist();

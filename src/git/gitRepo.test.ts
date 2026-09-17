@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { detectDefaultBranch, resolveMergeBase, resolveBaseRef } from "./gitRepo.js";
+import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -49,5 +49,31 @@ describe("gitRepo", () => {
   it("resolveBaseRef honors an explicit override", async () => {
     const { stdout } = await execFileAsync("git", ["rev-parse", "feature"], { cwd: repoPath });
     expect(await resolveBaseRef(repoPath, "feature")).toBe(stdout.trim());
+  });
+
+  it("lists commits ahead of baseRef, oldest first", async () => {
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nthree\n");
+    await git(repoPath, ["commit", "-am", "second feature commit"]);
+
+    const { stdout } = await execFileAsync("git", ["log", "--format=%H", "main..feature"], { cwd: repoPath });
+    const [newestSha, oldestSha] = stdout.trim().split("\n");
+
+    const commits = await listCommits(repoPath, "main");
+    expect(commits.map(c => c.sha)).toEqual([oldestSha, newestSha]);
+    expect(commits[0].subject).toBe("feature commit");
+    expect(commits[1].subject).toBe("second feature commit");
+    expect(commits[0].shortSha).toHaveLength(7);
+    expect(commits[0].author).toBe("Test");
+    expect(commits[0].date).toBeTruthy();
+  });
+
+  it("getCurrentBranch returns the checked-out branch name", async () => {
+    expect(await getCurrentBranch(repoPath)).toBe("feature");
+  });
+
+  it("getCurrentBranch falls back to a short sha when HEAD is detached", async () => {
+    await git(repoPath, ["checkout", "--detach"]);
+    const branch = await getCurrentBranch(repoPath);
+    expect(branch).toMatch(/^[0-9a-f]{7,}$/);
   });
 });

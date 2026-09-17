@@ -19,7 +19,7 @@ describe("cli commands", () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "dv-cli-"));
     process.env.DIFFVIEWER_HOME = home;
     sessionId = "s1";
-    store = SessionStore.create([{ path: "/repo", name: "repo", baseRef: "abc" }], sessionId, path.join(home, "data"));
+    store = SessionStore.create([{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }], sessionId, path.join(home, "data"));
     const app = createApp(store);
     server = app.listen(0, "127.0.0.1");
     await new Promise<void>(resolve => server.once("listening", resolve));
@@ -68,7 +68,7 @@ describe("cli commands", () => {
   it("sessionsCommand finds an active session for a given repo path", async () => {
     await store.persist();
     const found = await sessionsCommand("/repo");
-    expect(found).toEqual([{ sessionId: "s1", repos: [{ path: "/repo", name: "repo", baseRef: "abc" }] }]);
+    expect(found).toEqual([{ sessionId: "s1", repos: [{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }] }]);
     expect(await sessionsCommand("/nonexistent")).toEqual([]);
   });
 
