@@ -144,6 +144,11 @@ export async function sessionsCommand(repoFilter?: string): Promise<Array<{ sess
   } catch {
     return [];
   }
+  // Repos are stored resolved-and-absolute (server.ts does this at session
+  // creation); resolve the filter the same way so a relative path, a
+  // trailing slash, or `.` doesn't fail to match a session that otherwise
+  // covers this exact repo.
+  const resolvedFilter = repoFilter ? path.resolve(repoFilter) : undefined;
   const sessionIds = entries.filter(f => f.endsWith(".json")).map(f => f.replace(/\.json$/, ""));
   const results: Array<{ sessionId: string; repos: RepoConfig[] }> = [];
   for (const id of sessionIds) {
@@ -151,7 +156,7 @@ export async function sessionsCommand(repoFilter?: string): Promise<Array<{ sess
       const raw = await fs.readFile(path.join(getDataDir(), `${id}.json`), "utf-8");
       const data = JSON.parse(raw) as SessionData;
       if (data.status !== "active") continue;
-      if (!repoFilter || data.repos.some(r => r.path === repoFilter)) {
+      if (!resolvedFilter || data.repos.some(r => r.path === resolvedFilter)) {
         results.push({ sessionId: id, repos: data.repos });
       }
     } catch {

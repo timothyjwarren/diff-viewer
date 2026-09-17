@@ -72,6 +72,12 @@ describe("cli commands", () => {
     expect(await sessionsCommand("/nonexistent")).toEqual([]);
   });
 
+  it("sessionsCommand matches a repo filter regardless of a trailing slash or relative form", async () => {
+    await store.persist();
+    expect(await sessionsCommand("/repo/")).toHaveLength(1);
+    expect(await sessionsCommand("/repo/../repo")).toHaveLength(1);
+  });
+
   it("watchCommand prints one line per notification and keeps looping across events", async () => {
     // A short long-poll timeout so the pending request unblocks quickly once
     // this test removes the registry entry, instead of waiting out the

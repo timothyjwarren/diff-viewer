@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./api/app.js";
 import { SessionStore } from "./session/sessionStore.js";
-import { resolveBaseRef, getCurrentBranch } from "./git/gitRepo.js";
+import { resolveBaseRef, getCurrentBranch, assertValidRepoPath } from "./git/gitRepo.js";
 import { writeRegistryEntry } from "./registry.js";
 import { parseRepoArgs } from "./parseRepoArgs.js";
 
@@ -26,6 +26,25 @@ async function main(): Promise<void> {
   const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
   const { value: titleArg, rest: repoArgv } = extractFlag(afterSessionId, "--title");
   const repoArgs = parseRepoArgs(repoArgv);
+
+  if (repoArgs.length === 0) {
+    console.error("diff-viewer: no repo paths given (pass one or more <path[:baseRef]> arguments)");
+    process.exit(1);
+  }
+
+  const validationErrors: string[] = [];
+  for (const { path: repoPath } of repoArgs) {
+    try {
+      await assertValidRepoPath(path.resolve(repoPath));
+    } catch (err) {
+      validationErrors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (validationErrors.length > 0) {
+    console.error(`diff-viewer: invalid repo path${validationErrors.length > 1 ? "s" : ""}:`);
+    for (const msg of validationErrors) console.error(`  - ${msg}`);
+    process.exit(1);
+  }
 
   const repos = await Promise.all(repoArgs.map(async ({ path: repoPath, baseRef }) => {
     const resolvedPath = path.resolve(repoPath);

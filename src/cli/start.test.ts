@@ -28,4 +28,9 @@ describe("startCommand", () => {
     expect(result.url).toContain(result.sessionId);
     await stopCommand(result.sessionId);
   });
+
+  it("surfaces the server's stderr instead of a generic timeout when it exits during startup", async () => {
+    const fixturePath = path.join(__dirname, "testFixtures/failingServer.mjs");
+    await expect(startCommand([], fixturePath)).rejects.toThrow(/Not a directory: \/nonexistent\/path/);
+  });
 });

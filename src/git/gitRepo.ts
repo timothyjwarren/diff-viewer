@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
 import { promisify } from "node:util";
 import type { CommitInfo } from "../types.js";
 
@@ -8,6 +9,29 @@ const FIELD_SEP = "\x1f";
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd });
   return stdout.trim();
+}
+
+/**
+ * Throws a clear, specific error for a bad repo path instead of letting a git
+ * spawn fail later with a cryptic `spawn git ENOENT` (Node reports a
+ * nonexistent `cwd` that way, not as a cwd error) that leaves the caller no
+ * wiser than "the server didn't start in time".
+ */
+export async function assertValidRepoPath(repoPath: string): Promise<void> {
+  let stat;
+  try {
+    stat = await fs.stat(repoPath);
+  } catch {
+    throw new Error(`No such directory: ${repoPath}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`Not a directory: ${repoPath}`);
+  }
+  try {
+    await git(repoPath, ["rev-parse", "--is-inside-work-tree"]);
+  } catch {
+    throw new Error(`Not a git repository: ${repoPath}`);
+  }
 }
 
 export async function detectDefaultBranch(repoPath: string): Promise<string> {

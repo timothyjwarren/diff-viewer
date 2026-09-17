@@ -10,6 +10,24 @@ working directory.
 
 Arguments: $ARGUMENTS
 
+**$ARGUMENTS must be repo/worktree paths only** — `diff-viewer start` takes
+positional filesystem paths, not a natural-language description of what to
+review. If $ARGUMENTS is empty, or reads like an instruction/question rather
+than one or more paths (e.g. the user typed `/review show me what I
+changed`), do not pass it through literally — use the current directory (or
+whatever repo/worktree the conversation is actually about) as the path
+instead, and treat the prose as context for the conversation, not as CLI
+arguments. Passing prose through directly makes each word its own invalid
+repo path and the server refuses to start.
+
+`<path[:baseRef]>`'s `baseRef` accepts any git ref: a branch name, or an
+explicit commit SHA. This matters when there's no branch divergence to diff
+(e.g. the changes were already committed straight to the default branch) —
+in that case a bare `<path>` diffs against the merge-base of the current
+branch, which is empty. Instead pass the *parent* of the range you want as
+an explicit SHA, e.g. `/repo:abc1234` to review everything after commit
+`abc1234`; this also populates the in-app commit picker with that range.
+
 Steps:
 1. Choose a `--title`. The user is typically reviewing several diff-viewer
    tabs across several projects at once, so the title is the only thing that
@@ -18,10 +36,18 @@ Steps:
    *and* what's being reviewed (feature, branch, or task), not just the repo.
    Good: `"api-gateway: auth token refactor"`, `"checkout-web: PR 482 review"`.
    Bad: `"diff-viewer"`, `"review"`, a bare repo name with no task context.
-   Run `diff-viewer start --title "<title>" $ARGUMENTS` via Bash. Parse the
-   printed JSON for `sessionId` and `url`.
+   Run `diff-viewer start --title "<title>" <path[:baseRef]>...` via Bash,
+   using the paths determined above (not $ARGUMENTS verbatim unless it was
+   already just paths). Parse the printed JSON for `sessionId` and `url`.
+   If it fails instead, it prints exactly why (e.g. `Not a directory: ...` or
+   `Not a git repository: ...`) — read that message and fix the invocation
+   rather than retrying the same arguments.
 2. Open `url` in the user's default browser (`open <url>` on macOS,
-   `xdg-open <url>` on Linux, `start <url>` on Windows).
+   `xdg-open <url>` on Linux, `start <url>` on Windows). Check the URL's
+   port against what `start` printed before assuming an already-open browser
+   tab is this session — each session listens on its own random port, so a
+   tab showing a different repo or a stale diff is a leftover tab from a
+   different session, not this one failing to navigate.
 3. Start watching for comments and verdicts with the `Monitor` tool — not a
    backgrounded `Bash` call — since this is a "notify me every time X
    happens, indefinitely" watch, not a one-shot wait:

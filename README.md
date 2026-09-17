@@ -126,6 +126,30 @@ Monitor.
 | `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
 
+### Invoking it correctly
+
+`<path[:baseRef]>`'s trailing paths are positional filesystem paths, not a
+natural-language description -- passing prose (e.g. a whole user request)
+where a path is expected turns each word into its own invalid repo path.
+`start` validates every path up front and fails fast with a specific reason
+(`Not a directory: ...` / `Not a git repository: ...` / `No such directory:
+...`) instead of hanging until the client's 5s startup timeout, so a bad
+invocation is diagnosable from its own output.
+
+`baseRef` accepts any git ref, including a bare commit SHA -- not just a
+branch name. The default diff (no `baseRef` given) is against the
+merge-base of the current branch and its default branch, which is empty if
+the changes were committed straight to the default branch with no
+divergence. To review an explicit commit range in that case, pass the
+*parent* of the range as the baseRef: `/repo:abc1234` diffs everything after
+`abc1234`, and also seeds the in-app commit picker with that range.
+
+Each session binds to its own random port, so `start`'s printed URL is
+always unique -- a browser tab showing a different repo or stale content is
+a leftover tab from an unrelated session, not this one failing to navigate.
+`diff-viewer sessions` (no `--repo` filter) lists everything currently
+running if that needs confirming.
+
 For development:
 
 ```bash

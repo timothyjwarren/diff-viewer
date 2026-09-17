@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch } from "./gitRepo.js";
+import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch, assertValidRepoPath } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -75,5 +75,26 @@ describe("gitRepo", () => {
     await git(repoPath, ["checkout", "--detach"]);
     const branch = await getCurrentBranch(repoPath);
     expect(branch).toMatch(/^[0-9a-f]{7,}$/);
+  });
+
+  it("assertValidRepoPath resolves for a real git repo", async () => {
+    await expect(assertValidRepoPath(repoPath)).resolves.toBeUndefined();
+  });
+
+  it("assertValidRepoPath rejects a path that doesn't exist", async () => {
+    await expect(assertValidRepoPath(path.join(repoPath, "nope"))).rejects.toThrow(/No such directory/);
+  });
+
+  it("assertValidRepoPath rejects a file that isn't a directory", async () => {
+    await expect(assertValidRepoPath(path.join(repoPath, "a.txt"))).rejects.toThrow(/Not a directory/);
+  });
+
+  it("assertValidRepoPath rejects a directory that isn't a git repo", async () => {
+    const plainDir = await fs.mkdtemp(path.join(os.tmpdir(), "dv-notgit-"));
+    try {
+      await expect(assertValidRepoPath(plainDir)).rejects.toThrow(/Not a git repository/);
+    } finally {
+      await fs.rm(plainDir, { recursive: true, force: true });
+    }
   });
 });
