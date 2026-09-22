@@ -159,6 +159,30 @@ describe("api app", () => {
     expect(threads.body[0].outdated).toBe(false);
   });
 
+  it("a real-sha-pinned thread's canonical position tracks HEAD only, unaffected by an uncommitted shift", async () => {
+    const app = createApp(await buildStore());
+    const initialHeadSha = await commitAll("feature commit");
+
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    expect(threadRes.body.pinnedRef).toBe(initialHeadSha);
+
+    // Shift the commented line by inserting above it, but leave it
+    // uncommitted — the committed-only view's numbering is untouched by
+    // this, so the canonical position must stay put too.
+    await fs.writeFile(path.join(repoPath, "a.txt"), "zero\none\ntwo\n");
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(true);
+    expect(res.body.headSha).toBe(initialHeadSha);
+
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body[0].lineStart).toBe(2);
+    expect(threads.body[0].outdated).toBe(false);
+  });
+
   it("GET /api/repo-state names only the actually-dirty files", async () => {
     const app = createApp(await buildStore());
     await commitAll("first");

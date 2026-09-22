@@ -8,6 +8,7 @@ import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
 import { ExpandStrip } from "./ExpandStrip";
+import { shiftForUncommitted } from "../lib/uncommittedShift";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
 
@@ -147,9 +148,15 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
                   comments.selection && comments.selection.side === side && lineNumber != null &&
                   lineNumber >= comments.selection.start && lineNumber <= comments.selection.end,
                 );
-                const threadsHere = comments.threads.filter(
-                  t => t.side === side && lineNumber != null && t.lineEnd === lineNumber,
-                );
+                const threadsHere = comments.threads.filter(t => {
+                  if (t.side !== side || lineNumber == null) return false;
+                  // Uncommitted edits only shift "new"-side numbering; a
+                  // thread's stored lineEnd is canonical (HEAD-relative), so
+                  // project it into this view's displayed numbering before
+                  // matching it to the line actually being rendered.
+                  const displayLine = side === "new" ? shiftForUncommitted(hunks, t.lineEnd) : t.lineEnd;
+                  return displayLine === lineNumber;
+                });
                 const showComposer = Boolean(
                   comments.composerArmed && comments.selection && comments.selection.side === side &&
                   lineNumber === comments.selection.end && threadsHere.length === 0,

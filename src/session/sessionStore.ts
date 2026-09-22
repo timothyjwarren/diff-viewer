@@ -181,7 +181,12 @@ export class SessionStore {
     headSha: string,
     dirty: boolean,
     readSnapshot: (pinnedRef: string, file: string) => Promise<string>,
-    readCurrent: (file: string, side: "old" | "new") => Promise<string>,
+    // pinnedRef is passed through so the caller can track a real-sha-pinned
+    // thread against committed (HEAD) content only — matching the
+    // committed-only view exactly — while an "uncommitted"-pinned thread
+    // still tracks the working tree, since that *is* its commit basis until
+    // it gets committed and backfilled to a real sha.
+    readCurrent: (file: string, side: "old" | "new", pinnedRef: string) => Promise<string>,
   ): Promise<void> {
     // Snapshot advances are staged and applied after the loop, not written
     // as each thread is processed: multiple threads can share a
@@ -197,7 +202,7 @@ export class SessionStore {
         this.data.contentSnapshots[key] = await readSnapshot(thread.pinnedRef, thread.file);
       }
       const snapshot = this.data.contentSnapshots[key];
-      const current = await readCurrent(thread.file, thread.side);
+      const current = await readCurrent(thread.file, thread.side, thread.pinnedRef);
       const result = trackThreadDrift({ thread, snapshot, current });
       thread.lineStart = result.lineStart;
       thread.lineEnd = result.lineEnd;

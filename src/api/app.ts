@@ -174,14 +174,19 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
             ? readWorkingTreeFile(repo.path, file).then(linesToContent)
             : readFileAtRef(repo.path, pinnedRef, file).then(linesToContent),
           // The "old" side is always baseRef's content, which never moves
-          // during a session — only "new"-side threads can actually drift.
-          // "new" always reads the working tree (a superset of HEAD when
-          // clean) so a not-yet-committed edit to a commented line flags it
-          // outdated immediately, rather than waiting for a commit.
-          (file, side) => (side === "new"
-            ? readWorkingTreeFile(repo.path, file)
-            : readFileAtRef(repo.path, repo.baseRef, file)
-          ).then(linesToContent),
+          // during a session. For the "new" side: a thread pinned to
+          // "uncommitted" tracks the working tree (that's its commit basis
+          // until it's committed and backfilled to a real sha); a
+          // real-sha-pinned thread tracks HEAD only, not the working tree —
+          // its canonical position must match the committed-only view
+          // exactly, so it only drifts/outdates on an actual commit. Any
+          // uncommitted shift is applied separately, per-view, at render
+          // time in the client, not folded into this canonical position.
+          (file, side, pinnedRef) => {
+            if (side === "old") return readFileAtRef(repo.path, repo.baseRef, file).then(linesToContent);
+            return (pinnedRef === "uncommitted" ? readWorkingTreeFile(repo.path, file) : readFileAtRef(repo.path, headSha, file))
+              .then(linesToContent);
+          },
         );
         await store.persist();
         lastKnownState.set(repoPath, { headSha, dirty });
