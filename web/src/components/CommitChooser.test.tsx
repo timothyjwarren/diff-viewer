@@ -50,9 +50,13 @@ describe("CommitChooser", () => {
     fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
     fireEvent.mouseDown(screen.getByText("first"));
     fireEvent.mouseEnter(screen.getByText("second"));
-    // Still mid-drag: the popover must stay open and onChange must not have
-    // committed yet (it only fires once, at mouseup).
+    // Still mid-drag: the popover must stay open, both rows passed over so
+    // far must preview as selected, and onChange must not have committed
+    // yet (it only fires once, at mouseup).
     expect(screen.getByText("Show all commits")).toBeInTheDocument();
+    expect(screen.getByText("first").closest("[role='option']")).toHaveClass("commit-chooser-row-selected");
+    expect(screen.getByText("second").closest("[role='option']")).toHaveClass("commit-chooser-row-selected");
+    expect(screen.getByText("third").closest("[role='option']")).not.toHaveClass("commit-chooser-row-selected");
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.mouseEnter(screen.getByText("third"));
     fireEvent.mouseUp(window);
@@ -91,7 +95,7 @@ describe("CommitChooser", () => {
     const withUncommitted = [...commits, { sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" }];
     render(<CommitChooser commits={withUncommitted} range={null} onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /commit range/ }));
-    expect(screen.getByText("Uncommitted changes").closest("button")).toHaveClass("commit-chooser-row-uncommitted");
+    expect(screen.getByText("Uncommitted changes").closest("[role='option']")).toHaveClass("commit-chooser-row-uncommitted");
   });
 
   it("shows a badge on the collapsed trigger when newer commits are excluded from the current range", () => {

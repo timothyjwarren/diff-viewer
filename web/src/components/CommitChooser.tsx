@@ -91,18 +91,33 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
             const selected = isSelected(c.sha);
             return (
               <li key={c.sha}>
-                <button
-                  type="button"
+                {/*
+                 * A plain div, not a button: browsers implicitly capture the
+                 * mouse to a pressed form control, which silently suppresses
+                 * mouseenter on sibling elements during a drag — the same
+                 * reason the diff-line gutter drag-select (DiffView.tsx) uses
+                 * a span rather than a button. tabIndex+onKeyDown keep it
+                 * keyboard-selectable despite not being a native control.
+                 */}
+                <div
                   role="option"
+                  tabIndex={0}
                   aria-selected={selected}
                   className={`commit-chooser-row${selected ? " commit-chooser-row-selected" : ""}${c.sha === "uncommitted" ? " commit-chooser-row-uncommitted" : ""}`}
                   onMouseDown={() => { setDragAnchor(c.sha); setDragHover(c.sha); }}
                   onMouseEnter={() => { if (dragAnchor) setDragHover(c.sha); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onChange({ from: c.sha, to: c.sha });
+                      setOpen(false);
+                    }
+                  }}
                 >
                   <span className="commit-chooser-sha">{c.shortSha}</span>
                   <span className="commit-chooser-subject">{c.subject}</span>
                   <span className="commit-chooser-author">{c.author}</span>
-                </button>
+                </div>
               </li>
             );
           })}
