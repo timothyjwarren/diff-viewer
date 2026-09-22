@@ -132,6 +132,17 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads.find(t => t.id === t1.id)!.comments[0].agentStatus).toBe("cleared");
   });
 
+  it("markAllSeen never marks a pending comment as seen", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "queued for review", pending: true,
+    });
+
+    store.markAllSeen();
+    expect(store.snapshot.threads.find(t => t.id === thread.id)!.comments[0].agentStatus).toBeUndefined();
+  });
+
   it("markAllSeen never marks the agent's own comments", () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({

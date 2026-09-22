@@ -112,12 +112,14 @@ export class SessionStore {
    * yet are touched, so this can't resurrect an already-"cleared" comment
    * back to "seen", nor downgrade an in-progress "acked" one. Agent-authored
    * comments are never touched — this indicator is for comments the agent
-   * needs to read and react to, not its own outgoing replies.
+   * needs to read and react to, not its own outgoing replies. Pending
+   * comments are skipped too — they're invisible to the agent until bundled
+   * into a verdict, so they must not appear "seen" before that happens.
    */
   markAllSeen(): void {
     for (const thread of this.data.threads) {
       for (const comment of thread.comments) {
-        if (comment.author === "user" && !comment.agentStatus) comment.agentStatus = "seen";
+        if (comment.author === "user" && !comment.pending && !comment.agentStatus) comment.agentStatus = "seen";
       }
     }
   }
