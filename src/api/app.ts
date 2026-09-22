@@ -2,13 +2,15 @@ import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty } from "../git/gitRepo.js";
-import { readWorkingTreeFile, readFileAtRef } from "../git/fileContent.js";
+import { readWorkingTreeFile, readFileAtRef, linesToContent } from "../git/fileContent.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
   const repo = store.snapshot.repos.find(r => r.path === repoPath);
   if (!repo) throw new Error(`Unknown repo: ${repoPath}`);
   return repo;
 }
+
+const lastKnownState = new Map<string, { headSha: string; dirty: boolean }>();
 
 export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutMs = 55000): express.Express {
   const app = express();
@@ -77,7 +79,7 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const lines = pinnedRef === "uncommitted"
       ? await readWorkingTreeFile(repo.path, rest.file)
       : await readFileAtRef(repo.path, pinnedRef, rest.file);
-    store.ensureContentSnapshot(pinnedRef, rest.file, lines.join("\n"));
+    store.ensureContentSnapshot(pinnedRef, rest.file, linesToContent(lines));
     const thread = store.addThread({ ...rest, pinnedRef });
     await store.persist();
     res.status(201).json(thread);
@@ -148,6 +150,37 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const verdict = store.addVerdict(req.body.type, req.body.summary);
     await store.persist();
     res.status(201).json(verdict);
+  });
+
+  app.get("/api/repo-state", async (req, res) => {
+    const { repoPath } = req.query as Record<string, string>;
+    try {
+      const repo = findRepo(store, repoPath);
+      const [headSha, dirty] = await Promise.all([resolveHeadSha(repo.path), isDirty(repo.path)]);
+      const prev = lastKnownState.get(repoPath);
+      if (!prev || prev.headSha !== headSha || prev.dirty !== dirty) {
+        await store.recomputeThreadPositions(
+          repoPath, headSha, dirty,
+          (pinnedRef, file) => pinnedRef === "uncommitted"
+            ? readWorkingTreeFile(repo.path, file).then(linesToContent)
+            : readFileAtRef(repo.path, pinnedRef, file).then(linesToContent),
+          // The "old" side is always baseRef's content, which never moves
+          // during a session — only "new"-side threads can actually drift.
+          // "new" always reads the working tree (a superset of HEAD when
+          // clean) so a not-yet-committed edit to a commented line flags it
+          // outdated immediately, rather than waiting for a commit.
+          (file, side) => (side === "new"
+            ? readWorkingTreeFile(repo.path, file)
+            : readFileAtRef(repo.path, repo.baseRef, file)
+          ).then(linesToContent),
+        );
+        await store.persist();
+        lastKnownState.set(repoPath, { headSha, dirty });
+      }
+      res.json({ headSha, dirty });
+    } catch {
+      res.status(404).end();
+    }
   });
 
   app.get("/api/wait", (req, res) => {

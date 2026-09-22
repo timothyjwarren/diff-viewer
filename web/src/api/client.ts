@@ -69,6 +69,10 @@ export async function deleteComment(threadId: string, commentId: string): Promis
   await fetch(`/api/threads/${threadId}/comments/${commentId}`, { method: "DELETE" });
 }
 
+export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean }> {
+  return json(await fetch(`/api/repo-state?repoPath=${encodeURIComponent(repoPath)}`));
+}
+
 export async function fetchVerdicts(): Promise<Verdict[]> {
   return json(await fetch("/api/verdicts"));
 }

@@ -4,7 +4,7 @@ import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
-  fetchCommits, fetchRepoDiff,
+  fetchCommits, fetchRepoDiff, fetchRepoState,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
@@ -136,9 +136,10 @@ export function App() {
     refreshThreads();
     const interval = setInterval(() => {
       refreshThreads();
+      repos.forEach(r => fetchRepoState(r.repoPath).catch(() => {}));
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [repos]);
 
   useEffect(() => {
     // A gutter mousedown starts tracking a drag; releasing anywhere (not just

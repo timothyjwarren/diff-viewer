@@ -14,3 +14,15 @@ export async function readFileAtRef(repoPath: string, ref: string, relativePath:
   const { stdout } = await execFileAsync("git", ["show", `${ref}:${relativePath}`], { cwd: repoPath });
   return stdout.replace(/\n$/, "").split("\n");
 }
+
+/**
+ * Joins a lines array back into file content, normalizing away the trailing
+ * empty element `readWorkingTreeFile` leaves for a file ending in a
+ * newline — `readFileAtRef` never has one, since it strips the trailing
+ * newline before splitting. Without this, comparing content read via the
+ * two functions spuriously looks changed on the last line.
+ */
+export function linesToContent(lines: string[]): string {
+  const trimmed = lines.length > 0 && lines[lines.length - 1] === "" ? lines.slice(0, -1) : lines;
+  return trimmed.join("\n");
+}

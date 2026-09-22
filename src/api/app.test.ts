@@ -113,6 +113,28 @@ describe("api app", () => {
     expect(res.body.pinnedRef).toBe("uncommitted");
   });
 
+  it("GET /api/repo-state reports headSha and dirty, and a changed headSha triggers reposition", async () => {
+    const app = createApp(await buildStore());
+    const initialHeadSha = await commitAll("feature commit");
+
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    expect(threadRes.body.pinnedRef).toBe(initialHeadSha);
+
+    await fs.writeFile(path.join(repoPath, "a.txt"), "zero\none\ntwo\n"); // shifts the commented line
+    await git(repoPath, ["commit", "-am", "shift"]);
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(false);
+    expect(res.body.headSha).not.toBe(initialHeadSha);
+
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body[0].lineStart).toBe(3); // shifted down by the inserted "zero" line
+    expect(threads.body[0].outdated).toBe(false);
+  });
+
   it("posting a non-pending user comment is immediately reflected in /api/wait", async () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
