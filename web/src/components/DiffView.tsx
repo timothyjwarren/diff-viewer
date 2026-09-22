@@ -79,6 +79,7 @@ export interface CommentHandlers {
   threads: CommentThreadData[];
   selection: SelectionState;
   composerArmed: boolean;
+  quotedText: string | null;
   onGutterMouseDown: (side: "old" | "new", line: number) => void;
   onGutterMouseEnter: (side: "old" | "new", line: number) => void;
   onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void;
@@ -88,11 +89,16 @@ export interface CommentHandlers {
   onDelete: (threadId: string, commentId: string) => void;
 }
 
-function Composer({ onSubmit, onCancel }: {
+function formatQuote(text: string): string {
+  return text.split("\n").map(line => `> ${line}`).join("\n") + "\n\n";
+}
+
+function Composer({ onSubmit, onCancel, quotedText }: {
   onSubmit: (body: string, pending: boolean) => void;
   onCancel: () => void;
+  quotedText: string | null;
 }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => (quotedText ? formatQuote(quotedText) : ""));
   return (
     <div className="comment-composer">
       <textarea
@@ -109,14 +115,14 @@ function Composer({ onSubmit, onCancel }: {
   );
 }
 
-function Pane({ hunks, side, lang, repoName, comments, onExpand, fileLineCount, showHeaders = true }: {
-  hunks: DiffHunk[]; side: "old" | "new"; lang: string; repoName: string; comments: CommentHandlers;
+function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLineCount, showHeaders = true }: {
+  hunks: DiffHunk[]; side: "old" | "new"; lang: string; repoName: string; fileId: string; comments: CommentHandlers;
   onExpand: (hunkIndex: number, direction: "up" | "down", amount?: number) => void;
   fileLineCount: number | null;
   showHeaders?: boolean;
 }) {
   return (
-    <div className="diff-pane" data-side={side}>
+    <div className="diff-pane" data-side={side} data-file={fileId}>
       <div className="diff-pane-content">
         {hunks.map((hunk, hi) => {
           const rows: PairedRow[] = pairHunkLines(hunk.lines);
@@ -167,6 +173,7 @@ function Pane({ hunks, side, lang, repoName, comments, onExpand, fileLineCount, 
                           side, comments.selection!.start, comments.selection!.end, body, pending,
                         )}
                         onCancel={comments.onCancelSelection}
+                        quotedText={comments.quotedText}
                       />
                     )}
                   </div>
@@ -202,6 +209,7 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const lang = detectLanguage(file.newPath || file.oldPath);
+  const fileId = file.newPath || file.oldPath;
 
   useEffect(() => setHunks(file.hunks), [file]);
   void baseRef;
@@ -250,17 +258,17 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
         <div className="diff-view-body">
           {viewingFullFile && fullFileLines ? (
             <Pane
-              hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} comments={comments}
+              hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
               onExpand={expand} fileLineCount={fullFileLines.length} showHeaders={false}
             />
           ) : (
             <>
               <Pane
-                hunks={hunks} side="old" lang={lang} repoName={repoName} comments={comments}
+                hunks={hunks} side="old" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
                 onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
               />
               <Pane
-                hunks={hunks} side="new" lang={lang} repoName={repoName} comments={comments}
+                hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
                 onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
               />
             </>

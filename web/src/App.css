@@ -464,6 +464,13 @@ main {
   user-select: none;
   border-right: 1px solid var(--border);
   cursor: pointer;
+  /* Keeps the clickable line-number area reachable without scrolling back
+   * left when a diff pane is scrolled horizontally. Needs an opaque
+   * background since code content scrolls underneath it. */
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-elevated);
 }
 
 .diff-line-number {
@@ -517,14 +524,41 @@ main {
   background: var(--del-bg-strong);
 }
 
+/*
+ * The gutter is a sticky child painted over scrolled-past code, so it needs
+ * its own opaque background rather than inheriting the row's (semi-
+ * transparent) tint — these layer the same tint colors over the gutter's
+ * base background, in the same specificity/order as the row rules above so
+ * hover still wins over add/del at rest.
+ */
+.diff-line:hover .diff-line-gutter {
+  background: linear-gradient(rgba(177, 186, 196, 0.08), rgba(177, 186, 196, 0.08)), var(--bg-elevated);
+}
+
+.diff-line-add .diff-line-gutter {
+  background: linear-gradient(var(--add-bg), var(--add-bg)), var(--bg-elevated);
+}
+
+.diff-line-add:hover .diff-line-gutter {
+  background: linear-gradient(var(--add-bg-strong), var(--add-bg-strong)), var(--bg-elevated);
+}
+
+.diff-line-del .diff-line-gutter {
+  background: linear-gradient(var(--del-bg), var(--del-bg)), var(--bg-elevated);
+}
+
+.diff-line-del:hover .diff-line-gutter {
+  background: linear-gradient(var(--del-bg-strong), var(--del-bg-strong)), var(--bg-elevated);
+}
+
 .diff-line-selected {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
-.diff-line span,
-.diff-line pre,
-.diff-line code {
+.diff-line-code span,
+.diff-line-code pre,
+.diff-line-code code {
   background: transparent !important;
   margin: 0;
   padding: 0;
