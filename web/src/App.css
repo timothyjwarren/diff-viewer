@@ -857,3 +857,49 @@ main {
   font-size: 12px;
   font-weight: 600;
 }
+
+.file-view-page {
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+.file-view-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.file-view-body {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 4;
+}
+
+.file-view-line {
+  display: flex;
+}
+
+.file-view-line-number {
+  flex: 0 0 48px;
+  text-align: right;
+  padding: 0 12px 0 4px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  background: var(--bg-elevated);
+}
+
+.file-view-line-code {
+  padding: 0 12px;
+  white-space: pre;
+}

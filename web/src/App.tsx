@@ -235,7 +235,7 @@ export function App() {
               file={file}
               repoPath={repo.repoPath}
               repoName={`${repo.repo}:${repo.branch}`}
-              baseRef=""
+              gitRef={rangeByRepo[repo.repoPath]?.to ?? "working"}
               comments={commentHandlersFor(file)}
             />
           </div>

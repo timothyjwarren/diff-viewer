@@ -116,18 +116,17 @@ function Composer({ onSubmit, onCancel, quotedText }: {
   );
 }
 
-function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLineCount, showHeaders = true }: {
+function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLineCount }: {
   hunks: DiffHunk[]; side: "old" | "new"; lang: string; repoName: string; fileId: string; comments: CommentHandlers;
   onExpand: (hunkIndex: number, direction: "up" | "down", amount?: number) => void;
   fileLineCount: number | null;
-  showHeaders?: boolean;
 }) {
   return (
     <div className="diff-pane" data-side={side} data-file={fileId}>
       <div className="diff-pane-content">
         {hunks.map((hunk, hi) => {
           const rows: PairedRow[] = pairHunkLines(hunk.lines);
-          const gapBefore = showHeaders ? hiddenLinesBefore(hunks, hi) : 0;
+          const gapBefore = hiddenLinesBefore(hunks, hi);
           return (
             <div key={hi} className="diff-hunk">
               {gapBefore > 0 && (
@@ -184,7 +183,7 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
             </div>
           );
         })}
-        {showHeaders && hunks.length > 0 && (() => {
+        {hunks.length > 0 && (() => {
           const lastIndex = hunks.length - 1;
           const gapAfter = hiddenLinesAfter(hunks, lastIndex, fileLineCount);
           if (gapAfter === 0) return null;
@@ -202,19 +201,17 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
   );
 }
 
-export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
-  file: DiffFile; repoPath: string; repoName: string; baseRef: string;
+export function DiffView({ file, repoPath, repoName, gitRef, comments }: {
+  file: DiffFile; repoPath: string; repoName: string; gitRef: string;
   comments: CommentHandlers;
 }) {
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
-  const [viewingFullFile, setViewingFullFile] = useState(false);
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
 
   useEffect(() => setHunks(file.hunks), [file]);
-  void baseRef;
 
   async function loadFullFile() {
     const lines = await fetchFile(repoPath, file.newPath, "working");
@@ -227,19 +224,10 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
     setHunks(prev => expandHunkContext(prev, lines, hunkIndex, direction, amount));
   }
 
-  async function toggleViewFile() {
-    if (!viewingFullFile) await loadFullFile();
-    setViewingFullFile(v => !v);
+  function openFileView() {
+    const params = new URLSearchParams({ repoPath, path: fileId, ref: gitRef, repoName });
+    window.open(`/view-file?${params}`, "_blank");
   }
-
-  const fullFileHunks: DiffHunk[] = fullFileLines
-    ? [{
-      oldStart: 1, oldLines: fullFileLines.length, newStart: 1, newLines: fullFileLines.length,
-      lines: fullFileLines.map((content, idx) => (
-        { type: "context" as const, oldLineNumber: idx + 1, newLineNumber: idx + 1, content }
-      )),
-    }]
-    : [];
 
   return (
     <div className="diff-view">
@@ -253,28 +241,19 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
             <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
           </button>
           <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
-          <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
+          <button onClick={openFileView}>View File</button>
         </div>
       </div>
       {!collapsed && (
         <div className="diff-view-body">
-          {viewingFullFile && fullFileLines ? (
-            <Pane
-              hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
-              onExpand={expand} fileLineCount={fullFileLines.length} showHeaders={false}
-            />
-          ) : (
-            <>
-              <Pane
-                hunks={hunks} side="old" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
-                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
-              />
-              <Pane
-                hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
-                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
-              />
-            </>
-          )}
+          <Pane
+            hunks={hunks} side="old" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
+            onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+          />
+          <Pane
+            hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
+            onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+          />
         </div>
       )}
     </div>
