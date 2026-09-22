@@ -10,6 +10,12 @@ export async function computeDiff(repoPath: string, baseRef: string): Promise<Di
   return parseUnifiedDiff(stdout, repoPath);
 }
 
+/** Diffs baseRef against the working tree — every committed change plus any uncommitted edits. */
+export async function computeDiffIncludingUncommitted(repoPath: string, baseRef: string): Promise<DiffFile[]> {
+  const { stdout } = await execFileAsync("git", ["diff", "--no-color", baseRef], { cwd: repoPath });
+  return parseUnifiedDiff(stdout, repoPath);
+}
+
 /**
  * Diffs the inclusive commit range `from..to`, both committed — unless `to`
  * is the `"uncommitted"` sentinel, in which case it diffs against the

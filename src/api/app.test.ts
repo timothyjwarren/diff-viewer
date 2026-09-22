@@ -88,6 +88,18 @@ describe("api app", () => {
     expect(addedLines).toEqual(["two"]);
   });
 
+  it("GET /api/repo-diff with to=uncommitted and no from returns the full history plus uncommitted edits", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-diff").query({ repoPath, to: "uncommitted" });
+    expect(res.status).toBe(200);
+    const addedLines = res.body[0].hunks.flatMap((h: { lines: { type: string; content: string }[] }) => h.lines)
+      .filter((l: { type: string }) => l.type === "add").map((l: { content: string }) => l.content);
+    expect(addedLines).toEqual(["two", "uncommitted"]);
+  });
+
   it("GET /api/file returns working-tree lines", async () => {
     const app = createApp(await buildStore());
     const res = await request(app).get("/api/file").query({ repoPath, path: "a.txt", ref: "working" });
@@ -133,6 +145,16 @@ describe("api app", () => {
     const threads = await request(app).get("/api/threads");
     expect(threads.body[0].lineStart).toBe(3); // shifted down by the inserted "zero" line
     expect(threads.body[0].outdated).toBe(false);
+  });
+
+  it("GET /api/repo-state names only the actually-dirty files", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(true);
+    expect(res.body.dirtyFiles).toEqual(["a.txt"]);
   });
 
   it("posting a non-pending user comment is immediately reflected in /api/wait", async () => {

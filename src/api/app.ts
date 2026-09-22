@@ -1,7 +1,7 @@
 import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
-import { computeDiff, computeRangeDiff } from "../git/diff.js";
-import { listCommits, resolveHeadSha, isDirty } from "../git/gitRepo.js";
+import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted } from "../git/diff.js";
+import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef, linesToContent } from "../git/fileContent.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
@@ -47,7 +47,12 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const { repoPath, from, to } = req.query as Record<string, string | undefined>;
     try {
       const repo = findRepo(store, repoPath!);
-      const files = from && to ? await computeRangeDiff(repo.path, from, to) : await computeDiff(repo.path, repo.baseRef);
+      // to=uncommitted with no from means "everything, including local
+      // edits" (the chooser's "Show all commits + uncommitted changes"),
+      // as distinct from a specific from..uncommitted range.
+      const files = to === "uncommitted" && !from
+        ? await computeDiffIncludingUncommitted(repo.path, repo.baseRef)
+        : from && to ? await computeRangeDiff(repo.path, from, to) : await computeDiff(repo.path, repo.baseRef);
       res.json(files);
     } catch {
       res.status(404).end();
@@ -156,7 +161,8 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const { repoPath } = req.query as Record<string, string>;
     try {
       const repo = findRepo(store, repoPath);
-      const [headSha, dirty] = await Promise.all([resolveHeadSha(repo.path), isDirty(repo.path)]);
+      const [headSha, dirtyFiles] = await Promise.all([resolveHeadSha(repo.path), listDirtyFiles(repo.path)]);
+      const dirty = dirtyFiles.length > 0;
       const prev = lastKnownState.get(repoPath);
       if (!prev || prev.headSha !== headSha || prev.dirty !== dirty) {
         await store.recomputeThreadPositions(
@@ -177,7 +183,7 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
         await store.persist();
         lastKnownState.set(repoPath, { headSha, dirty });
       }
-      res.json({ headSha, dirty });
+      res.json({ headSha, dirty, dirtyFiles });
     } catch {
       res.status(404).end();
     }

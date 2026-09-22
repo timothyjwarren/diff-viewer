@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { computeDiff, computeRangeDiff } from "./diff.js";
+import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted } from "./diff.js";
 import { resolveBaseRef } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
@@ -72,5 +72,17 @@ describe("computeDiff", () => {
     const both = await computeRangeDiff(repoPath, firstSha.trim(), secondSha.trim());
     expect(both[0].hunks.flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content))
       .toEqual(["three", "four"]);
+  });
+
+  it("computeDiffIncludingUncommitted includes both committed history and the working tree", async () => {
+    const baseRef = await resolveBaseRef(repoPath);
+    await git(repoPath, ["checkout", "-b", "feature"]);
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\n");
+    await git(repoPath, ["commit", "-am", "committed change"]);
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\nuncommitted\n");
+
+    const files = await computeDiffIncludingUncommitted(repoPath, baseRef);
+    const addedLines = files.flatMap(f => f.hunks).flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content);
+    expect(addedLines).toEqual(["committed", "uncommitted"]);
   });
 });
