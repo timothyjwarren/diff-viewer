@@ -10,6 +10,8 @@ export interface DiffLine {
   oldLineNumber: number | null;
   newLineNumber: number | null;
   content: string;
+  /** True for an "add" line that only exists in the uncommitted working tree, not at HEAD. */
+  uncommitted?: boolean;
 }
 
 export interface DiffHunk {

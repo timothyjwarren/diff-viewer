@@ -566,20 +566,20 @@ main {
   background: linear-gradient(var(--add-bg-strong), var(--add-bg-strong)), var(--bg-elevated);
 }
 
-/* Files with an uncommitted edit get amber add-lines instead of green, matching .uncommitted-banner. */
-.diff-view-body-uncommitted .diff-line-add {
+/* An added line that only exists in the uncommitted working tree (not at HEAD) gets amber instead of green, matching .uncommitted-banner — the rest of the file's committed additions stay green. */
+.diff-line-uncommitted {
   background: var(--uncommitted-add-bg);
 }
 
-.diff-view-body-uncommitted .diff-line-add:hover {
+.diff-line-uncommitted:hover {
   background: var(--uncommitted-add-bg-strong);
 }
 
-.diff-view-body-uncommitted .diff-line-add .diff-line-gutter {
+.diff-line-uncommitted .diff-line-gutter {
   background: linear-gradient(var(--uncommitted-add-bg), var(--uncommitted-add-bg)), var(--bg-elevated);
 }
 
-.diff-view-body-uncommitted .diff-line-add:hover .diff-line-gutter {
+.diff-line-uncommitted:hover .diff-line-gutter {
   background: linear-gradient(var(--uncommitted-add-bg-strong), var(--uncommitted-add-bg-strong)), var(--bg-elevated);
 }
 

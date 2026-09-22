@@ -100,6 +100,18 @@ describe("api app", () => {
     expect(addedLines).toEqual(["two", "uncommitted"]);
   });
 
+  it("GET /api/repo-diff with to=uncommitted flags only the uncommitted add line, not the earlier committed one", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-diff").query({ repoPath, to: "uncommitted" });
+    const addLines = res.body[0].hunks.flatMap((h: { lines: { type: string; content: string; uncommitted?: boolean }[] }) => h.lines)
+      .filter((l: { type: string }) => l.type === "add");
+    expect(addLines.find((l: { content: string }) => l.content === "two").uncommitted).toBeFalsy();
+    expect(addLines.find((l: { content: string }) => l.content === "uncommitted").uncommitted).toBe(true);
+  });
+
   it("GET /api/file returns working-tree lines", async () => {
     const app = createApp(await buildStore());
     const res = await request(app).get("/api/file").query({ repoPath, path: "a.txt", ref: "working" });

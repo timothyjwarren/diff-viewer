@@ -11,6 +11,17 @@ const file: DiffFile = {
   }],
 };
 
+const fileWithMixedAdds: DiffFile = {
+  repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
+  hunks: [{
+    oldStart: 1, oldLines: 1, newStart: 1, newLines: 3,
+    lines: [
+      { type: "add", oldLineNumber: null, newLineNumber: 1, content: "committed addition" },
+      { type: "add", oldLineNumber: null, newLineNumber: 2, content: "uncommitted addition", uncommitted: true },
+    ],
+  }],
+};
+
 const comments: CommentHandlers = {
   threads: [], selection: null, composerArmed: false, quotedText: null,
   onGutterMouseDown: vi.fn(), onGutterMouseEnter: vi.fn(), onCreateThread: vi.fn(),
@@ -37,17 +48,11 @@ describe("DiffView", () => {
     expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
   });
 
-  it("tints added lines amber instead of green when showUncommittedBanner is true", () => {
-    const { container } = render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner comments={comments} />,
+  it("tints only the specific lines flagged uncommitted, not the whole file's other additions", () => {
+    render(
+      <DiffView file={fileWithMixedAdds} repoPath="/repo" repoName="repo:main" showUncommittedBanner comments={comments} />,
     );
-    expect(container.querySelector(".diff-view-body-uncommitted")).toBeInTheDocument();
-  });
-
-  it("does not tint added lines amber when showUncommittedBanner is false", () => {
-    const { container } = render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner={false} comments={comments} />,
-    );
-    expect(container.querySelector(".diff-view-body-uncommitted")).not.toBeInTheDocument();
+    expect(screen.getByText("committed addition").closest(".diff-line")).not.toHaveClass("diff-line-uncommitted");
+    expect(screen.getByText("uncommitted addition").closest(".diff-line")).toHaveClass("diff-line-uncommitted");
   });
 });

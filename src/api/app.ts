@@ -1,6 +1,6 @@
 import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
-import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted } from "../git/diff.js";
+import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted, markUncommittedLines } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef, linesToContent } from "../git/fileContent.js";
 
@@ -53,6 +53,9 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
       const files = to === "uncommitted" && !from
         ? await computeDiffIncludingUncommitted(repo.path, repo.baseRef)
         : from && to ? await computeRangeDiff(repo.path, from, to) : await computeDiff(repo.path, repo.baseRef);
+      if (to === "uncommitted") {
+        await markUncommittedLines(repo.path, await resolveHeadSha(repo.path), files);
+      }
       res.json(files);
     } catch {
       res.status(404).end();

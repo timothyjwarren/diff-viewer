@@ -46,7 +46,7 @@ function Line({ line, lang, repoName, side, selected, onGutterMouseDown, onGutte
 
   return (
     <div
-      className={`diff-line diff-line-${line.type}${selected ? " diff-line-selected" : ""}`}
+      className={`diff-line diff-line-${line.type}${selected ? " diff-line-selected" : ""}${line.uncommitted ? " diff-line-uncommitted" : ""}`}
       data-line-number={lineNumber}
     >
       {/*
@@ -259,7 +259,7 @@ export function DiffView({ file, repoPath, repoName, showUncommittedBanner, comm
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
       {!collapsed && (
-        <div className={`diff-view-body${showUncommittedBanner ? " diff-view-body-uncommitted" : ""}`}>
+        <div className="diff-view-body">
           {viewingFullFile && fullFileLines ? (
             <Pane
               hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
