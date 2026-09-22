@@ -71,6 +71,8 @@ export interface CommentThread {
   lineEnd: number;
   side: "old" | "new";
   resolved: boolean;
+  pinnedRef: string | "uncommitted";
+  outdated: boolean;
   comments: Comment[];
 }
 
@@ -102,6 +104,7 @@ export interface SessionData {
   threads: CommentThread[];
   verdicts: Verdict[];
   notifications: NotificationEvent[];
+  contentSnapshots: Record<string, string>;
 }
 
 export function verdictIntent(type: VerdictType): VerdictIntent {

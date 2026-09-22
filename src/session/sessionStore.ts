@@ -19,6 +19,7 @@ export interface NewThreadInput {
   body: string;
   suggestion?: string;
   pending?: boolean;
+  pinnedRef: string;
 }
 
 export class SessionStore {
@@ -35,7 +36,7 @@ export class SessionStore {
   static create(repos: RepoConfig[], id: string, title: string, dataDir: string = getDataDir()): SessionStore {
     const data: SessionData = {
       id, title, repos, createdAt: new Date().toISOString(), status: "active",
-      threads: [], verdicts: [], notifications: [],
+      threads: [], verdicts: [], notifications: [], contentSnapshots: {},
     };
     return new SessionStore(data, path.join(dataDir, `${id}.json`));
   }
@@ -68,13 +69,20 @@ export class SessionStore {
     const thread: CommentThread = {
       id: randomUUID(), repoPath: input.repoPath, file: input.file,
       lineStart: input.lineStart, lineEnd: input.lineEnd, side: input.side,
-      resolved: false, comments: [comment],
+      resolved: false, pinnedRef: input.pinnedRef, outdated: false, comments: [comment],
     };
     this.data.threads.push(thread);
     if (input.author === "user" && !pending) {
       this.notify({ type: "comment", threadId: thread.id, commentId: comment.id });
     }
     return thread;
+  }
+
+  ensureContentSnapshot(pinnedRef: string, file: string, content: string): void {
+    const key = `${pinnedRef}:${file}`;
+    if (!(key in this.data.contentSnapshots)) {
+      this.data.contentSnapshots[key] = content;
+    }
   }
 
   addReply(threadId: string, author: CommentAuthor, body: string, suggestion?: string, pendingInput?: boolean): Comment {

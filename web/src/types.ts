@@ -24,7 +24,8 @@ export interface Comment {
 }
 export interface CommentThread {
   id: string; repoPath: string; file: string; lineStart: number; lineEnd: number;
-  side: "old" | "new"; resolved: boolean; comments: Comment[];
+  side: "old" | "new"; resolved: boolean; pinnedRef: string | "uncommitted"; outdated: boolean;
+  comments: Comment[];
 }
 
 export type VerdictType = "comment" | "approve" | "request_changes";

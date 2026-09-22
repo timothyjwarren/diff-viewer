@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch, assertValidRepoPath } from "./gitRepo.js";
+import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch, assertValidRepoPath, resolveHeadSha } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -96,5 +96,10 @@ describe("gitRepo", () => {
     } finally {
       await fs.rm(plainDir, { recursive: true, force: true });
     }
+  });
+
+  it("resolves the current HEAD sha", async () => {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    expect(await resolveHeadSha(repoPath)).toBe(stdout.trim());
   });
 });

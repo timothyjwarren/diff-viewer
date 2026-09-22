@@ -63,6 +63,10 @@ export async function resolveBaseRef(repoPath: string, explicitBaseRef?: string)
   return resolveMergeBase(repoPath, defaultBranch);
 }
 
+export async function resolveHeadSha(repoPath: string): Promise<string> {
+  return git(repoPath, ["rev-parse", "HEAD"]);
+}
+
 /** The repo's current branch name, or its short HEAD sha when detached. */
 export async function getCurrentBranch(repoPath: string): Promise<string> {
   const branch = await git(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
