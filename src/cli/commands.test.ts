@@ -74,6 +74,26 @@ describe("cli commands", () => {
     expect(result.verdicts[0].intent).toBe("changes_requested");
   });
 
+  it("reviewCommand omits pending comments, and threads that are pending-only", async () => {
+    const shownThread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false,
+    });
+    store.addReply(shownThread.id, "user", "also, why this?", undefined, true);
+    const hiddenThread = store.addThread({
+      repoPath: "/repo", file: "b.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "queued for review", pending: true,
+    });
+
+    const result = await reviewCommand(sessionId) as any;
+
+    expect(result.threads).toHaveLength(1);
+    expect(result.threads[0].id).toBe(shownThread.id);
+    expect(result.threads[0].comments).toHaveLength(1);
+    expect(result.threads[0].comments[0].body).toBe("why?");
+    expect(result.threads.some((t: any) => t.id === hiddenThread.id)).toBe(false);
+  });
+
   it("reviewCommand marks comments as seen as a side effect of the agent reading them", async () => {
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",

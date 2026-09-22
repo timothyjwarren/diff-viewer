@@ -3,7 +3,7 @@ import path from "node:path";
 import { getRegistryDir, getDataDir } from "../paths.js";
 import { readRegistryEntry, removeRegistryEntry } from "../registry.js";
 import { readCursor, writeCursor } from "./cursor.js";
-import { verdictIntent, type SessionData, type RepoConfig } from "../types.js";
+import { verdictIntent, type SessionData, type RepoConfig, type CommentThread } from "../types.js";
 
 async function baseUrl(sessionId: string): Promise<string> {
   const { port } = await readRegistryEntry(sessionId);
@@ -98,8 +98,8 @@ export async function watchCommand(sessionId: string, log: (line: string) => voi
 
 export async function reviewCommand(sessionId: string): Promise<unknown> {
   const url = await baseUrl(sessionId);
-  const [threads, verdicts] = await Promise.all([
-    fetch(`${url}/api/threads`).then(r => r.json()),
+  const [rawThreads, verdicts] = await Promise.all([
+    fetch(`${url}/api/threads`).then(r => r.json()) as Promise<CommentThread[]>,
     fetch(`${url}/api/verdicts`).then(r => r.json()),
     // Fetching via `review` is what the agent uses to read comments, so it's
     // what should flip their "seen" flag — the frontend's own polling of
@@ -107,6 +107,11 @@ export async function reviewCommand(sessionId: string): Promise<unknown> {
     // seen instantly (before the agent ever looked at it).
     fetch(`${url}/api/mark-seen`, { method: "POST" }),
   ]);
+  // Pending comments are queued in the user's in-progress review and stay
+  // invisible to the agent until bundled into a submitted verdict.
+  const threads = rawThreads
+    .map(t => ({ ...t, comments: t.comments.filter(c => !c.pending) }))
+    .filter(t => t.comments.length > 0);
   const verdictsWithIntent = (verdicts as Array<{ type: "comment" | "approve" | "request_changes" }>).map(v => ({
     ...v, intent: verdictIntent(v.type),
   }));
