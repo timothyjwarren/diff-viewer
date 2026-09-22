@@ -183,6 +183,13 @@ export class SessionStore {
     readSnapshot: (pinnedRef: string, file: string) => Promise<string>,
     readCurrent: (file: string, side: "old" | "new") => Promise<string>,
   ): Promise<void> {
+    // Snapshot advances are staged and applied after the loop, not written
+    // as each thread is processed: multiple threads can share a
+    // (pinnedRef, file) key, and mutating the cache mid-loop would make a
+    // later thread on the same key diff against `current` twice (no-op)
+    // instead of once against the original `snapshot`.
+    const snapshotAdvances: Record<string, string> = {};
+
     for (const thread of this.data.threads) {
       if (thread.repoPath !== repoPath || thread.outdated) continue;
       const key = `${thread.pinnedRef}:${thread.file}`;
@@ -197,8 +204,15 @@ export class SessionStore {
       thread.outdated = result.outdated;
       if (thread.pinnedRef === "uncommitted" && !dirty && !result.outdated) {
         thread.pinnedRef = headSha;
-        this.data.contentSnapshots[`${headSha}:${thread.file}`] = snapshot;
+        snapshotAdvances[`${headSha}:${thread.file}`] = current;
+      } else if (!result.outdated) {
+        // Advance the cache to the position we just repositioned to, so the
+        // next recompute diffs from here instead of re-applying this same
+        // shift on top of an already-updated lineStart/lineEnd.
+        snapshotAdvances[key] = current;
       }
     }
+
+    Object.assign(this.data.contentSnapshots, snapshotAdvances);
   }
 }

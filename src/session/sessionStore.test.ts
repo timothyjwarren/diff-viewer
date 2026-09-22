@@ -177,4 +177,26 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads[0].pinnedRef).toBe("newsha123");
     expect(store.snapshot.threads[0].outdated).toBe(false);
   });
+
+  it("recomputeThreadPositions does not compound a shift across repeated calls", async () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 3, lineEnd: 3, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "sha1",
+    });
+    store.ensureContentSnapshot("sha1", "a.txt", "one\ntwo\nthree\n");
+    const current = "zero\none\ntwo\nthree\n"; // one line inserted above the commented range
+
+    // A line-inserting change lands as one commit, but a session might poll
+    // /api/repo-state (and thus recompute) more than once while it's the
+    // current HEAD — e.g. once while the working tree is still dirty, once
+    // more right after the commit lands. Both calls diff the same
+    // unchanged file content against the same cached snapshot, so the
+    // second call must be a no-op, not a second application of the shift.
+    await store.recomputeThreadPositions("/repo", "sha2", false, async () => "one\ntwo\nthree\n", async () => current);
+    expect(store.snapshot.threads.find(t => t.id === thread.id)!.lineStart).toBe(4);
+
+    await store.recomputeThreadPositions("/repo", "sha2", false, async () => "one\ntwo\nthree\n", async () => current);
+    expect(store.snapshot.threads.find(t => t.id === thread.id)!.lineStart).toBe(4);
+  });
 });
