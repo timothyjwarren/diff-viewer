@@ -48,6 +48,7 @@ describe("api app", () => {
 
   it("GET /api/diffs returns parsed diffs for each repo", async () => {
     const app = createApp(await buildStore());
+    await commitAll("feature commit");
     const res = await request(app).get("/api/diffs");
     expect(res.status).toBe(200);
     expect(res.body[0].repo).toBe("repo");
@@ -87,6 +88,30 @@ describe("api app", () => {
     expect(addedLines).toEqual(["two"]);
   });
 
+  it("GET /api/repo-diff with to=uncommitted and no from returns the full history plus uncommitted edits", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-diff").query({ repoPath, to: "uncommitted" });
+    expect(res.status).toBe(200);
+    const addedLines = res.body[0].hunks.flatMap((h: { lines: { type: string; content: string }[] }) => h.lines)
+      .filter((l: { type: string }) => l.type === "add").map((l: { content: string }) => l.content);
+    expect(addedLines).toEqual(["two", "uncommitted"]);
+  });
+
+  it("GET /api/repo-diff with to=uncommitted flags only the uncommitted add line, not the earlier committed one", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-diff").query({ repoPath, to: "uncommitted" });
+    const addLines = res.body[0].hunks.flatMap((h: { lines: { type: string; content: string; uncommitted?: boolean }[] }) => h.lines)
+      .filter((l: { type: string }) => l.type === "add");
+    expect(addLines.find((l: { content: string }) => l.content === "two").uncommitted).toBeFalsy();
+    expect(addLines.find((l: { content: string }) => l.content === "uncommitted").uncommitted).toBe(true);
+  });
+
   it("GET /api/file returns working-tree lines", async () => {
     const app = createApp(await buildStore());
     const res = await request(app).get("/api/file").query({ repoPath, path: "a.txt", ref: "working" });
@@ -103,11 +128,86 @@ describe("api app", () => {
     await fs.rm(webDistDir, { recursive: true, force: true });
   });
 
+  it("resolves toRef=HEAD to the current commit sha and snapshots the file", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    const headSha = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath })).stdout.trim();
+    expect(res.body.pinnedRef).toBe(headSha);
+  });
+
+  it("resolves toRef=uncommitted to the uncommitted sentinel", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      body: "q", pending: false, toRef: "uncommitted",
+    });
+    expect(res.body.pinnedRef).toBe("uncommitted");
+  });
+
+  it("GET /api/repo-state reports headSha and dirty, and a changed headSha triggers reposition", async () => {
+    const app = createApp(await buildStore());
+    const initialHeadSha = await commitAll("feature commit");
+
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    expect(threadRes.body.pinnedRef).toBe(initialHeadSha);
+
+    await fs.writeFile(path.join(repoPath, "a.txt"), "zero\none\ntwo\n"); // shifts the commented line
+    await git(repoPath, ["commit", "-am", "shift"]);
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(false);
+    expect(res.body.headSha).not.toBe(initialHeadSha);
+
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body[0].lineStart).toBe(3); // shifted down by the inserted "zero" line
+    expect(threads.body[0].outdated).toBe(false);
+  });
+
+  it("a real-sha-pinned thread's canonical position tracks HEAD only, unaffected by an uncommitted shift", async () => {
+    const app = createApp(await buildStore());
+    const initialHeadSha = await commitAll("feature commit");
+
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    expect(threadRes.body.pinnedRef).toBe(initialHeadSha);
+
+    // Shift the commented line by inserting above it, but leave it
+    // uncommitted — the committed-only view's numbering is untouched by
+    // this, so the canonical position must stay put too.
+    await fs.writeFile(path.join(repoPath, "a.txt"), "zero\none\ntwo\n");
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(true);
+    expect(res.body.headSha).toBe(initialHeadSha);
+
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body[0].lineStart).toBe(2);
+    expect(threads.body[0].outdated).toBe(false);
+  });
+
+  it("GET /api/repo-state names only the actually-dirty files", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("first");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nuncommitted\n");
+
+    const res = await request(app).get("/api/repo-state").query({ repoPath });
+    expect(res.body.dirty).toBe(true);
+    expect(res.body.dirtyFiles).toEqual(["a.txt"]);
+  });
+
   it("posting a non-pending user comment is immediately reflected in /api/wait", async () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "why?", pending: false,
+      author: "user", body: "why?", pending: false, toRef: "HEAD",
     });
     const res = await request(app).get("/api/wait").query({ since: 0 });
     expect(res.status).toBe(200);
@@ -118,7 +218,7 @@ describe("api app", () => {
     const app = createApp(await buildStore(), undefined, 100);
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "consider this", pending: true,
+      author: "user", body: "consider this", pending: true, toRef: "HEAD",
     });
     const waitBeforeSubmit = await request(app).get("/api/wait").query({ since: 0 });
     expect(waitBeforeSubmit.status).toBe(204);
@@ -133,7 +233,7 @@ describe("api app", () => {
     const app = createApp(await buildStore());
     const threadRes = await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "please rename this", pending: false,
+      author: "user", body: "please rename this", pending: false, toRef: "HEAD",
     });
     const commentId = threadRes.body.comments[0].id;
 
@@ -158,7 +258,7 @@ describe("api app", () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "one", pending: false,
+      author: "user", body: "one", pending: false, toRef: "HEAD",
     });
     let threads = await request(app).get("/api/threads");
     expect(threads.body[0].comments[0].agentStatus).toBeUndefined();

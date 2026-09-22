@@ -20,7 +20,10 @@ export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {
 export async function fetchRepoDiff(repoPath: string, range?: CommitRange): Promise<DiffFile[]> {
   const params = new URLSearchParams({ repoPath });
   if (range) {
-    params.set("from", range.from);
+    // range.from is "" for the "everything, including uncommitted edits"
+    // mode — the server treats to=uncommitted with no from specially, so
+    // that empty from is never sent as a query param.
+    if (range.from) params.set("from", range.from);
     params.set("to", range.to);
   }
   return json(await fetch(`/api/repo-diff?${params}`));
@@ -41,11 +44,11 @@ export interface NewThreadInput {
   side: "old" | "new"; body: string; suggestion?: string; pending: boolean;
 }
 
-export async function createThread(input: NewThreadInput): Promise<CommentThread> {
+export async function createThread(input: NewThreadInput, toRef: string): Promise<CommentThread> {
   return json(await fetch("/api/threads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, author: "user" }),
+    body: JSON.stringify({ ...input, toRef, author: "user" }),
   }));
 }
 
@@ -75,6 +78,10 @@ export async function resolveThread(threadId: string, resolved: boolean): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resolved }),
   });
+}
+
+export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[] }> {
+  return json(await fetch(`/api/repo-state?repoPath=${encodeURIComponent(repoPath)}`));
 }
 
 export async function fetchVerdicts(): Promise<Verdict[]> {

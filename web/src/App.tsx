@@ -4,7 +4,7 @@ import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
-  submitVerdict, fetchCommits, fetchRepoDiff,
+  submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
@@ -63,6 +63,7 @@ export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
+  const [dirtyFilesByRepo, setDirtyFilesByRepo] = useState<Record<string, string[]>>({});
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [offscreenNewComments, setOffscreenNewComments] = useState<string[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
@@ -133,12 +134,19 @@ export function App() {
   }
 
   useEffect(() => {
+    function pollRepoStates() {
+      repos.forEach(r => fetchRepoState(r.repoPath)
+        .then(state => setDirtyFilesByRepo(prev => ({ ...prev, [r.repoPath]: state.dirtyFiles })))
+        .catch(() => {}));
+    }
     refreshThreads();
+    pollRepoStates();
     const interval = setInterval(() => {
       refreshThreads();
+      pollRepoStates();
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [repos]);
 
   useEffect(() => {
     // A gutter mousedown starts tracking a drag; releasing anywhere (not just
@@ -187,7 +195,8 @@ export function App() {
       },
       onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
         if (!body.trim()) return;
-        await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });
+        const toRef = rangeByRepo[file.repoPath]?.to ?? "HEAD";
+        await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending }, toRef);
         setComposerArmed(false);
         setQuotedText(null);
         dispatchLineSelection({ type: "clear" });
@@ -236,6 +245,10 @@ export function App() {
               repoPath={repo.repoPath}
               repoName={`${repo.repo}:${repo.branch}`}
               gitRef={rangeByRepo[repo.repoPath]?.to ?? "working"}
+              showUncommittedBanner={
+                rangeByRepo[repo.repoPath]?.to === "uncommitted"
+                && Boolean(dirtyFilesByRepo[repo.repoPath]?.includes(fileName(file)))
+              }
               comments={commentHandlersFor(file)}
             />
           </div>

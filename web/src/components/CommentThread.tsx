@@ -43,6 +43,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
             Resolved &middot; {thread.comments.length} comment{thread.comments.length === 1 ? "" : "s"}
           </span>
         )}
+        {thread.outdated && <span className="comment-thread-outdated-badge">Outdated</span>}
         <button
           type="button"
           className="comment-thread-resolve-button"

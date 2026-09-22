@@ -8,6 +8,7 @@ import type {
   Verdict, VerdictType, NotificationEvent, VerdictIntent,
 } from "../types.js";
 import { verdictIntent } from "../types.js";
+import { trackThreadDrift } from "./driftTracking.js";
 
 export interface NewThreadInput {
   repoPath: string;
@@ -19,6 +20,7 @@ export interface NewThreadInput {
   body: string;
   suggestion?: string;
   pending?: boolean;
+  pinnedRef: string;
 }
 
 export class SessionStore {
@@ -35,7 +37,7 @@ export class SessionStore {
   static create(repos: RepoConfig[], id: string, title: string, dataDir: string = getDataDir()): SessionStore {
     const data: SessionData = {
       id, title, repos, createdAt: new Date().toISOString(), status: "active",
-      threads: [], verdicts: [], notifications: [],
+      threads: [], verdicts: [], notifications: [], contentSnapshots: {},
     };
     return new SessionStore(data, path.join(dataDir, `${id}.json`));
   }
@@ -68,13 +70,20 @@ export class SessionStore {
     const thread: CommentThread = {
       id: randomUUID(), repoPath: input.repoPath, file: input.file,
       lineStart: input.lineStart, lineEnd: input.lineEnd, side: input.side,
-      resolved: false, comments: [comment],
+      resolved: false, pinnedRef: input.pinnedRef, outdated: false, comments: [comment],
     };
     this.data.threads.push(thread);
     if (input.author === "user" && !pending) {
       this.notify({ type: "comment", threadId: thread.id, commentId: comment.id });
     }
     return thread;
+  }
+
+  ensureContentSnapshot(pinnedRef: string, file: string, content: string): void {
+    const key = `${pinnedRef}:${file}`;
+    if (!(key in this.data.contentSnapshots)) {
+      this.data.contentSnapshots[key] = content;
+    }
   }
 
   addReply(threadId: string, author: CommentAuthor, body: string, suggestion?: string, pendingInput?: boolean): Comment {
@@ -173,5 +182,50 @@ export class SessionStore {
 
   notificationsSince(cursor: number): NotificationEvent[] {
     return this.data.notifications.slice(cursor);
+  }
+
+  async recomputeThreadPositions(
+    repoPath: string,
+    headSha: string,
+    dirty: boolean,
+    readSnapshot: (pinnedRef: string, file: string) => Promise<string>,
+    // pinnedRef is passed through so the caller can track a real-sha-pinned
+    // thread against committed (HEAD) content only — matching the
+    // committed-only view exactly — while an "uncommitted"-pinned thread
+    // still tracks the working tree, since that *is* its commit basis until
+    // it gets committed and backfilled to a real sha.
+    readCurrent: (file: string, side: "old" | "new", pinnedRef: string) => Promise<string>,
+  ): Promise<void> {
+    // Snapshot advances are staged and applied after the loop, not written
+    // as each thread is processed: multiple threads can share a
+    // (pinnedRef, file) key, and mutating the cache mid-loop would make a
+    // later thread on the same key diff against `current` twice (no-op)
+    // instead of once against the original `snapshot`.
+    const snapshotAdvances: Record<string, string> = {};
+
+    for (const thread of this.data.threads) {
+      if (thread.repoPath !== repoPath || thread.outdated) continue;
+      const key = `${thread.pinnedRef}:${thread.file}`;
+      if (!(key in this.data.contentSnapshots)) {
+        this.data.contentSnapshots[key] = await readSnapshot(thread.pinnedRef, thread.file);
+      }
+      const snapshot = this.data.contentSnapshots[key];
+      const current = await readCurrent(thread.file, thread.side, thread.pinnedRef);
+      const result = trackThreadDrift({ thread, snapshot, current });
+      thread.lineStart = result.lineStart;
+      thread.lineEnd = result.lineEnd;
+      thread.outdated = result.outdated;
+      if (thread.pinnedRef === "uncommitted" && !dirty && !result.outdated) {
+        thread.pinnedRef = headSha;
+        snapshotAdvances[`${headSha}:${thread.file}`] = current;
+      } else if (!result.outdated) {
+        // Advance the cache to the position we just repositioned to, so the
+        // next recompute diffs from here instead of re-applying this same
+        // shift on top of an already-updated lineStart/lineEnd.
+        snapshotAdvances[key] = current;
+      }
+    }
+
+    Object.assign(this.data.contentSnapshots, snapshotAdvances);
   }
 }

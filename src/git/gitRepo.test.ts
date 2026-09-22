@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch, assertValidRepoPath } from "./gitRepo.js";
+import { detectDefaultBranch, resolveMergeBase, resolveBaseRef, listCommits, getCurrentBranch, assertValidRepoPath, resolveHeadSha, isDirty, listDirtyFiles } from "./gitRepo.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -96,5 +96,24 @@ describe("gitRepo", () => {
     } finally {
       await fs.rm(plainDir, { recursive: true, force: true });
     }
+  });
+
+  it("resolves the current HEAD sha", async () => {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    expect(await resolveHeadSha(repoPath)).toBe(stdout.trim());
+  });
+
+  it("isDirty is false on a clean checkout and true after an edit", async () => {
+    expect(await isDirty(repoPath)).toBe(false);
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nTHREE\n");
+    expect(await isDirty(repoPath)).toBe(true);
+  });
+
+  it("listDirtyFiles names only the files with uncommitted changes", async () => {
+    expect(await listDirtyFiles(repoPath)).toEqual([]);
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\nTHREE\n");
+    await fs.writeFile(path.join(repoPath, "b.txt"), "new file\n");
+    await git(repoPath, ["add", "b.txt"]);
+    expect(await listDirtyFiles(repoPath)).toEqual(["a.txt", "b.txt"]);
   });
 });

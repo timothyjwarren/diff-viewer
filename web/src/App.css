@@ -10,6 +10,9 @@
   --add-bg-strong: rgba(46, 160, 67, 0.3);
   --del-bg: rgba(248, 81, 73, 0.15);
   --del-bg-strong: rgba(248, 81, 73, 0.3);
+  /* Same amber as .uncommitted-banner, for the added/context lines of a file with an uncommitted edit. */
+  --uncommitted-add-bg: rgba(242, 201, 138, 0.15);
+  --uncommitted-add-bg-strong: rgba(242, 201, 138, 0.3);
 }
 
 * {
@@ -104,6 +107,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
+  user-select: none;
 }
 
 .commit-chooser-reset-row {
@@ -159,6 +163,25 @@ body {
   flex: 0 0 auto;
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.commit-chooser-row-uncommitted .commit-chooser-subject {
+  font-style: italic;
+  color: #d8a53d;
+}
+
+.commit-chooser-row-uncommitted .commit-chooser-sha {
+  color: #d8a53d;
+}
+
+.commit-chooser-excluded-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.75em;
+  background: #9e6a03;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 6px;
 }
 
 .sidebar ul {
@@ -543,6 +566,23 @@ main {
   background: linear-gradient(var(--add-bg-strong), var(--add-bg-strong)), var(--bg-elevated);
 }
 
+/* An added line that only exists in the uncommitted working tree (not at HEAD) gets amber instead of green, matching .uncommitted-banner — the rest of the file's committed additions stay green. */
+.diff-line-uncommitted {
+  background: var(--uncommitted-add-bg);
+}
+
+.diff-line-uncommitted:hover {
+  background: var(--uncommitted-add-bg-strong);
+}
+
+.diff-line-uncommitted .diff-line-gutter {
+  background: linear-gradient(var(--uncommitted-add-bg), var(--uncommitted-add-bg)), var(--bg-elevated);
+}
+
+.diff-line-uncommitted:hover .diff-line-gutter {
+  background: linear-gradient(var(--uncommitted-add-bg-strong), var(--uncommitted-add-bg-strong)), var(--bg-elevated);
+}
+
 .diff-line-del .diff-line-gutter {
   background: linear-gradient(var(--del-bg), var(--del-bg)), var(--bg-elevated);
 }
@@ -662,6 +702,14 @@ main {
   padding: 0 6px;
 }
 
+.comment-thread-outdated-badge {
+  font-size: 0.75em;
+  background: #7a4a12;
+  color: #f2c98a;
+  border-radius: 3px;
+  padding: 0 6px;
+}
+
 .comment-acked-badge {
   display: inline-flex;
   align-items: center;
@@ -696,6 +744,15 @@ main {
   height: 6px;
   border-radius: 50%;
   background: var(--text-muted);
+}
+
+.uncommitted-banner {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f2c98a;
+  background: #4a2f0a;
+  border-bottom: 1px solid var(--border);
 }
 
 .new-comment-banner {

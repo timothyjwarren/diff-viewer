@@ -63,6 +63,30 @@ export async function resolveBaseRef(repoPath: string, explicitBaseRef?: string)
   return resolveMergeBase(repoPath, defaultBranch);
 }
 
+export async function resolveHeadSha(repoPath: string): Promise<string> {
+  return git(repoPath, ["rev-parse", "HEAD"]);
+}
+
+/** Repo-relative paths with uncommitted changes (a rename's new path, for a rename). */
+export async function listDirtyFiles(repoPath: string): Promise<string[]> {
+  // Not routed through the shared git() helper: its stdout.trim() strips the
+  // leading space off the first porcelain line only (a clean " M a.txt"
+  // becomes "M a.txt"), throwing off the fixed 3-char status-prefix offset
+  // below for exactly that one line.
+  const { stdout } = await execFileAsync("git", ["status", "--porcelain"], { cwd: repoPath });
+  const status = stdout.replace(/\n$/, "");
+  if (!status) return [];
+  return status.split("\n").map(line => {
+    const path = line.slice(3);
+    const arrowIdx = path.indexOf(" -> ");
+    return arrowIdx === -1 ? path : path.slice(arrowIdx + 4);
+  });
+}
+
+export async function isDirty(repoPath: string): Promise<boolean> {
+  return (await listDirtyFiles(repoPath)).length > 0;
+}
+
 /** The repo's current branch name, or its short HEAD sha when detached. */
 export async function getCurrentBranch(repoPath: string): Promise<string> {
   const branch = await git(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
