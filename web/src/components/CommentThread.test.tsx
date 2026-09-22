@@ -13,7 +13,7 @@ const thread: CommentThreadData = {
 
 describe("CommentThread", () => {
   it("renders comments and labels the agent's reply distinctly", () => {
-    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.getByText("why is this here?")).toBeInTheDocument();
     expect(screen.getByText("it handles the edge case")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
@@ -21,7 +21,7 @@ describe("CommentThread", () => {
 
   it("submits a reply with the chosen pending flag", () => {
     const onReply = vi.fn();
-    render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("Reply..."), { target: { value: "thanks!" } });
     fireEvent.click(screen.getByText("Add single comment"));
     expect(onReply).toHaveBeenCalledWith("t1", "thanks!", false);
@@ -29,7 +29,7 @@ describe("CommentThread", () => {
 
   it("calls onDelete for a user's own comment", () => {
     const onDelete = vi.fn();
-    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} />);
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} onResolve={vi.fn()} />);
     fireEvent.click(screen.getAllByText("Delete")[0]);
     expect(onDelete).toHaveBeenCalledWith("t1", "c1");
   });
@@ -42,7 +42,7 @@ describe("CommentThread", () => {
         thread.comments[1],
       ],
     };
-    render(<CommentThread thread={ackedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={ackedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.getAllByText("Agent is working on this")).toHaveLength(1);
     expect(screen.queryByText("Seen")).not.toBeInTheDocument();
   });
@@ -55,13 +55,13 @@ describe("CommentThread", () => {
         thread.comments[1],
       ],
     };
-    render(<CommentThread thread={seenThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={seenThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.getAllByText("Seen")).toHaveLength(1);
     expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
   });
 
   it("shows no indicator on an untouched comment", () => {
-    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.queryByText("Seen")).not.toBeInTheDocument();
     expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
   });
@@ -74,8 +74,30 @@ describe("CommentThread", () => {
         thread.comments[1],
       ],
     };
-    render(<CommentThread thread={clearedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    render(<CommentThread thread={clearedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.queryByText("Seen")).not.toBeInTheDocument();
     expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
+  });
+
+  it("calls onResolve when the Resolve button is clicked", () => {
+    const onResolve = vi.fn();
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={onResolve} />);
+    fireEvent.click(screen.getByText("Resolve"));
+    expect(onResolve).toHaveBeenCalledWith("t1", true);
+  });
+
+  it("collapses comments and shows an Unresolve button once resolved", () => {
+    const resolvedThread: CommentThreadData = { ...thread, resolved: true };
+    render(<CommentThread thread={resolvedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    expect(screen.queryByText("why is this here?")).not.toBeInTheDocument();
+    expect(screen.getByText("Unresolve")).toBeInTheDocument();
+    expect(screen.getByText(/Resolved/)).toBeInTheDocument();
+  });
+
+  it("shows comments again on a resolved thread when the chevron is clicked", () => {
+    const resolvedThread: CommentThreadData = { ...thread, resolved: true };
+    render(<CommentThread thread={resolvedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText("Show resolved thread"));
+    expect(screen.getByText("why is this here?")).toBeInTheDocument();
   });
 });

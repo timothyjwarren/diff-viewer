@@ -3,8 +3,8 @@ import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, submitVerdict,
-  fetchCommits, fetchRepoDiff,
+  fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
+  submitVerdict, fetchCommits, fetchRepoDiff,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
@@ -206,6 +206,10 @@ export function App() {
       },
       onDelete: async (threadId, commentId) => {
         await deleteComment(threadId, commentId);
+        await refreshThreads();
+      },
+      onResolve: async (threadId, resolved) => {
+        await resolveThread(threadId, resolved);
         await refreshThreads();
       },
     };

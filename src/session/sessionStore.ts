@@ -122,6 +122,12 @@ export class SessionStore {
     }
   }
 
+  resolveThread(threadId: string, resolved: boolean): void {
+    const thread = this.data.threads.find(t => t.id === threadId);
+    if (!thread) throw new Error(`Thread not found: ${threadId}`);
+    thread.resolved = resolved;
+  }
+
   editComment(threadId: string, commentId: string, body: string): void {
     const thread = this.data.threads.find(t => t.id === threadId);
     if (!thread) throw new Error(`Thread not found: ${threadId}`);

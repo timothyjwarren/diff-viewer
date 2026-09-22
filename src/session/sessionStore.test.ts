@@ -74,6 +74,21 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads[0].comments).toHaveLength(1);
   });
 
+  it("resolveThread toggles a thread's resolved state", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "question", pending: false,
+    });
+    expect(store.snapshot.threads[0].resolved).toBe(false);
+
+    store.resolveThread(thread.id, true);
+    expect(store.snapshot.threads[0].resolved).toBe(true);
+
+    store.resolveThread(thread.id, false);
+    expect(store.snapshot.threads[0].resolved).toBe(false);
+  });
+
   it("ackComment sets agentStatus to acked; unackComment clears it to a terminal cleared state", () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({

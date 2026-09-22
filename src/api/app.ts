@@ -70,6 +70,16 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     res.status(201).json(thread);
   });
 
+  app.patch("/api/threads/:threadId/resolve", async (req, res) => {
+    try {
+      store.resolveThread(req.params.threadId, Boolean(req.body.resolved));
+      await store.persist();
+      res.status(204).end();
+    } catch {
+      res.status(404).end();
+    }
+  });
+
   app.post("/api/threads/:threadId/comments", async (req, res) => {
     const { author, body, suggestion, pending } = req.body;
     try {

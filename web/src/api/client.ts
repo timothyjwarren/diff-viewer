@@ -69,6 +69,14 @@ export async function deleteComment(threadId: string, commentId: string): Promis
   await fetch(`/api/threads/${threadId}/comments/${commentId}`, { method: "DELETE" });
 }
 
+export async function resolveThread(threadId: string, resolved: boolean): Promise<void> {
+  await fetch(`/api/threads/${threadId}/resolve`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resolved }),
+  });
+}
+
 export async function fetchVerdicts(): Promise<Verdict[]> {
   return json(await fetch("/api/verdicts"));
 }

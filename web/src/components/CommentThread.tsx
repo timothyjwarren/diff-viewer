@@ -10,68 +10,101 @@ function Avatar({ author }: { author: CommentAuthor }) {
   );
 }
 
-export function CommentThread({ thread, onReply, onEdit, onDelete }: {
+export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
+  onResolve: (threadId: string, resolved: boolean) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
+  // Resolving collapses the thread by default; the chevron lets the user
+  // peek at it again without unresolving. Unresolving always re-expands.
+  const [manualExpand, setManualExpand] = useState(false);
   const expanded = focused || draft.length > 0;
+  const collapsed = thread.resolved && !manualExpand;
 
   return (
-    <div className="comment-thread">
-      {thread.comments.map(comment => (
-        <div key={comment.id} id={`comment-${comment.id}`} className={`comment comment-${comment.author}`}>
-          <Avatar author={comment.author} />
-          <div className="comment-body">
-            <div className="comment-meta">
-              <span className="comment-author">{comment.author === "agent" ? "Agent" : "You"}</span>
-              <span className="comment-time">{timeAgo(comment.createdAt)}</span>
-              {comment.pending && <span className="comment-pending-badge">Pending</span>}
-              {comment.agentStatus === "acked" ? (
-                <span className="comment-acked-badge" title="The agent has read this and is working on it">
-                  <span className="comment-acked-dot" />
-                  Agent is working on this
-                </span>
-              ) : comment.agentStatus === "seen" ? (
-                <span className="comment-seen-badge" title="The agent has seen this comment">
-                  <span className="comment-seen-dot" />
-                  Seen
-                </span>
-              ) : null}
+    <div className={`comment-thread${thread.resolved ? " comment-thread-resolved" : ""}`}>
+      <div className="comment-thread-header">
+        {thread.resolved && (
+          <button
+            type="button"
+            className="diff-view-collapse-toggle"
+            aria-label={collapsed ? "Show resolved thread" : "Hide resolved thread"}
+            onClick={() => setManualExpand(v => !v)}
+          >
+            <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
+          </button>
+        )}
+        {thread.resolved && (
+          <span className="comment-thread-resolved-label">
+            Resolved &middot; {thread.comments.length} comment{thread.comments.length === 1 ? "" : "s"}
+          </span>
+        )}
+        <button
+          type="button"
+          className="comment-thread-resolve-button"
+          onClick={() => { onResolve(thread.id, !thread.resolved); setManualExpand(false); }}
+        >
+          {thread.resolved ? "Unresolve" : "Resolve"}
+        </button>
+      </div>
+      {!collapsed && (
+        <>
+          {thread.comments.map(comment => (
+            <div key={comment.id} id={`comment-${comment.id}`} className={`comment comment-${comment.author}`}>
+              <Avatar author={comment.author} />
+              <div className="comment-body">
+                <div className="comment-meta">
+                  <span className="comment-author">{comment.author === "agent" ? "Agent" : "You"}</span>
+                  <span className="comment-time">{timeAgo(comment.createdAt)}</span>
+                  {comment.pending && <span className="comment-pending-badge">Pending</span>}
+                  {comment.agentStatus === "acked" ? (
+                    <span className="comment-acked-badge" title="The agent has read this and is working on it">
+                      <span className="comment-acked-dot" />
+                      Agent is working on this
+                    </span>
+                  ) : comment.agentStatus === "seen" ? (
+                    <span className="comment-seen-badge" title="The agent has seen this comment">
+                      <span className="comment-seen-dot" />
+                      Seen
+                    </span>
+                  ) : null}
+                </div>
+                <p>{comment.body}</p>
+                {comment.author === "user" && (
+                  <div className="comment-actions">
+                    <button onClick={() => onEdit(thread.id, comment.id, comment.body)}>Edit</button>
+                    <button onClick={() => onDelete(thread.id, comment.id)}>Delete</button>
+                  </div>
+                )}
+              </div>
             </div>
-            <p>{comment.body}</p>
-            {comment.author === "user" && (
-              <div className="comment-actions">
-                <button onClick={() => onEdit(thread.id, comment.id, comment.body)}>Edit</button>
-                <button onClick={() => onDelete(thread.id, comment.id)}>Delete</button>
+          ))}
+          <div className="comment-reply">
+            <textarea
+              className={expanded ? "comment-reply-expanded" : ""}
+              placeholder="Reply..."
+              value={draft}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onChange={e => setDraft(e.target.value)}
+            />
+            {expanded && (
+              <div className="comment-reply-actions">
+                <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, false); setDraft(""); }}>
+                  Add single comment
+                </button>
+                <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, true); setDraft(""); }}>
+                  Add to review
+                </button>
               </div>
             )}
           </div>
-        </div>
-      ))}
-      <div className="comment-reply">
-        <textarea
-          className={expanded ? "comment-reply-expanded" : ""}
-          placeholder="Reply..."
-          value={draft}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onChange={e => setDraft(e.target.value)}
-        />
-        {expanded && (
-          <div className="comment-reply-actions">
-            <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, false); setDraft(""); }}>
-              Add single comment
-            </button>
-            <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, true); setDraft(""); }}>
-              Add to review
-            </button>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
