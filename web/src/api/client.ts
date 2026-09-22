@@ -41,11 +41,11 @@ export interface NewThreadInput {
   side: "old" | "new"; body: string; suggestion?: string; pending: boolean;
 }
 
-export async function createThread(input: NewThreadInput): Promise<CommentThread> {
+export async function createThread(input: NewThreadInput, toRef: string): Promise<CommentThread> {
   return json(await fetch("/api/threads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, author: "user" }),
+    body: JSON.stringify({ ...input, toRef, author: "user" }),
   }));
 }
 

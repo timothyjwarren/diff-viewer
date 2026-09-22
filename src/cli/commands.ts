@@ -141,7 +141,7 @@ export async function commentCommand(
   const res = await fetch(`${url}/api/threads`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoPath, file, lineStart, lineEnd, side, author: "agent", body: text }),
+    body: JSON.stringify({ repoPath, file, lineStart, lineEnd, side, author: "agent", body: text, toRef: "HEAD" }),
   });
   return res.json();
 }

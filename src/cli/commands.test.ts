@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Server } from "node:http";
-import { spawn } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createApp } from "../api/app.js";
 import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
@@ -11,6 +12,8 @@ import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
   stopCommand, sessionsCommand,
 } from "./commands.js";
+
+const execFileAsync = promisify(execFile);
 
 describe("cli commands", () => {
   let home: string;
@@ -38,17 +41,42 @@ describe("cli commands", () => {
   });
 
   it("commentCommand creates an agent-authored, immediate thread", async () => {
-    await commentCommand(sessionId, "/repo", "a.txt", 1, 1, "new", "consider simplifying this");
-    const threads = store.snapshot.threads;
-    expect(threads).toHaveLength(1);
-    expect(threads[0].comments[0].author).toBe("agent");
-    expect(threads[0].comments[0].pending).toBe(false);
+    // Unlike the other tests here, this one exercises the real /api/threads
+    // route (via HTTP), which now resolves toRef against a real git repo —
+    // so it needs a real repo on disk, not the fake "/repo" path.
+    const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "dv-cli-repo-"));
+    await execFileAsync("git", ["init", "-b", "main"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.name", "Test"], { cwd: repoPath });
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\n");
+    await execFileAsync("git", ["add", "a.txt"], { cwd: repoPath });
+    await execFileAsync("git", ["commit", "-m", "base"], { cwd: repoPath });
+
+    const repoStore = SessionStore.create([{ path: repoPath, name: "repo", branch: "main", baseRef: "abc" }], sessionId, "test session", path.join(home, "data"));
+    const repoApp = createApp(repoStore);
+    const repoServer = repoApp.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => repoServer.once("listening", resolve));
+    const address = repoServer.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    await writeRegistryEntry(sessionId, { port, pid: process.pid });
+
+    try {
+      await commentCommand(sessionId, repoPath, "a.txt", 1, 1, "new", "consider simplifying this");
+      const threads = repoStore.snapshot.threads;
+      expect(threads).toHaveLength(1);
+      expect(threads[0].comments[0].author).toBe("agent");
+      expect(threads[0].comments[0].pending).toBe(false);
+      expect(threads[0].pinnedRef).toBeTruthy();
+    } finally {
+      repoServer.close();
+      await fs.rm(repoPath, { recursive: true, force: true });
+    }
   });
 
   it("replyCommand posts an agent reply into an existing thread", async () => {
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "why?", pending: false,
+      author: "user", body: "why?", pending: false, pinnedRef: "abc",
     });
     await replyCommand(sessionId, thread.id, "because of X");
     expect(store.snapshot.threads[0].comments[1].body).toBe("because of X");
@@ -57,7 +85,7 @@ describe("cli commands", () => {
   it("ackCommand and unackCommand move a comment's agentStatus from acked to cleared", async () => {
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "please rename this", pending: false,
+      author: "user", body: "please rename this", pending: false, pinnedRef: "abc",
     });
     const commentId = thread.comments[0].id;
 
@@ -77,7 +105,7 @@ describe("cli commands", () => {
   it("reviewCommand marks comments as seen as a side effect of the agent reading them", async () => {
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "why?", pending: false,
+      author: "user", body: "why?", pending: false, pinnedRef: "abc",
     });
     expect(store.snapshot.threads[0].comments[0].agentStatus).toBeUndefined();
 

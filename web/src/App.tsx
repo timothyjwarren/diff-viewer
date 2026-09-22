@@ -187,7 +187,8 @@ export function App() {
       },
       onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
         if (!body.trim()) return;
-        await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending });
+        const toRef = rangeByRepo[file.repoPath]?.to ?? "HEAD";
+        await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending }, toRef);
         setComposerArmed(false);
         setQuotedText(null);
         dispatchLineSelection({ type: "clear" });

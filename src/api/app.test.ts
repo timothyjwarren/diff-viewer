@@ -93,11 +93,30 @@ describe("api app", () => {
     expect(res.body.lines).toEqual(["one", "two", ""]);
   });
 
+  it("resolves toRef=HEAD to the current commit sha and snapshots the file", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    const headSha = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath })).stdout.trim();
+    expect(res.body.pinnedRef).toBe(headSha);
+  });
+
+  it("resolves toRef=uncommitted to the uncommitted sentinel", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      body: "q", pending: false, toRef: "uncommitted",
+    });
+    expect(res.body.pinnedRef).toBe("uncommitted");
+  });
+
   it("posting a non-pending user comment is immediately reflected in /api/wait", async () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "why?", pending: false,
+      author: "user", body: "why?", pending: false, toRef: "HEAD",
     });
     const res = await request(app).get("/api/wait").query({ since: 0 });
     expect(res.status).toBe(200);
@@ -108,7 +127,7 @@ describe("api app", () => {
     const app = createApp(await buildStore(), undefined, 100);
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "consider this", pending: true,
+      author: "user", body: "consider this", pending: true, toRef: "HEAD",
     });
     const waitBeforeSubmit = await request(app).get("/api/wait").query({ since: 0 });
     expect(waitBeforeSubmit.status).toBe(204);
@@ -123,7 +142,7 @@ describe("api app", () => {
     const app = createApp(await buildStore());
     const threadRes = await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "please rename this", pending: false,
+      author: "user", body: "please rename this", pending: false, toRef: "HEAD",
     });
     const commentId = threadRes.body.comments[0].id;
 
@@ -148,7 +167,7 @@ describe("api app", () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
-      author: "user", body: "one", pending: false,
+      author: "user", body: "one", pending: false, toRef: "HEAD",
     });
     let threads = await request(app).get("/api/threads");
     expect(threads.body[0].comments[0].agentStatus).toBeUndefined();

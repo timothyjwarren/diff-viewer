@@ -1,7 +1,7 @@
 import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff } from "../git/diff.js";
-import { listCommits } from "../git/gitRepo.js";
+import { listCommits, resolveHeadSha } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef } from "../git/fileContent.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
@@ -65,7 +65,16 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   });
 
   app.post("/api/threads", async (req, res) => {
-    const thread = store.addThread(req.body as NewThreadInput);
+    // The client sends everything NewThreadInput needs except pinnedRef (it
+    // doesn't know the resolved sha) — toRef in its place, resolved below.
+    const { toRef, ...rest } = req.body as Omit<NewThreadInput, "pinnedRef"> & { toRef: string };
+    const repo = findRepo(store, rest.repoPath);
+    const pinnedRef = toRef === "HEAD" ? await resolveHeadSha(repo.path) : toRef;
+    const lines = pinnedRef === "uncommitted"
+      ? await readWorkingTreeFile(repo.path, rest.file)
+      : await readFileAtRef(repo.path, pinnedRef, rest.file);
+    store.ensureContentSnapshot(pinnedRef, rest.file, lines.join("\n"));
+    const thread = store.addThread({ ...rest, pinnedRef });
     await store.persist();
     res.status(201).json(thread);
   });
