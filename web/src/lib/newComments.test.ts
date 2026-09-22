@@ -3,7 +3,10 @@ import { newAgentCommentIds } from "./newComments";
 import type { CommentThread } from "../types";
 
 function thread(id: string, comments: CommentThread["comments"]): CommentThread {
-  return { id, repoPath: "/r", file: "a.ts", lineStart: 1, lineEnd: 1, side: "new", resolved: false, comments };
+  return {
+    id, repoPath: "/r", file: "a.ts", lineStart: 1, lineEnd: 1, side: "new", resolved: false,
+    pinnedRef: "abc123", outdated: false, comments,
+  };
 }
 
 describe("newAgentCommentIds", () => {

@@ -22,6 +22,11 @@ export function CommentThread({ thread, onReply, onEdit, onDelete }: {
 
   return (
     <div className="comment-thread">
+      {thread.outdated && (
+        <div className="comment-thread-outdated">
+          <span className="comment-thread-outdated-badge">Outdated</span>
+        </div>
+      )}
       {thread.comments.map(comment => (
         <div key={comment.id} id={`comment-${comment.id}`} className={`comment comment-${comment.author}`}>
           <Avatar author={comment.author} />

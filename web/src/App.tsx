@@ -233,7 +233,7 @@ export function App() {
               file={file}
               repoPath={repo.repoPath}
               repoName={`${repo.repo}:${repo.branch}`}
-              baseRef=""
+              activeRangeTo={rangeByRepo[repo.repoPath]?.to}
               comments={commentHandlersFor(file)}
             />
           </div>

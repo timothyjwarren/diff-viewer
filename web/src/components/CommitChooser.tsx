@@ -24,6 +24,7 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
   const label = range
     ? `${rangeCommitCount(commits, range)} of ${commits.length}`
     : `all ${commits.length} commits`;
+  const excludedCount = range ? commits.length - rangeCommitCount(commits, range) : 0;
 
   function selectCommit(sha: string, shiftKey: boolean) {
     const next = computeRangeClick(commits, rangeState, sha, shiftKey);
@@ -49,6 +50,11 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
         onClick={toggleOpen}
       >
         {label} &#9662;
+        {excludedCount > 0 && (
+          <span className="commit-chooser-excluded-badge" aria-label={`${excludedCount} commits not shown`}>
+            {excludedCount}
+          </span>
+        )}
       </button>
       {open && (
         <ul className="commit-chooser-popover" role="listbox" aria-multiselectable="true">

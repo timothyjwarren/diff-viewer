@@ -5,6 +5,7 @@ import type { CommentThread as CommentThreadData } from "../types";
 
 const thread: CommentThreadData = {
   id: "t1", repoPath: "/r", file: "a.ts", lineStart: 1, lineEnd: 1, side: "new", resolved: false,
+  pinnedRef: "abc123", outdated: false,
   comments: [
     { id: "c1", author: "user", body: "why is this here?", pending: false, createdAt: "2026-01-01T00:00:00Z" },
     { id: "c2", author: "agent", body: "it handles the edge case", pending: false, createdAt: "2026-01-01T00:01:00Z" },
@@ -77,5 +78,16 @@ describe("CommentThread", () => {
     render(<CommentThread thread={clearedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
     expect(screen.queryByText("Seen")).not.toBeInTheDocument();
     expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
+  });
+
+  it("shows an Outdated badge when the thread's commented lines have changed", () => {
+    const outdatedThread: CommentThreadData = { ...thread, outdated: true };
+    render(<CommentThread thread={outdatedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByText("Outdated")).toBeInTheDocument();
+  });
+
+  it("shows no Outdated badge for a current thread", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.queryByText("Outdated")).not.toBeInTheDocument();
   });
 });

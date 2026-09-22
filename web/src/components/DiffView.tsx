@@ -200,8 +200,8 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
   );
 }
 
-export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
-  file: DiffFile; repoPath: string; repoName: string; baseRef: string;
+export function DiffView({ file, repoPath, repoName, activeRangeTo, comments }: {
+  file: DiffFile; repoPath: string; repoName: string; activeRangeTo?: string | null;
   comments: CommentHandlers;
 }) {
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
@@ -212,7 +212,6 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
   const fileId = file.newPath || file.oldPath;
 
   useEffect(() => setHunks(file.hunks), [file]);
-  void baseRef;
 
   async function loadFullFile() {
     const lines = await fetchFile(repoPath, file.newPath, "working");
@@ -254,6 +253,9 @@ export function DiffView({ file, repoPath, repoName, baseRef, comments }: {
           <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
         </div>
       </div>
+      {activeRangeTo === "uncommitted" && (
+        <div className="uncommitted-banner">Viewing uncommitted changes</div>
+      )}
       {!collapsed && (
         <div className="diff-view-body">
           {viewingFullFile && fullFileLines ? (

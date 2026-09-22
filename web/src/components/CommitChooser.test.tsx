@@ -78,4 +78,15 @@ describe("CommitChooser", () => {
     fireEvent.click(screen.getByRole("button", { name: /commit range/ }));
     expect(screen.getByText("Uncommitted changes").closest("button")).toHaveClass("commit-chooser-row-uncommitted");
   });
+
+  it("shows a badge on the collapsed trigger when newer commits are excluded from the current range", () => {
+    const range = { from: commits[0].sha, to: commits[0].sha }; // narrowed to the oldest commit only
+    render(<CommitChooser commits={commits} range={range} onChange={vi.fn()} />);
+    expect(screen.getByLabelText(/commits not shown/)).toBeInTheDocument();
+  });
+
+  it("shows no exclusion badge when the range already covers every commit", () => {
+    render(<CommitChooser commits={commits} range={null} onChange={vi.fn()} />);
+    expect(screen.queryByLabelText(/commits not shown/)).not.toBeInTheDocument();
+  });
 });
