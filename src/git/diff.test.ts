@@ -30,17 +30,30 @@ describe("computeDiff", () => {
     await fs.rm(repoPath, { recursive: true, force: true });
   });
 
-  it("includes both committed and uncommitted changes since the base ref", async () => {
+  it("computeDiff only includes committed changes, not the working tree", async () => {
     const baseRef = await resolveBaseRef(repoPath);
     await git(repoPath, ["checkout", "-b", "feature"]);
     await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\n");
     await git(repoPath, ["commit", "-am", "committed change"]);
-    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\nuncommitted\n");
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\nUNCOMMITTED\n");
 
     const files = await computeDiff(repoPath, baseRef);
     expect(files).toHaveLength(1);
     const addedLines = files[0].hunks.flatMap(h => h.lines).filter(l => l.type === "add").map(l => l.content);
-    expect(addedLines).toEqual(["committed", "uncommitted"]);
+    expect(addedLines).toEqual(["committed"]);
+    expect(addedLines.some(l => l.includes("UNCOMMITTED"))).toBe(false);
+  });
+
+  it("computeRangeDiff treats to='uncommitted' as a diff against the working tree", async () => {
+    await git(repoPath, ["checkout", "-b", "feature"]);
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\n");
+    await git(repoPath, ["commit", "-am", "committed change"]);
+    const { stdout: committedSha } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\ntwo\ncommitted\nUNCOMMITTED\n");
+
+    const files = await computeRangeDiff(repoPath, committedSha.trim(), "uncommitted");
+    const addedLines = files.flatMap(f => f.hunks).flatMap(h => h.lines).map(l => l.content);
+    expect(addedLines.some(l => l.includes("UNCOMMITTED"))).toBe(true);
   });
 
   it("computeRangeDiff diffs only the given inclusive commit range, ignoring uncommitted changes", async () => {

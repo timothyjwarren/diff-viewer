@@ -71,4 +71,11 @@ describe("CommitChooser", () => {
     fireEvent.click(screen.getByText("Show all commits"));
     expect(onChange).toHaveBeenCalledWith(null);
   });
+
+  it("renders the uncommitted-changes row distinctly and excludes it from the default label", () => {
+    const withUncommitted = [...commits, { sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" }];
+    render(<CommitChooser commits={withUncommitted} range={null} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /commit range/ }));
+    expect(screen.getByText("Uncommitted changes").closest("button")).toHaveClass("commit-chooser-row-uncommitted");
+  });
 });

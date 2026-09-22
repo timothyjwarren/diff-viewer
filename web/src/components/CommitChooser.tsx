@@ -66,7 +66,7 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
                   type="button"
                   role="option"
                   aria-selected={selected}
-                  className={`commit-chooser-row${selected ? " commit-chooser-row-selected" : ""}`}
+                  className={`commit-chooser-row${selected ? " commit-chooser-row-selected" : ""}${c.sha === "uncommitted" ? " commit-chooser-row-uncommitted" : ""}`}
                   onClick={e => selectCommit(c.sha, e.shiftKey)}
                 >
                   <span className="commit-chooser-sha">{c.shortSha}</span>

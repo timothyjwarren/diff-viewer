@@ -67,6 +67,11 @@ export async function resolveHeadSha(repoPath: string): Promise<string> {
   return git(repoPath, ["rev-parse", "HEAD"]);
 }
 
+export async function isDirty(repoPath: string): Promise<boolean> {
+  const status = await git(repoPath, ["status", "--porcelain"]);
+  return status.length > 0;
+}
+
 /** The repo's current branch name, or its short HEAD sha when detached. */
 export async function getCurrentBranch(repoPath: string): Promise<string> {
   const branch = await git(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);

@@ -48,6 +48,7 @@ describe("api app", () => {
 
   it("GET /api/diffs returns parsed diffs for each repo", async () => {
     const app = createApp(await buildStore());
+    await commitAll("feature commit");
     const res = await request(app).get("/api/diffs");
     expect(res.status).toBe(200);
     expect(res.body[0].repo).toBe("repo");

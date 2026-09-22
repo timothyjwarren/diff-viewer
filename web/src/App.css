@@ -161,6 +161,15 @@ body {
   font-size: 11px;
 }
 
+.commit-chooser-row-uncommitted .commit-chooser-subject {
+  font-style: italic;
+  color: #d8a53d;
+}
+
+.commit-chooser-row-uncommitted .commit-chooser-sha {
+  color: #d8a53d;
+}
+
 .sidebar ul {
   list-style: none;
   margin: 0;

@@ -1,7 +1,7 @@
 import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff } from "../git/diff.js";
-import { listCommits, resolveHeadSha } from "../git/gitRepo.js";
+import { listCommits, resolveHeadSha, isDirty } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef } from "../git/fileContent.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
@@ -31,7 +31,11 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const { repoPath } = req.query as Record<string, string>;
     try {
       const repo = findRepo(store, repoPath);
-      res.json(await listCommits(repo.path, repo.baseRef));
+      const commits = await listCommits(repo.path, repo.baseRef);
+      if (await isDirty(repo.path)) {
+        commits.push({ sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" });
+      }
+      res.json(commits);
     } catch {
       res.status(404).end();
     }
