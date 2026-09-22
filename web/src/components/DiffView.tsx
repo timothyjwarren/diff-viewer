@@ -200,8 +200,10 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
   );
 }
 
-export function DiffView({ file, repoPath, repoName, activeRangeTo, comments }: {
-  file: DiffFile; repoPath: string; repoName: string; activeRangeTo?: string | null;
+export function DiffView({ file, repoPath, repoName, showUncommittedBanner, comments }: {
+  file: DiffFile; repoPath: string; repoName: string;
+  /** Only when the active range targets uncommitted AND this specific file actually has an uncommitted edit. */
+  showUncommittedBanner?: boolean;
   comments: CommentHandlers;
 }) {
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
@@ -253,7 +255,7 @@ export function DiffView({ file, repoPath, repoName, activeRangeTo, comments }: 
           <button onClick={toggleViewFile}>{viewingFullFile ? "View Diff" : "View File"}</button>
         </div>
       </div>
-      {activeRangeTo === "uncommitted" && (
+      {showUncommittedBanner && (
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
       {!collapsed && (

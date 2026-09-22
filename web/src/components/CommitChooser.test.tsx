@@ -105,6 +105,25 @@ describe("CommitChooser", () => {
     expect(screen.getByLabelText(/commits not shown/)).toBeInTheDocument();
   });
 
+  it("offers a distinct 'Show all commits + uncommitted changes' option when the repo is dirty, with no exclusion badge once selected", () => {
+    const withUncommitted = [...commits, { sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" }];
+    const onChange = vi.fn();
+    const { rerender } = render(<CommitChooser commits={withUncommitted} range={null} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
+    fireEvent.click(screen.getByText("Show all commits + uncommitted changes"));
+    expect(onChange).toHaveBeenCalledWith({ from: "", to: "uncommitted" });
+
+    rerender(<CommitChooser commits={withUncommitted} range={{ from: "", to: "uncommitted" }} onChange={onChange} />);
+    expect(screen.getByRole("button", { name: /commit range/i })).toHaveTextContent("all 3 + uncommitted");
+    expect(screen.queryByLabelText(/commits not shown/)).not.toBeInTheDocument();
+  });
+
+  it("does not offer the '+ uncommitted' option when the repo is clean", () => {
+    render(<CommitChooser commits={commits} range={null} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
+    expect(screen.queryByText(/uncommitted changes/i)).not.toBeInTheDocument();
+  });
+
   it("shows no exclusion badge in the default view when the repo is clean", () => {
     render(<CommitChooser commits={commits} range={null} onChange={vi.fn()} />);
     expect(screen.queryByLabelText(/commits not shown/)).not.toBeInTheDocument();

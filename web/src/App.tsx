@@ -63,6 +63,7 @@ export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
+  const [dirtyFilesByRepo, setDirtyFilesByRepo] = useState<Record<string, string[]>>({});
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [offscreenNewComments, setOffscreenNewComments] = useState<string[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
@@ -133,10 +134,16 @@ export function App() {
   }
 
   useEffect(() => {
+    function pollRepoStates() {
+      repos.forEach(r => fetchRepoState(r.repoPath)
+        .then(state => setDirtyFilesByRepo(prev => ({ ...prev, [r.repoPath]: state.dirtyFiles })))
+        .catch(() => {}));
+    }
     refreshThreads();
+    pollRepoStates();
     const interval = setInterval(() => {
       refreshThreads();
-      repos.forEach(r => fetchRepoState(r.repoPath).catch(() => {}));
+      pollRepoStates();
     }, 3000);
     return () => clearInterval(interval);
   }, [repos]);
@@ -233,7 +240,10 @@ export function App() {
               file={file}
               repoPath={repo.repoPath}
               repoName={`${repo.repo}:${repo.branch}`}
-              activeRangeTo={rangeByRepo[repo.repoPath]?.to}
+              showUncommittedBanner={
+                rangeByRepo[repo.repoPath]?.to === "uncommitted"
+                && Boolean(dirtyFilesByRepo[repo.repoPath]?.includes(fileName(file)))
+              }
               comments={commentHandlersFor(file)}
             />
           </div>

@@ -18,16 +18,21 @@ const comments: CommentHandlers = {
 };
 
 describe("DiffView", () => {
-  it("shows an uncommitted-changes banner when the active range targets the uncommitted pseudo-commit", () => {
+  it("shows an uncommitted-changes banner when showUncommittedBanner is true", () => {
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" activeRangeTo="uncommitted" comments={comments} />,
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner comments={comments} />,
     );
     expect(screen.getByText(/Viewing uncommitted changes/)).toBeInTheDocument();
   });
 
-  it("shows no banner when a real commit range or no range is active", () => {
+  it("shows no banner when showUncommittedBanner is false or omitted", () => {
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" activeRangeTo="abc123" comments={comments} />,
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner={false} comments={comments} />,
+    );
+    expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
+
+    render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" comments={comments} />,
     );
     expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
   });

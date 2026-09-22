@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CommitInfo, CommitRange } from "../types";
 import { computeRangeClick, isShaInRange, rangeCommitCount } from "../lib/commitRange";
+
+/** The chooser's "everything" mode: baseRef through the working tree, committed history plus any local edits. */
+const EVERYTHING_RANGE: CommitRange = { from: "", to: "uncommitted" };
 
 export function CommitChooser({ commits, range, onChange, onOpen }: {
   commits: CommitInfo[];
@@ -15,6 +18,7 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
   // the same row, no drag) is just the zero-distance case of a drag.
   const [dragAnchor, setDragAnchor] = useState<string | null>(null);
   const [dragHover, setDragHover] = useState<string | null>(null);
+  const popoverRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     if (!dragAnchor) return;
@@ -26,8 +30,23 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
       setDragHover(null);
       setOpen(false);
     }
+    // Auto-scrolls the popover when the drag nears its top/bottom edge —
+    // without this, rows below the visible ~320px are unreachable while
+    // dragging, since releasing the mouse to scroll manually ends the drag.
+    function autoScroll(e: MouseEvent) {
+      const el = popoverRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const edge = 24;
+      if (e.clientY < rect.top + edge) el.scrollTop -= 12;
+      else if (e.clientY > rect.bottom - edge) el.scrollTop += 12;
+    }
     window.addEventListener("mouseup", finishDrag);
-    return () => window.removeEventListener("mouseup", finishDrag);
+    window.addEventListener("mousemove", autoScroll);
+    return () => {
+      window.removeEventListener("mouseup", finishDrag);
+      window.removeEventListener("mousemove", autoScroll);
+    };
   }, [dragAnchor, dragHover, commits, onChange]);
 
   if (commits.length === 0) return null;
@@ -41,16 +60,21 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
 
   const realCommitCount = commits.filter(c => c.sha !== "uncommitted").length;
   const hasUncommittedRow = realCommitCount !== commits.length;
+  const isEverythingMode = range?.from === EVERYTHING_RANGE.from && range?.to === EVERYTHING_RANGE.to;
 
-  const label = range
-    ? `${rangeCommitCount(commits, range)} of ${commits.length}`
-    : `all ${realCommitCount} commits`;
+  const label = isEverythingMode
+    ? `all ${realCommitCount} + uncommitted`
+    : range
+      ? `${rangeCommitCount(commits, range)} of ${commits.length}`
+      : `all ${realCommitCount} commits`;
   // The default (no-range) view always excludes the uncommitted row by
   // design (Task 3) — so it counts as excluded here too, not just the
-  // commits a narrowed range leaves out.
-  const excludedCount = range
-    ? commits.length - rangeCommitCount(commits, range)
-    : (hasUncommittedRow ? 1 : 0);
+  // commits a narrowed range leaves out. "Everything" mode excludes nothing.
+  const excludedCount = isEverythingMode
+    ? 0
+    : range
+      ? commits.length - rangeCommitCount(commits, range)
+      : (hasUncommittedRow ? 1 : 0);
 
   // While dragging, the row highlight previews the in-progress drag range
   // rather than the last-committed `range` prop, so the drag reads live —
@@ -62,11 +86,17 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
 
   function isSelected(sha: string): boolean {
     if (previewRange) return isShaInRange(commits, { from: previewRange.from, to: previewRange.to }, sha);
+    if (isEverythingMode) return true;
     return Boolean(range && isShaInRange(commits, range, sha));
   }
 
   function showAll() {
     onChange(null);
+    setOpen(false);
+  }
+
+  function showAllWithUncommitted() {
+    onChange(EVERYTHING_RANGE);
     setOpen(false);
   }
 
@@ -88,13 +118,21 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
         )}
       </button>
       {open && (
-        <ul className="commit-chooser-popover" role="listbox" aria-multiselectable="true">
+        <ul className="commit-chooser-popover" role="listbox" aria-multiselectable="true" ref={popoverRef}>
           <li className="commit-chooser-reset-row">
             <button type="button" className="commit-chooser-reset" onClick={showAll}>
               {!range && <span className="commit-chooser-check">&#10003; </span>}
               Show all commits
             </button>
           </li>
+          {hasUncommittedRow && (
+            <li className="commit-chooser-reset-row">
+              <button type="button" className="commit-chooser-reset" onClick={showAllWithUncommitted}>
+                {isEverythingMode && <span className="commit-chooser-check">&#10003; </span>}
+                Show all commits + uncommitted changes
+              </button>
+            </li>
+          )}
           {commits.map(c => {
             const selected = isSelected(c.sha);
             return (

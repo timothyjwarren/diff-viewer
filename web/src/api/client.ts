@@ -20,7 +20,10 @@ export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {
 export async function fetchRepoDiff(repoPath: string, range?: CommitRange): Promise<DiffFile[]> {
   const params = new URLSearchParams({ repoPath });
   if (range) {
-    params.set("from", range.from);
+    // range.from is "" for the "everything, including uncommitted edits"
+    // mode — the server treats to=uncommitted with no from specially, so
+    // that empty from is never sent as a query param.
+    if (range.from) params.set("from", range.from);
     params.set("to", range.to);
   }
   return json(await fetch(`/api/repo-diff?${params}`));
@@ -69,7 +72,7 @@ export async function deleteComment(threadId: string, commentId: string): Promis
   await fetch(`/api/threads/${threadId}/comments/${commentId}`, { method: "DELETE" });
 }
 
-export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean }> {
+export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[] }> {
   return json(await fetch(`/api/repo-state?repoPath=${encodeURIComponent(repoPath)}`));
 }
 
