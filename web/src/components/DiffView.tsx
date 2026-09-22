@@ -259,7 +259,7 @@ export function DiffView({ file, repoPath, repoName, showUncommittedBanner, comm
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
       {!collapsed && (
-        <div className="diff-view-body">
+        <div className={`diff-view-body${showUncommittedBanner ? " diff-view-body-uncommitted" : ""}`}>
           {viewingFullFile && fullFileLines ? (
             <Pane
               hunks={fullFileHunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}

@@ -36,4 +36,18 @@ describe("DiffView", () => {
     );
     expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
   });
+
+  it("tints added lines amber instead of green when showUncommittedBanner is true", () => {
+    const { container } = render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner comments={comments} />,
+    );
+    expect(container.querySelector(".diff-view-body-uncommitted")).toBeInTheDocument();
+  });
+
+  it("does not tint added lines amber when showUncommittedBanner is false", () => {
+    const { container } = render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" showUncommittedBanner={false} comments={comments} />,
+    );
+    expect(container.querySelector(".diff-view-body-uncommitted")).not.toBeInTheDocument();
+  });
 });
