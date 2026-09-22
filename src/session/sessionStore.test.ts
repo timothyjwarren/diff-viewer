@@ -159,4 +159,22 @@ describe("SessionStore", () => {
     store.ensureContentSnapshot("abc123", "a.txt", "SHOULD NOT OVERWRITE\n");
     expect(store.snapshot.contentSnapshots["abc123:a.txt"]).toBe("one\ntwo\n");
   });
+
+  it("recomputeThreadPositions repositions unaffected threads and backfills an uncommitted pin once committed", async () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "uncommitted",
+    });
+    store.ensureContentSnapshot("uncommitted", "a.txt", "one\n");
+
+    await store.recomputeThreadPositions(
+      "/repo", "newsha123", false,
+      async () => "one\n",
+      async () => "one\n",
+    );
+
+    expect(store.snapshot.threads[0].pinnedRef).toBe("newsha123");
+    expect(store.snapshot.threads[0].outdated).toBe(false);
+  });
 });

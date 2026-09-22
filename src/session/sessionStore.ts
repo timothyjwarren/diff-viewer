@@ -8,6 +8,7 @@ import type {
   Verdict, VerdictType, NotificationEvent, VerdictIntent,
 } from "../types.js";
 import { verdictIntent } from "../types.js";
+import { trackThreadDrift } from "./driftTracking.js";
 
 export interface NewThreadInput {
   repoPath: string;
@@ -173,5 +174,31 @@ export class SessionStore {
 
   notificationsSince(cursor: number): NotificationEvent[] {
     return this.data.notifications.slice(cursor);
+  }
+
+  async recomputeThreadPositions(
+    repoPath: string,
+    headSha: string,
+    dirty: boolean,
+    readSnapshot: (pinnedRef: string, file: string) => Promise<string>,
+    readCurrent: (file: string, side: "old" | "new") => Promise<string>,
+  ): Promise<void> {
+    for (const thread of this.data.threads) {
+      if (thread.repoPath !== repoPath || thread.outdated) continue;
+      const key = `${thread.pinnedRef}:${thread.file}`;
+      if (!(key in this.data.contentSnapshots)) {
+        this.data.contentSnapshots[key] = await readSnapshot(thread.pinnedRef, thread.file);
+      }
+      const snapshot = this.data.contentSnapshots[key];
+      const current = await readCurrent(thread.file, thread.side);
+      const result = trackThreadDrift({ thread, snapshot, current });
+      thread.lineStart = result.lineStart;
+      thread.lineEnd = result.lineEnd;
+      thread.outdated = result.outdated;
+      if (thread.pinnedRef === "uncommitted" && !dirty && !result.outdated) {
+        thread.pinnedRef = headSha;
+        this.data.contentSnapshots[`${headSha}:${thread.file}`] = snapshot;
+      }
+    }
   }
 }
