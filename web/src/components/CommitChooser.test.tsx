@@ -34,24 +34,39 @@ describe("CommitChooser", () => {
     expect(screen.getByText("third")).toBeInTheDocument();
   });
 
-  it("a plain click on a commit selects just that commit and closes the popover", () => {
+  it("a plain click (mousedown+mouseup, no drag) selects just that commit and closes the popover", () => {
     const onChange = vi.fn();
     render(<CommitChooser commits={commits} range={null} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
-    fireEvent.click(screen.getByText("second"));
+    fireEvent.mouseDown(screen.getByText("second"));
+    fireEvent.mouseUp(window);
     expect(onChange).toHaveBeenCalledWith({ from: "bbb222", to: "bbb222" });
     expect(screen.queryByText("Show all commits")).not.toBeInTheDocument();
   });
 
-  it("shift-clicking a second commit selects the contiguous range between them", () => {
+  it("dragging from one commit to another selects the contiguous range between them, without closing the popover mid-drag", () => {
     const onChange = vi.fn();
-    const { rerender } = render(<CommitChooser commits={commits} range={null} onChange={onChange} />);
+    render(<CommitChooser commits={commits} range={null} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
-    fireEvent.click(screen.getByText("first"));
-    rerender(<CommitChooser commits={commits} range={{ from: "aaa111", to: "aaa111" }} onChange={onChange} />);
+    fireEvent.mouseDown(screen.getByText("first"));
+    fireEvent.mouseEnter(screen.getByText("second"));
+    // Still mid-drag: the popover must stay open and onChange must not have
+    // committed yet (it only fires once, at mouseup).
+    expect(screen.getByText("Show all commits")).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.mouseEnter(screen.getByText("third"));
+    fireEvent.mouseUp(window);
+    expect(onChange).toHaveBeenCalledWith({ from: "aaa111", to: "ccc333" });
+  });
+
+  it("dragging in reverse (later commit to earlier) still selects the contiguous range in order", () => {
+    const onChange = vi.fn();
+    render(<CommitChooser commits={commits} range={null} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
-    fireEvent.click(screen.getByText("third"), { shiftKey: true });
-    expect(onChange).toHaveBeenLastCalledWith({ from: "aaa111", to: "ccc333" });
+    fireEvent.mouseDown(screen.getByText("third"));
+    fireEvent.mouseEnter(screen.getByText("first"));
+    fireEvent.mouseUp(window);
+    expect(onChange).toHaveBeenCalledWith({ from: "aaa111", to: "ccc333" });
   });
 
   it("calls onOpen when the popover is opened, but not when it's closed", () => {

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CommitInfo, CommitRange } from "../types";
-import { computeRangeClick, isShaInRange, rangeCommitCount, type CommitRangeState } from "../lib/commitRange";
+import { computeRangeClick, isShaInRange, rangeCommitCount } from "../lib/commitRange";
 
 export function CommitChooser({ commits, range, onChange, onOpen }: {
   commits: CommitInfo[];
@@ -10,7 +10,25 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
   onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [rangeState, setRangeState] = useState<CommitRangeState | null>(null);
+  // Set on mousedown over a row, cleared on mouseup: while set, a range is
+  // being dragged out from this sha. A plain click (mousedown+mouseup on
+  // the same row, no drag) is just the zero-distance case of a drag.
+  const [dragAnchor, setDragAnchor] = useState<string | null>(null);
+  const [dragHover, setDragHover] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dragAnchor) return;
+    function finishDrag() {
+      const finalSha = dragHover ?? dragAnchor!;
+      const next = computeRangeClick(commits, { anchor: dragAnchor!, from: dragAnchor!, to: dragAnchor! }, finalSha, true);
+      onChange({ from: next.from, to: next.to });
+      setDragAnchor(null);
+      setDragHover(null);
+      setOpen(false);
+    }
+    window.addEventListener("mouseup", finishDrag);
+    return () => window.removeEventListener("mouseup", finishDrag);
+  }, [dragAnchor, dragHover, commits, onChange]);
 
   if (commits.length === 0) return null;
 
@@ -26,15 +44,20 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
     : `all ${commits.length} commits`;
   const excludedCount = range ? commits.length - rangeCommitCount(commits, range) : 0;
 
-  function selectCommit(sha: string, shiftKey: boolean) {
-    const next = computeRangeClick(commits, rangeState, sha, shiftKey);
-    setRangeState(next);
-    onChange({ from: next.from, to: next.to });
-    setOpen(false);
+  // While dragging, the row highlight previews the in-progress drag range
+  // rather than the last-committed `range` prop, so the drag reads live —
+  // onChange only fires once, at mouseup, to avoid re-fetching the diff on
+  // every row the drag passes over.
+  const previewRange = dragAnchor
+    ? computeRangeClick(commits, { anchor: dragAnchor, from: dragAnchor, to: dragAnchor }, dragHover ?? dragAnchor, true)
+    : null;
+
+  function isSelected(sha: string): boolean {
+    if (previewRange) return isShaInRange(commits, { from: previewRange.from, to: previewRange.to }, sha);
+    return Boolean(range && isShaInRange(commits, range, sha));
   }
 
   function showAll() {
-    setRangeState(null);
     onChange(null);
     setOpen(false);
   }
@@ -65,7 +88,7 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
             </button>
           </li>
           {commits.map(c => {
-            const selected = Boolean(range && isShaInRange(commits, range, c.sha));
+            const selected = isSelected(c.sha);
             return (
               <li key={c.sha}>
                 <button
@@ -73,7 +96,8 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
                   role="option"
                   aria-selected={selected}
                   className={`commit-chooser-row${selected ? " commit-chooser-row-selected" : ""}${c.sha === "uncommitted" ? " commit-chooser-row-uncommitted" : ""}`}
-                  onClick={e => selectCommit(c.sha, e.shiftKey)}
+                  onMouseDown={() => { setDragAnchor(c.sha); setDragHover(c.sha); }}
+                  onMouseEnter={() => { if (dragAnchor) setDragHover(c.sha); }}
                 >
                   <span className="commit-chooser-sha">{c.shortSha}</span>
                   <span className="commit-chooser-subject">{c.subject}</span>
