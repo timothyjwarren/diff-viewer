@@ -159,6 +159,7 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   if (webDistDir) {
     app.use(express.static(webDistDir));
     app.get("/session/:id", (_req, res) => res.sendFile("index.html", { root: webDistDir }));
+    app.get("/view-file", (_req, res) => res.sendFile("index.html", { root: webDistDir }));
   }
 
   return app;

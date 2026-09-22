@@ -93,6 +93,16 @@ describe("api app", () => {
     expect(res.body.lines).toEqual(["one", "two", ""]);
   });
 
+  it("GET /view-file serves the SPA shell when a webDistDir is configured", async () => {
+    const webDistDir = await fs.mkdtemp(path.join(os.tmpdir(), "dv-api-dist-"));
+    await fs.writeFile(path.join(webDistDir, "index.html"), "<html>shell</html>");
+    const app = createApp(await buildStore(), webDistDir);
+    const res = await request(app).get("/view-file").query({ repoPath, path: "a.txt", ref: "working" });
+    expect(res.status).toBe(200);
+    expect(res.text).toBe("<html>shell</html>");
+    await fs.rm(webDistDir, { recursive: true, force: true });
+  });
+
   it("posting a non-pending user comment is immediately reflected in /api/wait", async () => {
     const app = createApp(await buildStore());
     await request(app).post("/api/threads").send({
