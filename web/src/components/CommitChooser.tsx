@@ -39,10 +39,18 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
     });
   }
 
+  const realCommitCount = commits.filter(c => c.sha !== "uncommitted").length;
+  const hasUncommittedRow = realCommitCount !== commits.length;
+
   const label = range
     ? `${rangeCommitCount(commits, range)} of ${commits.length}`
-    : `all ${commits.length} commits`;
-  const excludedCount = range ? commits.length - rangeCommitCount(commits, range) : 0;
+    : `all ${realCommitCount} commits`;
+  // The default (no-range) view always excludes the uncommitted row by
+  // design (Task 3) — so it counts as excluded here too, not just the
+  // commits a narrowed range leaves out.
+  const excludedCount = range
+    ? commits.length - rangeCommitCount(commits, range)
+    : (hasUncommittedRow ? 1 : 0);
 
   // While dragging, the row highlight previews the in-progress drag range
   // rather than the last-committed `range` prop, so the drag reads live —

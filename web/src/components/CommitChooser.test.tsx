@@ -94,8 +94,20 @@ describe("CommitChooser", () => {
   it("renders the uncommitted-changes row distinctly and excludes it from the default label", () => {
     const withUncommitted = [...commits, { sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" }];
     render(<CommitChooser commits={withUncommitted} range={null} onChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /commit range/i })).toHaveTextContent("all 3 commits");
     fireEvent.click(screen.getByRole("button", { name: /commit range/ }));
     expect(screen.getByText("Uncommitted changes").closest("[role='option']")).toHaveClass("commit-chooser-row-uncommitted");
+  });
+
+  it("shows an exclusion badge in the default view when there are uncommitted changes, since they're always hidden there", () => {
+    const withUncommitted = [...commits, { sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" }];
+    render(<CommitChooser commits={withUncommitted} range={null} onChange={vi.fn()} />);
+    expect(screen.getByLabelText(/commits not shown/)).toBeInTheDocument();
+  });
+
+  it("shows no exclusion badge in the default view when the repo is clean", () => {
+    render(<CommitChooser commits={commits} range={null} onChange={vi.fn()} />);
+    expect(screen.queryByLabelText(/commits not shown/)).not.toBeInTheDocument();
   });
 
   it("shows a badge on the collapsed trigger when newer commits are excluded from the current range", () => {
