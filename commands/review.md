@@ -28,6 +28,29 @@ branch, which is empty. Instead pass the *parent* of the range you want as
 an explicit SHA, e.g. `/repo:abc1234` to review everything after commit
 `abc1234`; this also populates the in-app commit picker with that range.
 
+**Format every comment and reply as Markdown.** The viewer renders
+`reply` and `comment` text as Markdown, so write it the way you'd write a
+GitHub PR comment rather than as plain prose:
+- `inline code` for identifiers, file paths, commands, flags, and values
+- fenced code blocks (with a language tag) for anything multi-line
+- bullet or numbered lists for several points or steps
+- **bold** for the one thing the reader must not miss
+- `>` quotes when responding to a specific part of the user's comment
+
+Raw HTML is shown as literal text, and tables and strikethrough aren't
+supported. Backticks inside a double-quoted shell argument run as command
+substitution, so pass the text through a quoted heredoc, which leaves
+backticks, `$`, and quotes alone:
+```bash
+diff-viewer reply <sessionId> <threadId> "$(cat <<'EOF'
+Yes -- `parseArgs` returns `null` here, so the caller falls back to the
+default port:
+- `start` without `--port` binds an ephemeral port
+- `start --port 0` does the same
+EOF
+)"
+```
+
 Steps:
 1. Choose a `--title`. The user is typically reviewing several diff-viewer
    tabs across several projects at once, so the title is the only thing that
