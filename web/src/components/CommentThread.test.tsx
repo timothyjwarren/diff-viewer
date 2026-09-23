@@ -38,6 +38,68 @@ describe("CommentThread", () => {
     expect(onReply).toHaveBeenCalledWith("t1", "thanks!", false);
   });
 
+  describe("editing a comment", () => {
+    function startEdit(onEdit = vi.fn()) {
+      render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={onEdit} onDelete={vi.fn()} onResolve={vi.fn()} />);
+      fireEvent.click(screen.getByText("Edit"));
+      return { onEdit, editor: screen.getByDisplayValue("why is this here?") as HTMLTextAreaElement };
+    }
+
+    it("replaces the comment with an editor holding its raw text", () => {
+      const { editor } = startEdit();
+      expect(editor.tagName).toBe("TEXTAREA");
+      expect(editor).toHaveFocus();
+      expect(screen.queryByText("Edit")).not.toBeInTheDocument();
+      expect(screen.getByText("Save")).toBeInTheDocument();
+    });
+
+    it("saves the edited text and closes the editor", () => {
+      const { onEdit, editor } = startEdit();
+      fireEvent.change(editor, { target: { value: "why is **this** here?" } });
+      fireEvent.click(screen.getByText("Save"));
+      expect(onEdit).toHaveBeenCalledWith("t1", "c1", "why is **this** here?");
+      expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    });
+
+    it("saves with Cmd+Enter", () => {
+      const { onEdit, editor } = startEdit();
+      fireEvent.change(editor, { target: { value: "edited" } });
+      fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+      expect(onEdit).toHaveBeenCalledWith("t1", "c1", "edited");
+    });
+
+    it("cancel discards changes without calling onEdit", () => {
+      const { onEdit, editor } = startEdit();
+      fireEvent.change(editor, { target: { value: "never mind" } });
+      fireEvent.click(screen.getByText("Cancel"));
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(screen.getByText("why is this here?")).toBeInTheDocument();
+    });
+
+    it("Escape cancels only when the text is unchanged", () => {
+      const { editor } = startEdit();
+      fireEvent.change(editor, { target: { value: "half-typed" } });
+      fireEvent.keyDown(editor, { key: "Escape" });
+      expect(screen.getByDisplayValue("half-typed")).toBeInTheDocument();
+      fireEvent.change(editor, { target: { value: "why is this here?" } });
+      fireEvent.keyDown(editor, { key: "Escape" });
+      expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    });
+
+    it("disables Save when the text is empty", () => {
+      const { editor } = startEdit();
+      fireEvent.change(editor, { target: { value: "   " } });
+      expect(screen.getByText("Save")).toBeDisabled();
+    });
+
+    it("closes without calling onEdit when saved unchanged", () => {
+      const { onEdit } = startEdit();
+      fireEvent.click(screen.getByText("Save"));
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(screen.queryByText("Save")).not.toBeInTheDocument();
+    });
+  });
+
   it("calls onDelete for a user's own comment", () => {
     const onDelete = vi.fn();
     render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={onDelete} onResolve={vi.fn()} />);
