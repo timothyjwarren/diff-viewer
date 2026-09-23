@@ -73,6 +73,35 @@ describe("cli commands", () => {
     }
   });
 
+  it("commentCommand accepts author/createdAt/pending overrides for manual session reconstruction", async () => {
+    const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "dv-cli-repo-"));
+    await execFileAsync("git", ["init", "-b", "main"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.name", "Test"], { cwd: repoPath });
+    await fs.writeFile(path.join(repoPath, "a.txt"), "one\n");
+    await execFileAsync("git", ["add", "a.txt"], { cwd: repoPath });
+    await execFileAsync("git", ["commit", "-m", "base"], { cwd: repoPath });
+
+    const repoStore = SessionStore.create([{ path: repoPath, name: "repo", branch: "main", baseRef: "abc" }], sessionId, "test session", path.join(home, "data"));
+    const repoApp = createApp(repoStore);
+    const repoServer = repoApp.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => repoServer.once("listening", resolve));
+    const address = repoServer.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    await writeRegistryEntry(sessionId, { port, pid: process.pid });
+
+    try {
+      await commentCommand(sessionId, repoPath, "a.txt", 1, 1, "new", "recreated comment", {
+        author: "user", createdAt: "2020-01-01T00:00:00.000Z", pending: true,
+      });
+      const comment = repoStore.snapshot.threads[0].comments[0];
+      expect(comment).toMatchObject({ author: "user", createdAt: "2020-01-01T00:00:00.000Z", pending: true });
+    } finally {
+      repoServer.close();
+      await fs.rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it("replyCommand posts an agent reply into an existing thread", async () => {
     const thread = store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
@@ -80,6 +109,18 @@ describe("cli commands", () => {
     });
     await replyCommand(sessionId, thread.id, "because of X");
     expect(store.snapshot.threads[0].comments[1].body).toBe("because of X");
+  });
+
+  it("replyCommand accepts author/createdAt/pending overrides for manual session reconstruction", async () => {
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false, pinnedRef: "abc",
+    });
+    await replyCommand(sessionId, thread.id, "an old reply", {
+      author: "user", createdAt: "2020-01-01T00:00:00.000Z", pending: true,
+    });
+    const reply = store.snapshot.threads[0].comments[1];
+    expect(reply).toMatchObject({ author: "user", createdAt: "2020-01-01T00:00:00.000Z", pending: true });
   });
 
   it("ackCommand and unackCommand move a comment's agentStatus from acked to cleared", async () => {

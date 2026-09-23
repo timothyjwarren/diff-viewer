@@ -2,8 +2,36 @@
 import { startCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand,
+  stopCommand, sessionsCommand, type CommentOverrides,
 } from "../cli/commands.js";
+import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
+
+/**
+ * Pulls the optional --author/--created-at/--pending overrides used to
+ * manually reconstruct a session's comment history out of `argv`. Not
+ * typical use — normal `comment`/`reply` calls never pass these.
+ */
+function parseCommentOverrides(argv: string[]): { overrides: CommentOverrides; rest: string[] } {
+  const { value: authorArg, rest: afterAuthor } = extractFlag(argv, "--author");
+  const { value: createdAt, rest: afterCreatedAt } = extractFlag(afterAuthor, "--created-at");
+  const { present: pending, rest } = extractBooleanFlag(afterCreatedAt, "--pending");
+
+  if (authorArg !== undefined && authorArg !== "user" && authorArg !== "agent") {
+    throw new Error(`Invalid --author value: ${authorArg} (must be "user" or "agent")`);
+  }
+  if (createdAt !== undefined && Number.isNaN(Date.parse(createdAt))) {
+    throw new Error(`Invalid --created-at value: ${createdAt} (must be a valid date, e.g. ISO 8601)`);
+  }
+
+  return {
+    overrides: {
+      author: authorArg as CommentOverrides["author"],
+      createdAt,
+      pending: pending || undefined,
+    },
+    rest,
+  };
+}
 
 async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
@@ -25,13 +53,15 @@ async function main(): Promise<void> {
       break;
     }
     case "reply": {
-      console.log(JSON.stringify(await replyCommand(rest[0], rest[1], rest[2])));
+      const { overrides, rest: replyRest } = parseCommentOverrides(rest);
+      console.log(JSON.stringify(await replyCommand(replyRest[0], replyRest[1], replyRest[2], overrides)));
       break;
     }
     case "comment": {
-      const [sessionId, repoPath, file, lineStart, lineEnd, side, text] = rest;
+      const { overrides, rest: commentRest } = parseCommentOverrides(rest);
+      const [sessionId, repoPath, file, lineStart, lineEnd, side, text] = commentRest;
       console.log(JSON.stringify(await commentCommand(
-        sessionId, repoPath, file, Number(lineStart), Number(lineEnd), side as "old" | "new", text,
+        sessionId, repoPath, file, Number(lineStart), Number(lineEnd), side as "old" | "new", text, overrides,
       )));
       break;
     }

@@ -3,7 +3,7 @@ import path from "node:path";
 import { getRegistryDir, getDataDir } from "../paths.js";
 import { readRegistryEntry, removeRegistryEntry } from "../registry.js";
 import { readCursor, writeCursor } from "./cursor.js";
-import { verdictIntent, type SessionData, type RepoConfig, type CommentThread } from "../types.js";
+import { verdictIntent, type SessionData, type RepoConfig, type CommentThread, type CommentAuthor } from "../types.js";
 
 async function baseUrl(sessionId: string): Promise<string> {
   const { port } = await readRegistryEntry(sessionId);
@@ -118,12 +118,25 @@ export async function reviewCommand(sessionId: string): Promise<unknown> {
   return { threads, verdicts: verdictsWithIntent };
 }
 
-export async function replyCommand(sessionId: string, threadId: string, text: string): Promise<unknown> {
+/**
+ * `author`/`createdAt`/`pending` are for manually reconstructing a session's
+ * comment history (e.g. from a transcript) — normal use never sets them:
+ * author is always "agent" and createdAt is always "now".
+ */
+export interface CommentOverrides {
+  author?: CommentAuthor;
+  createdAt?: string;
+  pending?: boolean;
+}
+
+export async function replyCommand(
+  sessionId: string, threadId: string, text: string, overrides: CommentOverrides = {},
+): Promise<unknown> {
   const url = await baseUrl(sessionId);
   const res = await fetch(`${url}/api/threads/${threadId}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ author: "agent", body: text }),
+    body: JSON.stringify({ author: overrides.author ?? "agent", body: text, createdAt: overrides.createdAt, pending: overrides.pending }),
   });
   return res.json();
 }
@@ -141,12 +154,16 @@ export async function unackCommand(sessionId: string, threadId: string, commentI
 export async function commentCommand(
   sessionId: string, repoPath: string, file: string,
   lineStart: number, lineEnd: number, side: "old" | "new", text: string,
+  overrides: CommentOverrides = {},
 ): Promise<unknown> {
   const url = await baseUrl(sessionId);
   const res = await fetch(`${url}/api/threads`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoPath, file, lineStart, lineEnd, side, author: "agent", body: text, toRef: "HEAD" }),
+    body: JSON.stringify({
+      repoPath, file, lineStart, lineEnd, side, body: text, toRef: "HEAD",
+      author: overrides.author ?? "agent", createdAt: overrides.createdAt, pending: overrides.pending,
+    }),
   });
   return res.json();
 }

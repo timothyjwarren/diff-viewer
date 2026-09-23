@@ -104,9 +104,9 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   });
 
   app.post("/api/threads/:threadId/comments", async (req, res) => {
-    const { author, body, suggestion, pending } = req.body;
+    const { author, body, suggestion, pending, createdAt } = req.body;
     try {
-      const comment = store.addReply(req.params.threadId, author, body, suggestion, pending);
+      const comment = store.addReply(req.params.threadId, author, body, suggestion, pending, createdAt);
       await store.persist();
       res.status(201).json(comment);
     } catch {
