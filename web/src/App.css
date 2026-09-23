@@ -8,8 +8,10 @@
   --accent: #58a6ff;
   --add-bg: rgba(46, 160, 67, 0.15);
   --add-bg-strong: rgba(46, 160, 67, 0.3);
+  --add-bg-inline: rgba(46, 160, 67, 0.4);
   --del-bg: rgba(248, 81, 73, 0.15);
   --del-bg-strong: rgba(248, 81, 73, 0.3);
+  --del-bg-inline: rgba(248, 81, 73, 0.4);
   /* Same amber as .uncommitted-banner, for the added/context lines of a file with an uncommitted edit. */
   --uncommitted-add-bg: rgba(242, 201, 138, 0.15);
   --uncommitted-add-bg-strong: rgba(242, 201, 138, 0.3);
@@ -137,6 +139,11 @@ main::-webkit-scrollbar-thumb:hover {
 
 .scrollbar-marker-pending::before {
   background: #d29922;
+}
+
+.scrollbar-marker-resolved::before {
+  background: var(--text-muted);
+  opacity: 0.45;
 }
 
 .scrollbar-marker:hover::before {
@@ -671,6 +678,14 @@ main {
   background: var(--del-bg-strong);
 }
 
+.diff-line-add .diff-inline-change {
+  background: var(--add-bg-inline);
+}
+
+.diff-line-del .diff-inline-change {
+  background: var(--del-bg-inline);
+}
+
 /*
  * The gutter is a sticky child painted over scrolled-past code, so it needs
  * its own opaque background rather than inheriting the row's (semi-
@@ -720,7 +735,7 @@ main {
   outline-offset: -1px;
 }
 
-.diff-line-code span,
+.diff-line-code span:not(.diff-inline-change),
 .diff-line-code pre,
 .diff-line-code code {
   background: transparent !important;

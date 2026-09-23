@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 import type { CommentThread as CommentThreadData, DiffFile, DiffHunk, DiffLine } from "../types";
 import { detectLanguage } from "../lib/language";
 import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter, findGapExpansionForLine } from "../lib/expandContext";
 import { pairHunkLines, type PairedRow } from "../lib/pairLines";
+import { inlineChanges, type Range } from "../lib/inlineDiff";
 import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
@@ -16,32 +17,47 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function highlightLineInner(content: string, lang: string): Promise<string> {
+async function highlightLineInner(content: string, lang: string, changes: Range[]): Promise<string> {
   // shiki's codeToHtml always wraps a single line in its own <pre><code>...</code></pre>.
   // Keeping that wrapper makes every diff line render as its own boxed/margined block
   // (browser default `pre { margin }` plus shiki's own per-<pre> background-color), so
   // we discard the <pre>/<code> shell and keep only the highlighted <span> content.
-  const html = await codeToHtml(content || " ", { lang, theme: "github-dark" });
+  const html = await codeToHtml(content || " ", {
+    lang, theme: "github-dark",
+    decorations: changes.map(([start, end]) => ({ start, end, properties: { class: "diff-inline-change" } })),
+  });
   const match = LINE_SPAN_RE.exec(html);
   return match ? match[1] : escapeHtml(content);
 }
 
 const MARKERS: Record<DiffLine["type"], string> = { add: "+", del: "-", context: "" };
 
-function Line({ line, lang, repoName, side, selected, onGutterMouseDown, onGutterMouseEnter }: {
-  line: DiffLine; lang: string; repoName: string; side: "old" | "new";
+const NO_CHANGES: Range[] = [];
+
+function Line({ line, counterpart, lang, repoName, side, selected, onGutterMouseDown, onGutterMouseEnter }: {
+  line: DiffLine;
+  /** The other side's line in a changed pair, whose differences get highlighted. */
+  counterpart: DiffLine | null;
+  lang: string; repoName: string; side: "old" | "new";
   selected: boolean;
   onGutterMouseDown: (line: number) => void;
   onGutterMouseEnter: (line: number) => void;
 }) {
   const [html, setHtml] = useState<string>(() => escapeHtml(line.content));
+  const changes = useMemo(() => {
+    if (!counterpart) return NO_CHANGES;
+    const pair = side === "old"
+      ? inlineChanges(line.content, counterpart.content)
+      : inlineChanges(counterpart.content, line.content);
+    return pair?.[side] ?? NO_CHANGES;
+  }, [line.content, counterpart, side]);
   useEffect(() => {
     let cancelled = false;
-    highlightLineInner(line.content, lang).then(result => {
+    highlightLineInner(line.content, lang, changes).then(result => {
       if (!cancelled) setHtml(result);
     }).catch(() => setHtml(escapeHtml(line.content)));
     return () => { cancelled = true; };
-  }, [line.content, lang]);
+  }, [line.content, lang, changes]);
 
   const lineNumber = side === "old" ? line.oldLineNumber : line.newLineNumber;
 
@@ -176,7 +192,7 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
                 return (
                   <div key={ri}>
                     <Line
-                      line={l} lang={lang} repoName={repoName} side={side} selected={selected}
+                      line={l} counterpart={l.type === "context" ? null : row[side === "old" ? "new" : "old"]} lang={lang} repoName={repoName} side={side} selected={selected}
                       onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
                       onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
                     />

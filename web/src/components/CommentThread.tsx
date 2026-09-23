@@ -59,6 +59,12 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   // Resolving collapses the thread by default; the chevron lets the user
   // peek at it again without unresolving. Unresolving always re-expands.
   const [manualExpand, setManualExpand] = useState(false);
+  // A new comment on a resolved thread expands it so the comment is seen.
+  const [commentCount, setCommentCount] = useState(thread.comments.length);
+  if (thread.comments.length !== commentCount) {
+    setCommentCount(thread.comments.length);
+    if (thread.comments.length > commentCount && thread.resolved) setManualExpand(true);
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const expanded = focused || draft.length > 0;
   const collapsed = thread.resolved && !manualExpand;
@@ -71,7 +77,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   }
 
   return (
-    <div className={`comment-thread${thread.resolved ? " comment-thread-resolved" : ""}`}>
+    <div id={`thread-${thread.id}`} className={`comment-thread${thread.resolved ? " comment-thread-resolved" : ""}`}>
       <div className="comment-thread-header">
         {thread.resolved && (
           <button

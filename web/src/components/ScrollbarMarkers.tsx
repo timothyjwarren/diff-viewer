@@ -10,21 +10,27 @@ const FALLBACK_WIDTH = 10;
 
 interface Tick {
   threadId: string;
-  commentId: string;
   /** Position on the scrollbar track, 0 (top) to 1 (bottom). */
   fraction: number;
-  pending: boolean;
+  status: "open" | "pending" | "resolved";
   label: string;
 }
 
-function tickLabel(thread: CommentThread, pending: boolean): string {
+const STATUS_LABELS = { open: null, pending: "Pending", resolved: "Resolved" };
+
+function tickStatus(thread: CommentThread): Tick["status"] {
+  if (thread.resolved) return "resolved";
+  return thread.comments.some(c => c.pending) ? "pending" : "open";
+}
+
+function tickLabel(thread: CommentThread, status: Tick["status"]): string {
   const firstLine = thread.comments[0].body.split("\n")[0].slice(0, 80);
-  return [pending && "Pending", `${thread.file}:${thread.lineStart}`, firstLine].filter(Boolean).join(" · ");
+  return [STATUS_LABELS[status], `${thread.file}:${thread.lineStart}`, firstLine].filter(Boolean).join(" · ");
 }
 
 /**
  * Clickable tick marks laid over the scroll container's scrollbar, one per
- * unresolved thread, positioned to line up with the scrollbar thumb (see
+ * thread, positioned to line up with the scrollbar thumb (see
  * `tickFraction`). Re-measured on scroll and resize, since diffs expand,
  * collapse, and restyle after the first render.
  */
@@ -45,19 +51,19 @@ export function ScrollbarMarkers({ threads, scrollRef }: {
       setWidth(container.offsetWidth - container.clientWidth || FALLBACK_WIDTH);
       if (scrollHeight <= 0) return setTicks([]);
       const contentTop = container.getBoundingClientRect().top - container.scrollTop;
-      const next = threads
-        .filter(t => !t.resolved && t.comments.length > 0)
+      // Resolved ticks come first so open ones paint over them where they overlap.
+      const next = [...threads.filter(t => t.resolved), ...threads.filter(t => !t.resolved)]
+        .filter(t => t.comments.length > 0)
         .flatMap(t => {
-          const commentId = t.comments[0].id;
-          const el = document.getElementById(`comment-${commentId}`);
+          const el = document.getElementById(`thread-${t.id}`);
           if (!el) return [];
           const rect = el.getBoundingClientRect();
-          const pending = t.comments.some(c => c.pending);
+          const status = tickStatus(t);
           const fraction = tickFraction({
             contentCenter: rect.top + rect.height / 2 - contentTop,
             scrollHeight, clientHeight, minThumb: SCROLLBAR_MIN_THUMB,
           });
-          return [{ threadId: t.id, commentId, pending, label: tickLabel(t, pending), fraction }];
+          return [{ threadId: t.id, status, label: tickLabel(t, status), fraction }];
         });
       setTicks(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
@@ -82,12 +88,12 @@ export function ScrollbarMarkers({ threads, scrollRef }: {
         <button
           key={t.threadId}
           type="button"
-          className={`scrollbar-marker${t.pending ? " scrollbar-marker-pending" : ""}`}
+          className={`scrollbar-marker${t.status === "open" ? "" : ` scrollbar-marker-${t.status}`}`}
           style={{ top: `${Math.round(t.fraction * 1000) / 10}%` }}
           title={t.label}
           aria-label={t.label}
           onClick={() => {
-            document.getElementById(`comment-${t.commentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            document.getElementById(`thread-${t.threadId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
           }}
         />
       ))}

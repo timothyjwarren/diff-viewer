@@ -19,8 +19,8 @@ function rectAt(top: number, height = 20): DOMRect {
 
 /**
  * A scroll container 200px tall with 1000px of content (so its thumb is
- * 40px, above the minimum), scrolled 300px down, holding one 20px comment
- * element per `offsets` entry (content offsets of the comment's top).
+ * 40px, above the minimum), scrolled 300px down, holding one 20px thread
+ * element per `offsets` entry (content offsets of the thread's top).
  */
 function Harness({ threads, offsets }: { threads: CommentThread[]; offsets: Record<string, number> }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -37,10 +37,10 @@ function Harness({ threads, offsets }: { threads: CommentThread[]; offsets: Reco
           el.getBoundingClientRect = () => rectAt(0, 200);
         }}
       >
-        {Object.entries(offsets).map(([commentId, offset]) => (
+        {Object.entries(offsets).map(([threadId, offset]) => (
           <div
-            key={commentId}
-            id={`comment-${commentId}`}
+            key={threadId}
+            id={`thread-${threadId}`}
             ref={el => { if (el) el.getBoundingClientRect = () => rectAt(offset - scrollTop); }}
           />
         ))}
@@ -53,25 +53,34 @@ function Harness({ threads, offsets }: { threads: CommentThread[]; offsets: Reco
 const ticks = (c: HTMLElement) => Array.from(c.querySelectorAll<HTMLElement>(".scrollbar-marker"));
 
 describe("ScrollbarMarkers", () => {
-  it("places a tick for each unresolved thread at its comment's position", async () => {
+  it("places a tick for each thread at its position", async () => {
     const { container } = render(
-      <Harness threads={[thread("t1"), thread("t2")]} offsets={{ "t1-c": 250, "t2-c": 900 }} />,
+      <Harness threads={[thread("t1"), thread("t2")]} offsets={{ "t1": 250, "t2": 900 }} />,
     );
     await waitFor(() => expect(ticks(container)).toHaveLength(2));
     // Comment centers are 260 and 910 of 1000.
     expect(ticks(container).map(t => t.style.top)).toEqual(["26%", "91%"]);
   });
 
-  it("skips resolved threads and threads whose comments aren't rendered", async () => {
+  it("skips threads that aren't rendered", async () => {
     const { container } = render(
-      <Harness threads={[thread("t1", { resolved: true }), thread("t2"), thread("t3")]} offsets={{ "t1-c": 100, "t2-c": 500 }} />,
+      <Harness threads={[thread("t1"), thread("t2")]} offsets={{ "t1": 100 }} />,
     );
     await waitFor(() => expect(ticks(container)).toHaveLength(1));
   });
 
+  it("marks and labels resolved threads", async () => {
+    const { container } = render(
+      <Harness threads={[thread("t1", { resolved: true })]} offsets={{ "t1": 100 }} />,
+    );
+    await waitFor(() => expect(ticks(container)).toHaveLength(1));
+    expect(ticks(container)[0]).toHaveClass("scrollbar-marker-resolved");
+    expect(ticks(container)[0]).toHaveAttribute("title", "Resolved · a.ts:7 · first line");
+  });
+
   it("marks pending threads and labels ticks with the file, line, and first line of the comment", async () => {
     const { container } = render(
-      <Harness threads={[thread("t1", {}, true), thread("t2")]} offsets={{ "t1-c": 100, "t2-c": 500 }} />,
+      <Harness threads={[thread("t1", {}, true), thread("t2")]} offsets={{ "t1": 100, "t2": 500 }} />,
     );
     await waitFor(() => expect(ticks(container)).toHaveLength(2));
     expect(ticks(container)[0]).toHaveClass("scrollbar-marker-pending");
@@ -80,9 +89,9 @@ describe("ScrollbarMarkers", () => {
   });
 
   it("scrolls a thread into view when its tick is clicked", async () => {
-    const { container } = render(<Harness threads={[thread("t1")]} offsets={{ "t1-c": 600 }} />);
+    const { container } = render(<Harness threads={[thread("t1")]} offsets={{ "t1": 600 }} />);
     await waitFor(() => expect(ticks(container)).toHaveLength(1));
-    const target = document.getElementById("comment-t1-c")!;
+    const target = document.getElementById("thread-t1")!;
     target.scrollIntoView = vi.fn();
     fireEvent.click(ticks(container)[0]);
     expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
