@@ -229,6 +229,30 @@ describe("CommentThread", () => {
     expect(screen.getByText("why is this here?")).toBeInTheDocument();
   });
 
+  it("expands a resolved thread when a new comment arrives on it", () => {
+    const resolvedThread: CommentThreadData = { ...thread, resolved: true };
+    const handlers = { onReply: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onResolve: vi.fn() };
+    const { rerender } = render(<CommentThread thread={resolvedThread} {...handlers} />);
+    expect(screen.queryByText("why is this here?")).not.toBeInTheDocument();
+    const reply = { id: "c3", author: "agent" as const, body: "one more thing", pending: false, createdAt: "2026-01-01T00:02:00Z" };
+    rerender(<CommentThread thread={{ ...resolvedThread, comments: [...resolvedThread.comments, reply] }} {...handlers} />);
+    expect(screen.getByText("one more thing")).toBeInTheDocument();
+    expect(screen.getByText("Unresolve")).toBeInTheDocument();
+  });
+
+  it("keeps a resolved thread collapsed when a comment is removed", () => {
+    const resolvedThread: CommentThreadData = { ...thread, resolved: true };
+    const handlers = { onReply: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onResolve: vi.fn() };
+    const { rerender } = render(<CommentThread thread={resolvedThread} {...handlers} />);
+    rerender(<CommentThread thread={{ ...resolvedThread, comments: resolvedThread.comments.slice(0, 1) }} {...handlers} />);
+    expect(screen.queryByText("why is this here?")).not.toBeInTheDocument();
+  });
+
+  it("gives the thread an id for scrolling to it", () => {
+    const { container } = render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    expect(container.querySelector("#thread-t1")).toHaveClass("comment-thread");
+  });
+
   it("shows an Outdated badge when the thread's commented lines have changed", () => {
     const outdatedThread: CommentThreadData = { ...thread, outdated: true };
     render(<CommentThread thread={outdatedThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);

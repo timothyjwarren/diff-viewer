@@ -139,6 +139,11 @@ main::-webkit-scrollbar-thumb:hover {
   background: #d29922;
 }
 
+.scrollbar-marker-resolved::before {
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+
 .scrollbar-marker:hover::before {
   left: 0;
   right: 0;
