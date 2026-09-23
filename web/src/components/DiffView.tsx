@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 import type { CommentThread as CommentThreadData, DiffFile, DiffHunk, DiffLine } from "../types";
 import { detectLanguage } from "../lib/language";
@@ -101,16 +101,28 @@ function Composer({ onSubmit, onCancel, quotedText }: {
   quotedText: string | null;
 }) {
   const [draft, setDraft] = useState(() => (quotedText ? formatQuote(quotedText) : ""));
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function submit(pending: boolean) {
+    onSubmit(draft, pending);
+    setDraft("");
+    if (textareaRef.current) textareaRef.current.style.height = "";
+  }
+
   return (
     <div className="comment-composer">
       <textarea
+        ref={textareaRef}
         placeholder="Leave a comment..." value={draft} autoFocus
         onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => { if (e.key === "Escape") onCancel(); }}
+        onKeyDown={e => {
+          if (e.key === "Escape" && draft.trim() === "") onCancel();
+          else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(false); }
+        }}
       />
       <div className="comment-reply-actions">
-        <button onClick={() => { onSubmit(draft, false); setDraft(""); }}>Add single comment</button>
-        <button onClick={() => { onSubmit(draft, true); setDraft(""); }}>Add to review</button>
+        <button onClick={() => submit(false)}>Add single comment</button>
+        <button onClick={() => submit(true)}>Add to review</button>
         <button className="comment-cancel-button" onClick={onCancel}>Cancel</button>
       </div>
     </div>
@@ -217,8 +229,48 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [paneSplit, setPaneSplit] = useState(50);
+  const [dragging, setDragging] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number; split: number } | null>(null);
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
+  const isNewFile = file.status === "added";
+
+  function toggleCollapsed() {
+    setCollapsed(c => {
+      const next = !c;
+      if (next) headerRef.current?.scrollIntoView({ block: "start" });
+      return next;
+    });
+  }
+
+  function onDividerMouseDown(e: React.MouseEvent) {
+    dragStartRef.current = { x: e.clientX, split: paneSplit };
+    setDragging(true);
+  }
+
+  useEffect(() => {
+    if (!dragging) return;
+    function onMouseMove(e: MouseEvent) {
+      const start = dragStartRef.current;
+      const width = bodyRef.current?.getBoundingClientRect().width;
+      if (!start || !width) return;
+      const deltaPct = ((e.clientX - start.x) / width) * 100;
+      setPaneSplit(Math.min(80, Math.max(20, start.split + deltaPct)));
+    }
+    function onMouseUp() {
+      dragStartRef.current = null;
+      setDragging(false);
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [dragging]);
 
   useEffect(() => setHunks(file.hunks), [file]);
 
@@ -240,12 +292,12 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
 
   return (
     <div className="diff-view">
-      <div className="diff-view-header-sticky">
+      <div className="diff-view-header-sticky" ref={headerRef}>
         <div className="diff-view-header">
           <button
             className="diff-view-collapse-toggle"
             aria-label={collapsed ? "Expand file" : "Collapse file"}
-            onClick={() => setCollapsed(c => !c)}
+            onClick={toggleCollapsed}
           >
             <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
           </button>
@@ -257,15 +309,29 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
       {!collapsed && (
-        <div className="diff-view-body">
-          <Pane
-            hunks={hunks} side="old" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
-            onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
-          />
-          <Pane
-            hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
-            onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
-          />
+        <div
+          className={`diff-view-body${isNewFile ? " diff-view-body-single" : ""}`}
+          ref={bodyRef}
+          style={isNewFile ? undefined : { gridTemplateColumns: `${paneSplit}% 4px ${100 - paneSplit}%` }}
+        >
+          {isNewFile ? (
+            <Pane
+              hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
+              onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+            />
+          ) : (
+            <>
+              <Pane
+                hunks={hunks} side="old" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
+                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+              />
+              <div className="diff-pane-divider" role="separator" aria-orientation="vertical" onMouseDown={onDividerMouseDown} />
+              <Pane
+                hunks={hunks} side="new" lang={lang} repoName={repoName} fileId={fileId} comments={comments}
+                onExpand={expand} fileLineCount={fullFileLines?.length ?? null}
+              />
+            </>
+          )}
         </div>
       )}
     </div>

@@ -120,4 +120,153 @@ describe("DiffView", () => {
     expect(targetRow.nextElementSibling?.textContent).toContain("why is this here?");
     expect(insertedRow.nextElementSibling?.textContent ?? "").not.toContain("why is this here?");
   });
+
+  it("scrolls the sticky header into view when collapsing a file", () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Collapse file"));
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  });
+
+  it("does not scroll when expanding an already-collapsed file", () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Collapse file"));
+    scrollIntoView.mockClear();
+    fireEvent.click(screen.getByLabelText("Expand file"));
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("renders a single full-width pane for a newly added file", () => {
+    const addedFile: DiffFile = { ...file, status: "added" };
+    const { container } = render(
+      <DiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const panes = container.querySelectorAll(".diff-pane");
+    expect(panes).toHaveLength(1);
+    expect(panes[0].getAttribute("data-side")).toBe("new");
+  });
+
+  it("still renders two panes for a modified file", () => {
+    const { container } = render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    expect(container.querySelectorAll(".diff-pane")).toHaveLength(2);
+  });
+
+  it("resizes the two panes by dragging the divider between them", () => {
+    const { container } = render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const body = container.querySelector(".diff-view-body") as HTMLElement;
+    vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ width: 200 } as DOMRect);
+    const divider = screen.getByRole("separator");
+
+    fireEvent.mouseDown(divider, { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 150 });
+    fireEvent.mouseUp(window);
+
+    expect(body.style.gridTemplateColumns).toBe("75% 4px 25%");
+  });
+
+  it("does not show a divider for a single-pane (new) file", () => {
+    const addedFile: DiffFile = { ...file, status: "added" };
+    render(
+      <DiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+  });
+
+  it("resets a manually-enlarged composer textarea's height after submitting", () => {
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...") as HTMLTextAreaElement;
+    textarea.style.height = "200px";
+
+    fireEvent.click(screen.getByText("Add single comment"));
+
+    expect(textarea.style.height).toBe("");
+  });
+
+  it("cancels the composer on Escape when its draft is empty", () => {
+    const onCancelSelection = vi.fn();
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true, onCancelSelection }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...");
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+
+    expect(onCancelSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cancel the composer on Escape when its draft has text", () => {
+    const onCancelSelection = vi.fn();
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true, onCancelSelection }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...");
+    fireEvent.change(textarea, { target: { value: "not empty" } });
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+
+    expect(onCancelSelection).not.toHaveBeenCalled();
+  });
+
+  it("submits the composer as a single comment on Cmd/Ctrl+Enter", () => {
+    const onCreateThread = vi.fn();
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...");
+    fireEvent.change(textarea, { target: { value: "looks good" } });
+
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+
+    expect(onCreateThread).toHaveBeenCalledWith("new", 1, 1, "looks good", false);
+  });
+
+  it("does not submit the composer on a plain Enter (inserts a newline instead)", () => {
+    const onCreateThread = vi.fn();
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...");
+    fireEvent.change(textarea, { target: { value: "looks good" } });
+
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onCreateThread).not.toHaveBeenCalled();
+  });
 });

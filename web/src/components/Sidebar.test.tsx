@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Sidebar } from "./Sidebar";
+import { fileAnchorId } from "../lib/fileAnchor";
 import type { RepoDiff } from "../types";
 
 const repos: RepoDiff[] = [
@@ -28,5 +29,11 @@ describe("Sidebar", () => {
     render(<Sidebar repos={repos} onSelectFile={onSelectFile} />);
     fireEvent.click(screen.getByText("x.ts"));
     expect(onSelectFile).toHaveBeenCalledWith(repos[0].files[0]);
+  });
+
+  it("highlights the row for the currently active file", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} activeFileId={fileAnchorId(repos[0].files[0])} />);
+    expect(screen.getByText("x.ts").closest("li")).toHaveClass("sidebar-file-active");
+    expect(screen.getByText("y.ts").closest("li")).not.toHaveClass("sidebar-file-active");
   });
 });

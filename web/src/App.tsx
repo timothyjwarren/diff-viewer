@@ -8,12 +8,10 @@ import {
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
+import { fileAnchorId } from "./lib/fileAnchor";
+import { pickActiveEntry } from "./lib/scrollSpy";
+import { findAdjacentComment } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
-
-function fileAnchorId(file: DiffFile): string {
-  const name = file.newPath || file.oldPath;
-  return `file-${(file.repoPath + "-" + name).replace(/[^a-zA-Z0-9]+/g, "-")}`;
-}
 
 function fileName(file: DiffFile): string {
   return file.newPath || file.oldPath;
@@ -69,6 +67,7 @@ export function App() {
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
   const hasLoadedThreadsRef = useRef(false);
@@ -163,6 +162,40 @@ export function App() {
     return () => window.removeEventListener("mouseup", onWindowMouseUp);
   }, []);
 
+  useEffect(() => {
+    const anchors = repos.flatMap(r => r.files.map(f => document.getElementById(fileAnchorId(f))));
+    const elements = anchors.filter((el): el is HTMLElement => el !== null);
+    if (elements.length === 0) return;
+
+    const tops = new Map<string, { top: number; isIntersecting: boolean }>();
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        tops.set(entry.target.id, { top: entry.boundingClientRect.top, isIntersecting: entry.isIntersecting });
+      }
+      setActiveFileId(pickActiveEntry(
+        Array.from(tops.entries()).map(([id, v]) => ({ id, ...v })),
+      ));
+    }, { threshold: [0, 1] });
+
+    elements.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [repos]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!e.metaKey || !e.shiftKey) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const entries = Array.from(document.querySelectorAll<HTMLElement>("[id^='comment-']"))
+        .map(el => ({ id: el.id, top: el.getBoundingClientRect().top }));
+      const target = findAdjacentComment(entries, e.key === "ArrowDown" ? "next" : "previous");
+      if (!target) return;
+      e.preventDefault();
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   function scrollToFile(file: DiffFile) {
     document.getElementById(fileAnchorId(file))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -234,7 +267,7 @@ export function App() {
       <Sidebar
         repos={repos} onSelectFile={scrollToFile}
         commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-        onOpenCommits={handleOpenCommits}
+        onOpenCommits={handleOpenCommits} activeFileId={activeFileId}
       />
       <main>
         {repos.length === 0 && <p className="empty-state">No changes to review.</p>}

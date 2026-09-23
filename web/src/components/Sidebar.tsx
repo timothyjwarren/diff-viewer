@@ -1,5 +1,6 @@
 import type { CommitInfo, CommitRange, DiffFile, FileStatus, RepoDiff } from "../types";
 import { CommitChooser } from "./CommitChooser";
+import { fileAnchorId } from "../lib/fileAnchor";
 
 const STATUS_LETTER: Record<FileStatus, string> = {
   added: "A", modified: "M", deleted: "D", renamed: "R",
@@ -7,6 +8,7 @@ const STATUS_LETTER: Record<FileStatus, string> = {
 
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
+  activeFileId = null,
 }: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
@@ -14,6 +16,7 @@ export function Sidebar({
   rangeByRepo?: Record<string, CommitRange | null>;
   onRangeChange?: (repoPath: string, range: CommitRange | null) => void;
   onOpenCommits?: (repoPath: string) => void;
+  activeFileId?: string | null;
 }) {
   return (
     <nav className="sidebar">
@@ -39,8 +42,9 @@ export function Sidebar({
               const slash = name.lastIndexOf("/");
               const base = slash >= 0 ? name.slice(slash + 1) : name;
               const dir = slash >= 0 ? name.slice(0, slash) : "";
+              const isActive = activeFileId !== null && activeFileId === fileAnchorId(file);
               return (
-                <li key={name} title={name}>
+                <li key={name} title={name} className={isActive ? "sidebar-file-active" : undefined}>
                   <button onClick={() => onSelectFile(file)}>
                     <span className={`sidebar-file-status sidebar-file-status-${file.status}`}>
                       {STATUS_LETTER[file.status]}

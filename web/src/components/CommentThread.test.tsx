@@ -80,6 +80,61 @@ describe("CommentThread", () => {
     expect(screen.queryByText("Agent is working on this")).not.toBeInTheDocument();
   });
 
+  it("resets a manually-enlarged reply textarea's height after submitting", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Reply...") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "thanks!" } });
+    textarea.style.height = "200px";
+
+    fireEvent.click(screen.getByText("Add single comment"));
+
+    expect(textarea.style.height).toBe("");
+  });
+
+  it("blurs the reply box on Escape when it's empty, like clicking away", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Reply...");
+    textarea.focus();
+    expect(document.activeElement).toBe(textarea);
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+
+    expect(document.activeElement).not.toBe(textarea);
+  });
+
+  it("does not blur the reply box on Escape when it has text", () => {
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Reply...");
+    fireEvent.change(textarea, { target: { value: "not empty" } });
+    textarea.focus();
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it("submits the reply as a single comment on Cmd/Ctrl+Enter", () => {
+    const onReply = vi.fn();
+    render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Reply...");
+    fireEvent.change(textarea, { target: { value: "thanks!" } });
+
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+
+    expect(onReply).toHaveBeenCalledWith("t1", "thanks!", false);
+  });
+
+  it("does not submit the reply on a plain Enter (inserts a newline instead)", () => {
+    const onReply = vi.fn();
+    render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    const textarea = screen.getByPlaceholderText("Reply...");
+    fireEvent.change(textarea, { target: { value: "thanks!" } });
+
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onReply).not.toHaveBeenCalled();
+  });
+
   it("calls onResolve when the Resolve button is clicked", () => {
     const onResolve = vi.fn();
     render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={onResolve} />);

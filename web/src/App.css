@@ -208,6 +208,10 @@ body {
   background: rgba(177, 186, 196, 0.12);
 }
 
+.sidebar-file-active button {
+  background: rgba(88, 166, 255, 0.12);
+}
+
 .sidebar-file-status {
   flex: 0 0 14px;
   text-align: center;
@@ -364,6 +368,10 @@ main {
   border-radius: 0 0 6px 6px;
 }
 
+.diff-view-body-single {
+  grid-template-columns: 1fr;
+}
+
 .diff-pane {
   overflow-x: auto;
   user-select: text;
@@ -398,6 +406,15 @@ main {
 
 .diff-pane:first-child {
   border-left: none;
+}
+
+.diff-pane-divider {
+  cursor: col-resize;
+  background: var(--border);
+}
+
+.diff-pane-divider:hover {
+  background: var(--accent);
 }
 
 /*

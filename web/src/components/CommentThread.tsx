@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CommentThread as CommentThreadData, CommentAuthor } from "../types";
 import { timeAgo } from "../lib/timeAgo";
 
@@ -24,6 +24,13 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   const [manualExpand, setManualExpand] = useState(false);
   const expanded = focused || draft.length > 0;
   const collapsed = thread.resolved && !manualExpand;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function submitReply(pending: boolean) {
+    onReply(thread.id, draft, pending);
+    setDraft("");
+    if (textareaRef.current) textareaRef.current.style.height = "";
+  }
 
   return (
     <div className={`comment-thread${thread.resolved ? " comment-thread-resolved" : ""}`}>
@@ -86,19 +93,24 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
           ))}
           <div className="comment-reply">
             <textarea
+              ref={textareaRef}
               className={expanded ? "comment-reply-expanded" : ""}
               placeholder="Reply..."
               value={draft}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Escape" && draft.trim() === "") textareaRef.current?.blur();
+                else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitReply(false); }
+              }}
             />
             {expanded && (
               <div className="comment-reply-actions">
-                <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, false); setDraft(""); }}>
+                <button onMouseDown={e => e.preventDefault()} onClick={() => submitReply(false)}>
                   Add single comment
                 </button>
-                <button onMouseDown={e => e.preventDefault()} onClick={() => { onReply(thread.id, draft, true); setDraft(""); }}>
+                <button onMouseDown={e => e.preventDefault()} onClick={() => submitReply(true)}>
                   Add to review
                 </button>
               </div>
