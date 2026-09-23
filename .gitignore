@@ -4,3 +4,4 @@ web/node_modules/
 web/dist/
 docs/superpowers/plans/
 *.tsbuildinfo
+.claude/worktrees/
