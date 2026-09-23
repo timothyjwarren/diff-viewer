@@ -9,7 +9,8 @@ import {
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
-import { pickActiveEntry } from "./lib/scrollSpy";
+import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
+import { CommentScrollMarkers } from "./components/CommentScrollMarkers";
 import { findAdjacentComment, isEditableTarget } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
@@ -67,7 +68,9 @@ export function App() {
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
+  const [title, setTitle] = useState<string | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
   const hasLoadedThreadsRef = useRef(false);
@@ -118,7 +121,10 @@ export function App() {
       );
       setCommitsByRepo(Object.fromEntries(entries));
     });
-    fetchSession().then(session => { document.title = session.title; });
+    fetchSession().then(session => {
+      document.title = session.title;
+      setTitle(session.title);
+    });
   }, []);
 
   async function handleOpenCommits(repoPath: string) {
@@ -163,22 +169,32 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const anchors = repos.flatMap(r => r.files.map(f => document.getElementById(fileAnchorId(f))));
-    const elements = anchors.filter((el): el is HTMLElement => el !== null);
-    if (elements.length === 0) return;
+    const main = mainRef.current;
+    if (!main) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const mainTop = main.getBoundingClientRect().top;
+      const rects = Array.from(main.querySelectorAll<HTMLElement>(".file-anchor")).map(el => {
+        const rect = el.getBoundingClientRect();
+        return { id: el.id, top: rect.top - mainTop, bottom: rect.bottom - mainTop };
+      });
+      const next = computeViewportSpan(rects, main.clientHeight);
+      setViewportSpan(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
 
-    const tops = new Map<string, { top: number; isIntersecting: boolean }>();
-    const observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        tops.set(entry.target.id, { top: entry.boundingClientRect.top, isIntersecting: entry.isIntersecting });
-      }
-      setActiveFileId(pickActiveEntry(
-        Array.from(tops.entries()).map(([id, v]) => ({ id, ...v })),
-      ));
-    }, { threshold: [0, 1] });
-
-    elements.forEach(el => observer.observe(el));
-    return () => observer.disconnect();
+    schedule();
+    main.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    main.querySelectorAll(".file-anchor").forEach(el => resizeObserver?.observe(el));
+    return () => {
+      cancelAnimationFrame(frame);
+      main.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      resizeObserver?.disconnect();
+    };
   }, [repos]);
 
   const currentCommentIdRef = useRef<string | null>(null);
@@ -284,9 +300,10 @@ export function App() {
       <Sidebar
         repos={repos} onSelectFile={scrollToFile}
         commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-        onOpenCommits={handleOpenCommits} activeFileId={activeFileId}
+        onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan}
       />
-      <main>
+      <div className="main-pane">
+      <main ref={mainRef}>
         {repos.length === 0 && <p className="empty-state">No changes to review.</p>}
         {repos.map(repo => repo.files.map(file => (
           <div key={fileAnchorId(file)} id={fileAnchorId(file)} className="file-anchor">
@@ -304,6 +321,8 @@ export function App() {
           </div>
         )))}
       </main>
+      <CommentScrollMarkers threads={threads} scrollRef={mainRef} />
+      </div>
       <ReviewBar onSubmit={handleSubmitVerdict} />
       {offscreenNewComments.length > 0 && (
         <button
