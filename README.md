@@ -185,7 +185,7 @@ a leftover tab from an unrelated session, not this one failing to navigate.
 `diff-viewer sessions` (no `--repo` filter) lists everything currently
 running if that needs confirming.
 
-For development:
+### Developing
 
 ```bash
 npm install            # server/CLI deps
@@ -196,6 +196,14 @@ cd web && npm test      # frontend tests (vitest + @testing-library/react)
 
 npm run build            # compiles TS (tsc) and builds the frontend (vite build)
 ```
+
+In a working checkout, rerun both `npm install`s and `npm run build` after
+pulling. `bin/diff-viewer` installs dependencies only when a `node_modules/`
+directory is missing entirely, and builds only when `dist/` is missing, so
+an existing checkout keeps running its old build -- and tests fail on any
+newly added dependency -- until you do. Installed copies of the plugin
+don't need this: each version is installed into its own directory, which
+starts without `node_modules/` or `dist/`.
 
 Full architecture and design rationale:
 [`docs/superpowers/specs/2026-09-16-diff-viewer-design.md`](docs/superpowers/specs/2026-09-16-diff-viewer-design.md).
