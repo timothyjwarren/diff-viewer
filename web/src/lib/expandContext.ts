@@ -42,6 +42,37 @@ export function expandHunkContext(
   return result;
 }
 
+export interface GapExpansion { hunkIndex: number; direction: "up" | "down"; amount: number; }
+
+/**
+ * If `lineNumber` (in the "new"-side numbering `expandHunkContext` already
+ * works in) currently falls in a hidden gap around/between hunks, returns
+ * the `expandHunkContext` call needed to reveal exactly that line. Returns
+ * null if the line is already visible, or there are no hunks.
+ */
+export function findGapExpansionForLine(hunks: DiffHunk[], lineNumber: number): GapExpansion | null {
+  if (hunks.length === 0) return null;
+
+  const first = hunks[0];
+  if (lineNumber < first.newStart) {
+    return { hunkIndex: 0, direction: "up", amount: first.newStart - lineNumber };
+  }
+
+  for (let hi = 0; hi < hunks.length; hi++) {
+    const hunk = hunks[hi];
+    const hunkEnd = hunk.newStart + hunk.newLines - 1;
+    if (lineNumber >= hunk.newStart && lineNumber <= hunkEnd) return null;
+    if (lineNumber > hunkEnd) {
+      const next = hunks[hi + 1];
+      if (!next || lineNumber < next.newStart) {
+        return { hunkIndex: hi, direction: "down", amount: lineNumber - hunkEnd };
+      }
+    }
+  }
+
+  return null;
+}
+
 /** Number of unchanged lines hidden between the start of the file (or the previous hunk) and this hunk. */
 export function hiddenLinesBefore(hunks: DiffHunk[], hunkIndex: number): number {
   const hunk = hunks[hunkIndex];

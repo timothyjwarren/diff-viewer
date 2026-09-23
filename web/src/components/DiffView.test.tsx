@@ -3,6 +3,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DiffView, type CommentHandlers } from "./DiffView";
 import type { CommentThread as CommentThreadData, DiffFile } from "../types";
+import { fetchFile } from "../api/client";
+
+vi.mock("../api/client", () => ({ fetchFile: vi.fn() }));
 
 const file: DiffFile = {
   repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
@@ -120,6 +123,38 @@ describe("DiffView", () => {
     const insertedRow = within(newPane).getByText("inserted").closest(".diff-line")!;
     expect(targetRow.nextElementSibling?.textContent).toContain("why is this here?");
     expect(insertedRow.nextElementSibling?.textContent ?? "").not.toContain("why is this here?");
+  });
+
+  it("auto-expands a hidden gap to reveal a comment thread whose line is currently collapsed", async () => {
+    // Plain identifiers (not "line 10"-style digits) so shiki's tokenizer
+    // renders each as a single text node instead of splitting the number
+    // into its own span, which would otherwise defeat a plain-text query.
+    vi.mocked(fetchFile).mockResolvedValue(
+      Array.from({ length: 60 }, (_, i) => (i === 9 ? "targetline" : `filler${i}`)),
+    );
+    const fileWithHiddenThread: DiffFile = {
+      repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
+      hunks: [{
+        oldStart: 50, oldLines: 1, newStart: 50, newLines: 1,
+        lines: [{ type: "context", oldLineNumber: 50, newLineNumber: 50, content: "line50" }],
+      }],
+    };
+    const thread: CommentThreadData = {
+      id: "t1", repoPath: "/repo", file: "a.ts", lineStart: 10, lineEnd: 10, side: "new", resolved: false,
+      pinnedRef: "abc123", outdated: false,
+      comments: [{ id: "c1", author: "user", body: "why hidden?", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
+    };
+    render(
+      <DiffView
+        file={fileWithHiddenThread} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, threads: [thread] }}
+      />,
+    );
+
+    expect(screen.queryByText("targetline")).not.toBeInTheDocument();
+    expect(await screen.findByText("why hidden?")).toBeInTheDocument();
+    // Both panes reveal it (old and new numbering coincide for expanded context).
+    expect(await screen.findAllByText("targetline")).toHaveLength(2);
   });
 
   it("keeps the header at its current screen position when collapsing a file that isn't already at the top", () => {

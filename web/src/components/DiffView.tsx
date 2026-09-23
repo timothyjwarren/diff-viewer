@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 import type { CommentThread as CommentThreadData, DiffFile, DiffHunk, DiffLine } from "../types";
 import { detectLanguage } from "../lib/language";
-import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter } from "../lib/expandContext";
+import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter, findGapExpansionForLine } from "../lib/expandContext";
 import { pairHunkLines, type PairedRow } from "../lib/pairLines";
 import type { SelectionState } from "../lib/selection";
 import { fetchFile } from "../api/client";
@@ -236,6 +236,7 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const dragStartRef = useRef<{ x: number; split: number } | null>(null);
   const justCollapsedRef = useRef(false);
   const beforeCollapseTopRef = useRef<number | null>(null);
+  const autoExpandedThreadIdsRef = useRef<Set<string>>(new Set());
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
   const isNewFile = file.status === "added";
@@ -268,6 +269,23 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
     const delta = after - before;
     if (delta !== 0) headerEl.closest("main")?.scrollBy(0, delta);
   }, [collapsed]);
+
+  // A thread pinned to a line inside a currently-hidden context gap would
+  // otherwise never render anywhere — there's no visible line for it to
+  // attach to. Auto-expand just enough of the surrounding gap to bring it
+  // into view. Guarded per-thread-id so this only ever fires once per
+  // thread, even though `comments.threads` gets a new array identity on
+  // every parent render.
+  useEffect(() => {
+    for (const t of comments.threads) {
+      if (autoExpandedThreadIdsRef.current.has(t.id)) continue;
+      const lineNumber = t.side === "new" ? shiftForUncommitted(hunks, t.lineEnd) : t.lineEnd;
+      const gap = findGapExpansionForLine(hunks, lineNumber);
+      if (!gap) continue;
+      autoExpandedThreadIdsRef.current.add(t.id);
+      expand(gap.hunkIndex, gap.direction, gap.amount);
+    }
+  }, [hunks, comments.threads]);
 
   function onDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault();

@@ -61,4 +61,16 @@ describe("ExpandStrip", () => {
     expect(onExpandDown).toHaveBeenCalledTimes(1);
     expect(onExpandAll).not.toHaveBeenCalled();
   });
+
+  it("puts the 'expand down' button before 'expand up', so each sits next to the hunk it extends", () => {
+    // The strip sits between two hunks: the top hunk ends right above it, the
+    // bottom hunk starts right below it. "Expand down" grows the top hunk
+    // downward (toward the strip's top edge) and "expand up" grows the bottom
+    // hunk upward (toward the strip's bottom edge) — so "down" must render
+    // first to land next to the top hunk, and "up" second to land next to
+    // the bottom hunk, matching where a reader's eye already is.
+    render(<ExpandStrip showUp showDown hiddenCount={40} onExpandUp={() => {}} onExpandDown={() => {}} onExpandAll={() => {}} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map(b => b.getAttribute("aria-label"))).toEqual(["Expand down", "Expand up"]);
+  });
 });

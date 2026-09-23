@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter } from "./expandContext";
+import { expandHunkContext, hiddenLinesBefore, hiddenLinesAfter, findGapExpansionForLine } from "./expandContext";
 import type { DiffHunk } from "../types";
 
 const fullFile = ["one", "two", "three", "four", "five", "six", "seven"];
@@ -67,5 +67,31 @@ describe("hiddenLinesAfter", () => {
 
   it("counts lines between the last hunk and the end of the file once known", () => {
     expect(hiddenLinesAfter([hunk], 0, fullFile.length)).toBe(3);
+  });
+});
+
+describe("findGapExpansionForLine", () => {
+  it("returns null when the line is already visible inside a hunk", () => {
+    expect(findGapExpansionForLine([hunk], 4)).toBeNull();
+  });
+
+  it("returns null when there are no hunks", () => {
+    expect(findGapExpansionForLine([], 4)).toBeNull();
+  });
+
+  it("expands the first hunk upward when the line is hidden before it", () => {
+    expect(findGapExpansionForLine([hunk], 2)).toEqual({ hunkIndex: 0, direction: "up", amount: 2 });
+  });
+
+  it("expands the earlier hunk downward when the line is hidden between two hunks", () => {
+    const second: DiffHunk = {
+      oldStart: 7, oldLines: 1, newStart: 7, newLines: 1,
+      lines: [{ type: "context", oldLineNumber: 7, newLineNumber: 7, content: "seven" }],
+    };
+    expect(findGapExpansionForLine([hunk, second], 6)).toEqual({ hunkIndex: 0, direction: "down", amount: 2 });
+  });
+
+  it("expands the last hunk downward when the line is hidden after it", () => {
+    expect(findGapExpansionForLine([hunk], 6)).toEqual({ hunkIndex: 0, direction: "down", amount: 2 });
   });
 });
