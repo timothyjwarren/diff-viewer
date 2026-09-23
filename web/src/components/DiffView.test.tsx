@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { DiffView, type CommentHandlers } from "./DiffView";
 import type { CommentThread as CommentThreadData, DiffFile } from "../types";
 import { fetchFile } from "../api/client";
@@ -90,6 +90,27 @@ describe("DiffView", () => {
     );
     expect(screen.getByText("committed addition").closest(".diff-line")).not.toHaveClass("diff-line-uncommitted");
     expect(screen.getByText("uncommitted addition").closest(".diff-line")).toHaveClass("diff-line-uncommitted");
+  });
+
+  it("highlights the changed words within a changed line pair", async () => {
+    const changedFile: DiffFile = {
+      repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
+      hunks: [{
+        oldStart: 1, oldLines: 1, newStart: 1, newLines: 1,
+        lines: [
+          { type: "del", oldLineNumber: 1, newLineNumber: null, content: "const total = count + 1;" },
+          { type: "add", oldLineNumber: null, newLineNumber: 1, content: "const total = amount + 1;" },
+        ],
+      }],
+    };
+    const { container } = render(
+      <DiffView file={changedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const marks = (side: string) => Array.from(
+      container.querySelectorAll(`.diff-pane[data-side='${side}'] .diff-inline-change`), el => el.textContent,
+    );
+    await waitFor(() => expect(marks("new")).toEqual(["amount"]));
+    expect(marks("old")).toEqual(["count"]);
   });
 
   it("attaches a thread pinned to a committed line to that line's new (shifted) position, not its stale stored line", () => {
