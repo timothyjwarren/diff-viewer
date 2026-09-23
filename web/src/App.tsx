@@ -10,7 +10,7 @@ import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
 import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
-import { CommentRuler } from "./components/CommentRuler";
+import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import { findAdjacentComment, isEditableTarget } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
@@ -321,7 +321,7 @@ export function App() {
           </div>
         )))}
       </main>
-      <CommentRuler threads={threads} scrollRef={mainRef} />
+      <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
       <ReviewBar onSubmit={handleSubmitVerdict} />
       {offscreenNewComments.length > 0 && (
