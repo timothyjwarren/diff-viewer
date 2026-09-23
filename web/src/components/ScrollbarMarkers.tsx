@@ -3,7 +3,7 @@ import type { CommentThread } from "../types";
 import { tickFraction } from "../lib/scrollbarTicks";
 
 /** Must match `min-height` of `main::-webkit-scrollbar-thumb` in App.css. */
-export const SCROLLBAR_MIN_THUMB = 24;
+export const SCROLLBAR_MIN_THUMB = 12;
 
 /** Strip width when the scrollbar takes no layout width (e.g. overlay scrollbars). */
 const FALLBACK_WIDTH = 10;

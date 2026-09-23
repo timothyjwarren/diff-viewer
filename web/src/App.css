@@ -78,7 +78,10 @@ body {
 }
 
 /* Styled so the thumb has a known minimum length, which ScrollbarMarkers
- * needs to line ticks up with it (SCROLLBAR_MIN_THUMB must match). */
+ * needs to line ticks up with it (SCROLLBAR_MIN_THUMB must match). The
+ * minimum is small so the thumb stays true to scale on all but very long
+ * diffs, and the thumb is painted edge to edge vertically (inset only at
+ * the sides, small radius) so what's drawn matches its actual extent. */
 main::-webkit-scrollbar {
   width: 12px;
 }
@@ -89,11 +92,13 @@ main::-webkit-scrollbar-track {
 }
 
 main::-webkit-scrollbar-thumb {
-  min-height: 24px;
+  min-height: 12px;
   background: rgba(139, 148, 158, 0.35);
   background-clip: padding-box;
-  border: 2px solid transparent;
-  border-radius: 6px;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 2px;
+  border-radius: 4px;
 }
 
 main::-webkit-scrollbar-thumb:hover {
