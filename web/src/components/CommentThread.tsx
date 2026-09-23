@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { CommentThread as CommentThreadData, CommentAuthor } from "../types";
 import { timeAgo } from "../lib/timeAgo";
+import { CommentMarkdown } from "./CommentMarkdown";
 
 function Avatar({ author }: { author: CommentAuthor }) {
   return (
@@ -81,7 +82,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
                     </span>
                   ) : null}
                 </div>
-                <p>{comment.body}</p>
+                <CommentMarkdown body={comment.body} />
                 {comment.author === "user" && (
                   <div className="comment-actions">
                     <button onClick={() => onEdit(thread.id, comment.id, comment.body)}>Edit</button>
