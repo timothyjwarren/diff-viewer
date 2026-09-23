@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DiffView, type CommentHandlers } from "./DiffView";
@@ -121,30 +122,76 @@ describe("DiffView", () => {
     expect(insertedRow.nextElementSibling?.textContent ?? "").not.toContain("why is this here?");
   });
 
-  it("scrolls the sticky header into view when collapsing a file", () => {
-    const scrollIntoView = vi.fn();
-    HTMLElement.prototype.scrollIntoView = scrollIntoView;
-    render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+  it("keeps the header at its current screen position when collapsing a file that isn't already at the top", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValueOnce({ top: 300 } as DOMRect)
+      .mockReturnValueOnce({ top: 0 } as DOMRect);
+    const { container } = render(
+      <main>
+        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+      </main>,
     );
+    const mainEl = container.querySelector("main") as HTMLElement;
+    const scrollBy = vi.fn();
+    mainEl.scrollBy = scrollBy;
 
     fireEvent.click(screen.getByLabelText("Collapse file"));
 
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(scrollBy).toHaveBeenCalledWith(0, -300);
+  });
+
+  it("does not scroll at all when the header's screen position doesn't change on collapse", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+    const { container } = render(
+      <main>
+        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+      </main>,
+    );
+    const mainEl = container.querySelector("main") as HTMLElement;
+    const scrollBy = vi.fn();
+    mainEl.scrollBy = scrollBy;
+
+    fireEvent.click(screen.getByLabelText("Collapse file"));
+
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("compensates exactly once under StrictMode's double-invoked state updaters", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValueOnce({ top: 300 } as DOMRect)
+      .mockReturnValueOnce({ top: 0 } as DOMRect);
+    const { container } = render(
+      <StrictMode>
+        <main>
+          <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+        </main>
+      </StrictMode>,
+    );
+    const mainEl = container.querySelector("main") as HTMLElement;
+    const scrollBy = vi.fn();
+    mainEl.scrollBy = scrollBy;
+
+    fireEvent.click(screen.getByLabelText("Collapse file"));
+
+    expect(scrollBy).toHaveBeenCalledTimes(1);
   });
 
   it("does not scroll when expanding an already-collapsed file", () => {
-    const scrollIntoView = vi.fn();
-    HTMLElement.prototype.scrollIntoView = scrollIntoView;
-    render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
+    const { container } = render(
+      <main>
+        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+      </main>,
     );
+    const mainEl = container.querySelector("main") as HTMLElement;
+    const scrollBy = vi.fn();
+    mainEl.scrollBy = scrollBy;
 
     fireEvent.click(screen.getByLabelText("Collapse file"));
-    scrollIntoView.mockClear();
+    scrollBy.mockClear();
     fireEvent.click(screen.getByLabelText("Expand file"));
 
-    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(scrollBy).not.toHaveBeenCalled();
   });
 
   it("renders a single full-width pane for a newly added file", () => {
@@ -162,6 +209,18 @@ describe("DiffView", () => {
       <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     expect(container.querySelectorAll(".diff-pane")).toHaveLength(2);
+  });
+
+  it("prevents native text selection when starting a divider drag", () => {
+    render(
+      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const divider = screen.getByRole("separator");
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 100 });
+
+    divider.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it("resizes the two panes by dragging the divider between them", () => {

@@ -210,6 +210,7 @@ body {
 
 .sidebar-file-active button {
   background: rgba(88, 166, 255, 0.12);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .sidebar-file-status {
@@ -289,7 +290,11 @@ main {
 .diff-view-header-sticky {
   position: sticky;
   top: 0;
-  z-index: 2;
+  /* Must outrank .diff-line-gutter's z-index (2) — both are sticky (one
+   * vertically, one horizontally) and, without this, the gutter's later
+   * position in the DOM lets it paint over the header's collapse button
+   * whenever both happen to be stuck in the same on-screen area. */
+  z-index: 3;
   background: var(--bg);
   padding-top: 6px;
 }

@@ -234,19 +234,43 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; split: number } | null>(null);
+  const justCollapsedRef = useRef(false);
+  const beforeCollapseTopRef = useRef<number | null>(null);
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
   const isNewFile = file.status === "added";
 
   function toggleCollapsed() {
-    setCollapsed(c => {
-      const next = !c;
-      if (next) headerRef.current?.scrollIntoView({ block: "start" });
-      return next;
-    });
+    if (!collapsed) {
+      beforeCollapseTopRef.current = headerRef.current?.getBoundingClientRect().top ?? null;
+      justCollapsedRef.current = true;
+    }
+    setCollapsed(c => !c);
   }
 
+  // Collapsing removes the file's body, which can un-stick this file's
+  // sticky header (e.g. when you were scrolled deep into it) and leave the
+  // viewport showing whatever now lands at the old scroll position instead.
+  // Rather than forcing the header to the top (which jumps files that
+  // weren't scrolled that far), this measures how far the header actually
+  // moved on screen and scrolls by exactly that much to cancel it out —
+  // a no-op when the header didn't move. Runs in an effect (after the
+  // collapse commits, not as a side effect inside the setCollapsed updater,
+  // which StrictMode invokes twice) guarded by a ref so it still fires only
+  // once per real toggle.
+  useEffect(() => {
+    if (!collapsed || !justCollapsedRef.current) return;
+    justCollapsedRef.current = false;
+    const before = beforeCollapseTopRef.current;
+    const headerEl = headerRef.current;
+    if (before == null || !headerEl) return;
+    const after = headerEl.getBoundingClientRect().top;
+    const delta = after - before;
+    if (delta !== 0) headerEl.closest("main")?.scrollBy(0, delta);
+  }, [collapsed]);
+
   function onDividerMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
     dragStartRef.current = { x: e.clientX, split: paneSplit };
     setDragging(true);
   }
