@@ -188,14 +188,28 @@ export function App() {
       if (!e.metaKey || !e.shiftKey) return;
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       if (isEditableTarget(e.target as Element | null)) return;
+
+      // Every comment -- root and replies alike -- gets tagged with its
+      // thread's root id, so findAdjacentComment can tell replies apart from
+      // roots (only roots are valid navigation targets) while still using
+      // reply positions to detect which chain the viewport is inside.
+      const rootIdByCommentId = new Map<string, string>();
+      for (const thread of threadsRef.current) {
+        const rootId = thread.comments[0]?.id;
+        if (!rootId) continue;
+        for (const comment of thread.comments) rootIdByCommentId.set(comment.id, rootId);
+      }
       const entries = Array.from(document.querySelectorAll<HTMLElement>("[id^='comment-']"))
-        .map(el => ({ id: el.id, top: el.getBoundingClientRect().top }));
+        .map(el => {
+          const commentId = el.id.slice("comment-".length);
+          return { id: commentId, rootId: rootIdByCommentId.get(commentId) ?? commentId, top: el.getBoundingClientRect().top };
+        });
       const direction = e.key === "ArrowDown" ? "next" : "previous";
       const target = findAdjacentComment(entries, direction, currentCommentIdRef.current);
       if (!target) return;
       e.preventDefault();
       currentCommentIdRef.current = target;
-      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById(`comment-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
