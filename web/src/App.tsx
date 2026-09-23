@@ -10,7 +10,7 @@ import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
 import { pickActiveEntry } from "./lib/scrollSpy";
-import { findAdjacentComment } from "./lib/commentNav";
+import { findAdjacentComment, isEditableTarget } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
 function fileName(file: DiffFile): string {
@@ -181,15 +181,20 @@ export function App() {
     return () => observer.disconnect();
   }, [repos]);
 
+  const currentCommentIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!e.metaKey || !e.shiftKey) return;
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      if (isEditableTarget(e.target as Element | null)) return;
       const entries = Array.from(document.querySelectorAll<HTMLElement>("[id^='comment-']"))
         .map(el => ({ id: el.id, top: el.getBoundingClientRect().top }));
-      const target = findAdjacentComment(entries, e.key === "ArrowDown" ? "next" : "previous");
+      const direction = e.key === "ArrowDown" ? "next" : "previous";
+      const target = findAdjacentComment(entries, direction, currentCommentIdRef.current);
       if (!target) return;
       e.preventDefault();
+      currentCommentIdRef.current = target;
       document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     window.addEventListener("keydown", onKeyDown);
