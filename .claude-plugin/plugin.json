@@ -1,5 +1,5 @@
 {
   "name": "diff-viewer",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Local, GitHub-PR-style diff viewer for reviewing changes across multiple repos/worktrees before opening individual PRs."
 }
