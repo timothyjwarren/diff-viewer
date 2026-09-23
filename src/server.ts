@@ -6,14 +6,10 @@ import { SessionStore } from "./session/sessionStore.js";
 import { resolveBaseRef, getCurrentBranch, assertValidRepoPath } from "./git/gitRepo.js";
 import { writeRegistryEntry } from "./registry.js";
 import { parseRepoArgs } from "./parseRepoArgs.js";
+import { extractFlag, validatePort } from "./cli/flags.js";
+import { getDataDir } from "./paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-function extractFlag(argv: string[], flag: string): { value: string | undefined; rest: string[] } {
-  const idx = argv.indexOf(flag);
-  if (idx === -1) return { value: undefined, rest: argv };
-  return { value: argv[idx + 1], rest: [...argv.slice(0, idx), ...argv.slice(idx + 2)] };
-}
 
 function defaultTitle(repos: Array<{ name: string; branch: string }>): string {
   if (repos.length === 1) return `${repos[0].name}:${repos[0].branch}`;
@@ -24,8 +20,18 @@ function defaultTitle(repos: Array<{ name: string; branch: string }>): string {
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
-  const { value: titleArg, rest: repoArgv } = extractFlag(afterSessionId, "--title");
+  const { value: titleArg, rest: afterTitle } = extractFlag(afterSessionId, "--title");
+  const { value: portArg, rest: afterPort } = extractFlag(afterTitle, "--port");
+  const { value: importSessionId, rest: repoArgv } = extractFlag(afterPort, "--import-session");
   const repoArgs = parseRepoArgs(repoArgv);
+
+  let port: number;
+  try {
+    port = validatePort(portArg);
+  } catch (err) {
+    console.error(`diff-viewer: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
 
   if (repoArgs.length === 0) {
     console.error("diff-viewer: no repo paths given (pass one or more <path[:baseRef]> arguments)");
@@ -57,17 +63,40 @@ async function main(): Promise<void> {
   }));
 
   if (!sessionId) throw new Error("Missing required --session-id argument");
-  const title = titleArg ?? defaultTitle(repos);
-  const store = SessionStore.create(repos, sessionId, title);
+
+  let store: SessionStore;
+  if (importSessionId) {
+    const sourcePath = path.join(getDataDir(), `${importSessionId}.json`);
+    try {
+      store = await SessionStore.importFrom(sourcePath, sessionId, repos, titleArg);
+    } catch (err) {
+      console.error(`diff-viewer: failed to import session ${importSessionId}: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  } else {
+    const title = titleArg ?? defaultTitle(repos);
+    store = SessionStore.create(repos, sessionId, title);
+  }
   await store.persist();
 
   const webDistDir = path.join(__dirname, "../web/dist");
   const app = createApp(store, webDistDir);
-  const server = app.listen(0, "127.0.0.1", () => {
+  const server = app.listen(port, "127.0.0.1");
+
+  server.once("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE" && portArg !== undefined) {
+      console.error(`diff-viewer: port ${port} is already in use`);
+    } else {
+      console.error(err.message);
+    }
+    process.exit(1);
+  });
+
+  server.once("listening", () => {
     const address = server.address();
-    const port = typeof address === "object" && address ? address.port : 0;
-    void writeRegistryEntry(sessionId, { port, pid: process.pid }).then(() => {
-      console.log(JSON.stringify({ sessionId, port, url: `http://127.0.0.1:${port}/session/${sessionId}` }));
+    const boundPort = typeof address === "object" && address ? address.port : 0;
+    void writeRegistryEntry(sessionId, { port: boundPort, pid: process.pid }).then(() => {
+      console.log(JSON.stringify({ sessionId, port: boundPort, url: `http://127.0.0.1:${boundPort}/session/${sessionId}` }));
     });
   });
 

@@ -21,6 +21,7 @@ export interface NewThreadInput {
   suggestion?: string;
   pending?: boolean;
   pinnedRef: string;
+  createdAt?: string;
 }
 
 export class SessionStore {
@@ -47,6 +48,27 @@ export class SessionStore {
     return new SessionStore(JSON.parse(raw) as SessionData, filePath);
   }
 
+  /**
+   * Seeds a brand-new session (new id, fresh `repos`/live repo state) with
+   * another session's comment history — the source file is only read, never
+   * written, so the two sessions never contend for the same file.
+   */
+  static async importFrom(
+    sourceFilePath: string, newId: string, repos: RepoConfig[], title?: string, dataDir: string = getDataDir(),
+  ): Promise<SessionStore> {
+    const raw = await fs.readFile(sourceFilePath, "utf-8");
+    const source = JSON.parse(raw) as SessionData;
+    const data: SessionData = {
+      ...source,
+      id: newId,
+      title: title ?? source.title,
+      repos,
+      createdAt: new Date().toISOString(),
+      status: "active",
+    };
+    return new SessionStore(data, path.join(dataDir, `${newId}.json`));
+  }
+
   get id(): string { return this.data.id; }
   get snapshot(): SessionData { return structuredClone(this.data); }
   get notificationCount(): number { return this.data.notifications.length; }
@@ -65,7 +87,7 @@ export class SessionStore {
     const pending = input.author === "user" ? Boolean(input.pending) : false;
     const comment: Comment = {
       id: randomUUID(), author: input.author, body: input.body, suggestion: input.suggestion,
-      pending, createdAt: new Date().toISOString(),
+      pending, createdAt: input.createdAt ?? new Date().toISOString(),
     };
     const thread: CommentThread = {
       id: randomUUID(), repoPath: input.repoPath, file: input.file,
@@ -86,11 +108,14 @@ export class SessionStore {
     }
   }
 
-  addReply(threadId: string, author: CommentAuthor, body: string, suggestion?: string, pendingInput?: boolean): Comment {
+  addReply(
+    threadId: string, author: CommentAuthor, body: string, suggestion?: string,
+    pendingInput?: boolean, createdAt?: string,
+  ): Comment {
     const thread = this.data.threads.find(t => t.id === threadId);
     if (!thread) throw new Error(`Thread not found: ${threadId}`);
     const pending = author === "user" ? Boolean(pendingInput) : false;
-    const comment: Comment = { id: randomUUID(), author, body, suggestion, pending, createdAt: new Date().toISOString() };
+    const comment: Comment = { id: randomUUID(), author, body, suggestion, pending, createdAt: createdAt ?? new Date().toISOString() };
     thread.comments.push(comment);
     if (author === "user" && !pending) {
       this.notify({ type: "comment", threadId: thread.id, commentId: comment.id });

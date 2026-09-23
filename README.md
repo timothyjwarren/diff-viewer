@@ -117,15 +117,49 @@ Monitor.
 
 | Command | Purpose |
 |---|---|
-| `diff-viewer start [--title <text>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. |
+| `diff-viewer start [--title <text>] [--port <n>] [--import-session <sessionId>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. `--port` and `--import-session` are described below. |
 | `diff-viewer watch <sessionId>` | Loops indefinitely, printing one JSON line per comment/verdict notification; built for `Monitor`. |
 | `diff-viewer wait <sessionId>` | Long-polls until the next single comment or verdict, then exits. |
 | `diff-viewer review <sessionId>` | Prints all comment threads and verdicts (with computed intent) as JSON. |
-| `diff-viewer reply <sessionId> <threadId> <text>` | Post an agent reply into a thread. |
-| `diff-viewer comment <sessionId> <repoPath> <file> <lineStart> <lineEnd> <old\|new> <text>` | Post a new agent-authored comment (e.g. from `/code-review`). |
+| `diff-viewer reply <sessionId> <threadId> <text> [--author <user\|agent>] [--created-at <iso8601>] [--pending]` | Post a reply into a thread. The three flags are described below. |
+| `diff-viewer comment <sessionId> <repoPath> <file> <lineStart> <lineEnd> <old\|new> <text> [--author <user\|agent>] [--created-at <iso8601>] [--pending]` | Post a new comment (e.g. from `/code-review`). The three flags are described below. |
 | `diff-viewer ack <sessionId> <threadId> <commentId>` / `unack ...` | Move a single, immediately-posted comment's status from the automatic "seen" indicator (set the moment `diff-viewer review` reads it) to a pulsing "agent is working on this" indicator, then to a cleared/no-badge state once `unack` runs -- a one-way seen -> acked -> cleared progression, never reverting. |
 | `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
+
+### `--port`
+
+Normal use never needs this -- `start` binds to an OS-assigned ephemeral
+port by default, which is what `sessions` and the printed `url` are for.
+Pass `--port <n>` only when something external needs a fixed, predictable
+port (e.g. a script or bookmark pointing at a specific address). If that
+port is already in use, `start` fails immediately with `port <n> is
+already in use` instead of silently picking a different one.
+
+### `--import-session`
+
+The recommended way to continue a review is always a plain `start` --
+sessions are cheap and a fresh one avoids any risk of two servers touching
+the same file. `--import-session <sessionId>` is the deliberate exception:
+it seeds a brand-new session (its own id, port, and URL) with another
+session's comment history -- every thread, comment, and verdict, with
+original authors and timestamps intact -- while resolving `repos` fresh
+against the current working tree. The source session's file is only read,
+never written, so this is safe even if the source session is still running.
+Reach for it when handing a review off to a new process (e.g. after a
+crash) and you want the prior discussion to carry over rather than start
+silent.
+
+### `--author` / `--created-at` / `--pending`
+
+Normal use never needs these either -- a plain `comment` or `reply` is
+always agent-authored, timestamped now, and posted immediately. They exist
+so an agent can manually reconstruct a session's comment history from
+another source of truth (e.g. rebuilding state from a transcript): `--author
+user` posts as if the user wrote it, `--created-at <iso8601>` backdates it,
+and `--pending` queues it as an unsubmitted review comment instead of
+posting immediately (only meaningful together with `--author user` -- an
+agent-authored comment is never pending).
 
 ### Invoking it correctly
 

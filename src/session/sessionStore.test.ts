@@ -204,6 +204,82 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads[0].outdated).toBe(false);
   });
 
+  it("addThread uses a given createdAt instead of the current time", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "old comment", pending: false, pinnedRef: "abc123",
+      createdAt: "2020-01-01T00:00:00.000Z",
+    });
+    expect(thread.comments[0].createdAt).toBe("2020-01-01T00:00:00.000Z");
+  });
+
+  it("addReply uses a given createdAt instead of the current time", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "question", pending: false, pinnedRef: "abc123",
+    });
+    const reply = store.addReply(thread.id, "agent", "answer", undefined, false, "2020-06-15T12:00:00.000Z");
+    expect(reply.createdAt).toBe("2020-06-15T12:00:00.000Z");
+  });
+
+  describe("importFrom", () => {
+    const newRepos = [{ path: "/repo2", name: "repo2", branch: "main", baseRef: "def456" }];
+
+    it("copies threads/verdicts/notifications/contentSnapshots into a new session, preserving comment author and createdAt", async () => {
+      const source = SessionStore.create(repos, "src", "source session", dataDir);
+      source.addThread({
+        repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+        author: "user", body: "old question", pending: false, pinnedRef: "abc123",
+        createdAt: "2020-01-01T00:00:00.000Z",
+      });
+      source.ensureContentSnapshot("abc123", "a.txt", "one\n");
+      const verdict = source.addVerdict("comment", "fyi");
+      await source.persist();
+
+      const imported = await SessionStore.importFrom(
+        path.join(dataDir, "src.json"), "new-id", newRepos, undefined, dataDir,
+      );
+
+      expect(imported.id).toBe("new-id");
+      const snap = imported.snapshot;
+      expect(snap.repos).toEqual(newRepos);
+      expect(snap.title).toBe("source session");
+      expect(snap.threads).toHaveLength(1);
+      expect(snap.threads[0].comments[0]).toMatchObject({
+        author: "user", body: "old question", createdAt: "2020-01-01T00:00:00.000Z",
+      });
+      expect(snap.verdicts).toEqual([verdict]);
+      expect(snap.contentSnapshots).toEqual({ "abc123:a.txt": "one\n" });
+      expect(snap.status).toBe("active");
+    });
+
+    it("imports pending comments as-is", async () => {
+      const source = SessionStore.create(repos, "src2", "source session", dataDir);
+      source.addThread({
+        repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+        author: "user", body: "queued", pending: true, pinnedRef: "abc123",
+      });
+      await source.persist();
+
+      const imported = await SessionStore.importFrom(
+        path.join(dataDir, "src2.json"), "new-id-2", newRepos, undefined, dataDir,
+      );
+      expect(imported.snapshot.threads[0].comments[0].pending).toBe(true);
+    });
+
+    it("uses an explicit title override instead of the source title", async () => {
+      const source = SessionStore.create(repos, "src3", "source session", dataDir);
+      await source.persist();
+
+      const imported = await SessionStore.importFrom(
+        path.join(dataDir, "src3.json"), "new-id-3", newRepos, "custom title", dataDir,
+      );
+      expect(imported.snapshot.title).toBe("custom title");
+    });
+  });
+
   it("recomputeThreadPositions does not compound a shift across repeated calls", async () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({
