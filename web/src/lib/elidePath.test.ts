@@ -16,24 +16,28 @@ describe("elideDir", () => {
     expect(elideDir("", base, fitsIn(3))).toBe("");
   });
 
-  it("elides middle directories, keeping the first and as many trailing ones as fit", () => {
-    // "foo/…/baz/src/file.py" is 21 chars; "foo/…/src/file.py" is 17.
-    expect(elideDir(dir, base, fitsIn(21))).toBe("foo/…/baz/src/");
+  it("elides from the middle outward, keeping the root", () => {
+    // "foo/bar/…/src/file.py" is 21 chars; "foo/…/src/file.py" is 17.
+    expect(elideDir(dir, base, fitsIn(21))).toBe("foo/bar/…/src/");
     expect(elideDir(dir, base, fitsIn(20))).toBe("foo/…/src/");
   });
 
-  it("falls back to first/…/ and then …/ as space runs out", () => {
-    // "foo/…/file.py" is 13 chars; "…/file.py" is 9.
+  it("removes the middle of a long path evenly from both sides", () => {
+    const deep = "a1/b2/c3/d4/e5/f6/g7";
+    // Full is 22 chars with "x". Dropping from the middle removes d4, then
+    // d4/e5, then c3/d4/e5 -- an odd leftover goes to the filename's side.
+    expect(elideDir(deep, "x", fitsIn(22))).toBe("a1/b2/c3/d4/e5/f6/g7/");
+    expect(elideDir(deep, "x", fitsIn(21))).toBe("a1/b2/c3/…/e5/f6/g7/");
+    expect(elideDir(deep, "x", fitsIn(20))).toBe("a1/b2/c3/…/f6/g7/");
+    expect(elideDir(deep, "x", fitsIn(17))).toBe("a1/b2/…/f6/g7/");
+  });
+
+  it("keeps root/…/ as the shortest form, even when it doesn't fit", () => {
     expect(elideDir(dir, base, fitsIn(13))).toBe("foo/…/");
-    expect(elideDir(dir, base, fitsIn(12))).toBe("…/");
+    expect(elideDir(dir, base, fitsIn(3))).toBe("foo/…/");
   });
 
-  it("drops the directory entirely when even …/ doesn't fit", () => {
-    expect(elideDir(dir, base, fitsIn(8))).toBe("");
-  });
-
-  it("never elides a single directory to something longer than itself", () => {
-    expect(elideDir("a", base, fitsIn(9))).toBe("a/");
-    expect(elideDir("src", base, fitsIn(10))).toBe("…/");
+  it("never elides a single directory", () => {
+    expect(elideDir("src", base, fitsIn(3))).toBe("src/");
   });
 });

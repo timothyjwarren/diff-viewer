@@ -77,26 +77,59 @@ body {
   height: 100%;
 }
 
-.comment-scroll-markers {
+/* Overview ruler just left of main's scrollbar; `right` is set inline to the
+ * scrollbar's width. Sits over main's right padding, clear of the diffs. */
+.comment-ruler {
   position: absolute;
   top: 0;
-  right: 0;
   bottom: 0;
   width: 10px;
+  cursor: pointer;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.comment-ruler-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 4px;
+  background: rgba(177, 186, 196, 0.18);
   pointer-events: none;
 }
 
-.comment-scroll-marker {
+/* A 3px line centred in a taller, transparent hit area. */
+.comment-ruler-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  margin-top: -3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.comment-ruler-tick::before {
+  content: "";
   position: absolute;
   left: 1px;
   right: 1px;
+  top: 2px;
   height: 3px;
   border-radius: 1px;
   background: var(--accent);
 }
 
-.comment-scroll-marker-pending {
+.comment-ruler-tick-pending::before {
   background: #d29922;
+}
+
+.comment-ruler-tick:hover::before {
+  left: 0;
+  right: 0;
+  filter: brightness(1.3);
 }
 
 .sidebar-repo {
@@ -301,7 +334,9 @@ main {
    * stuck header that isn't covered by anything — letting the file's
    * own already-scrolled-past content peek through it. Top spacing is
    * applied to the first file card instead (see .file-anchor). */
-  padding: 0 16px 16px;
+  /* Extra right padding clears the comment ruler, which sits just left of
+   * the scrollbar (or of where macOS draws its overlay scrollbar). */
+  padding: 0 32px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
