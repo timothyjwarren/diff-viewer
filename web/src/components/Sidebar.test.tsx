@@ -31,9 +31,25 @@ describe("Sidebar", () => {
     expect(onSelectFile).toHaveBeenCalledWith(repos[0].files[0]);
   });
 
-  it("highlights the row for the currently active file", () => {
-    render(<Sidebar repos={repos} onSelectFile={() => {}} activeFileId={fileAnchorId(repos[0].files[0])} />);
-    expect(screen.getByText("x.ts").closest("li")).toHaveClass("sidebar-file-active");
-    expect(screen.getByText("y.ts").closest("li")).not.toHaveClass("sidebar-file-active");
+  it("shows a viewport indicator only while files are on screen", () => {
+    const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} />);
+    expect(screen.queryByTestId("viewport-indicator")).not.toBeInTheDocument();
+    const span = { startId: fileAnchorId(repos[0].files[0]), startFraction: 0.5, endId: fileAnchorId(repos[1].files[0]), endFraction: 0.5 };
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={span} />);
+    expect(screen.getByTestId("viewport-indicator")).toBeInTheDocument();
+  });
+
+  it("shows the session title", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} title="my review" />);
+    expect(screen.getByRole("heading", { name: "my review" })).toBeInTheDocument();
+  });
+
+  it("keeps the full path in the row's hover title", () => {
+    const nested: RepoDiff[] = [{
+      ...repos[0],
+      files: [{ ...repos[0].files[0], oldPath: "a/b/c/d.ts", newPath: "a/b/c/d.ts" }],
+    }];
+    render(<Sidebar repos={nested} onSelectFile={() => {}} />);
+    expect(screen.getByText("d.ts").closest("li")).toHaveAttribute("title", "a/b/c/d.ts");
   });
 });
