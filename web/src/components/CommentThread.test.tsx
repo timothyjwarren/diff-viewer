@@ -20,6 +20,16 @@ describe("CommentThread", () => {
     expect(screen.getByText("Agent")).toBeInTheDocument();
   });
 
+  it("renders comment bodies as Markdown", () => {
+    const mdThread: CommentThreadData = {
+      ...thread,
+      comments: [{ ...thread.comments[0], body: "use `foo`\n\n> quoted" }],
+    };
+    const { container } = render(<CommentThread thread={mdThread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
+    expect(container.querySelector(".comment-body code")).toHaveTextContent("foo");
+    expect(container.querySelector(".comment-body blockquote")).toHaveTextContent("quoted");
+  });
+
   it("submits a reply with the chosen pending flag", () => {
     const onReply = vi.fn();
     render(<CommentThread thread={thread} onReply={onReply} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
