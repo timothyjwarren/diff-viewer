@@ -11,6 +11,42 @@ function Avatar({ author }: { author: CommentAuthor }) {
   );
 }
 
+/** In-place editor for an existing comment's raw Markdown. */
+function CommentEditor({ initialBody, onSave, onCancel }: {
+  initialBody: string;
+  onSave: (body: string) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initialBody);
+  const canSave = draft.trim() !== "";
+
+  function save() {
+    if (!canSave) return;
+    if (draft === initialBody) onCancel();
+    else onSave(draft);
+  }
+
+  return (
+    <div className="comment-editor">
+      <textarea
+        className="comment-reply-expanded"
+        value={draft}
+        autoFocus
+        onFocus={e => e.currentTarget.setSelectionRange(draft.length, draft.length)}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Escape" && draft === initialBody) onCancel();
+          else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+        }}
+      />
+      <div className="comment-reply-actions">
+        <button onClick={save} disabled={!canSave}>Save</button>
+        <button className="comment-cancel-button" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
@@ -23,6 +59,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   // Resolving collapses the thread by default; the chevron lets the user
   // peek at it again without unresolving. Unresolving always re-expands.
   const [manualExpand, setManualExpand] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const expanded = focused || draft.length > 0;
   const collapsed = thread.resolved && !manualExpand;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,10 +119,18 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
                     </span>
                   ) : null}
                 </div>
-                <CommentMarkdown body={comment.body} />
-                {comment.author === "user" && (
+                {editingId === comment.id ? (
+                  <CommentEditor
+                    initialBody={comment.body}
+                    onSave={body => { onEdit(thread.id, comment.id, body); setEditingId(null); }}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <CommentMarkdown body={comment.body} />
+                )}
+                {comment.author === "user" && editingId !== comment.id && (
                   <div className="comment-actions">
-                    <button onClick={() => onEdit(thread.id, comment.id, comment.body)}>Edit</button>
+                    <button onClick={() => setEditingId(comment.id)}>Edit</button>
                     <button onClick={() => onDelete(thread.id, comment.id)}>Delete</button>
                   </div>
                 )}

@@ -878,6 +878,15 @@ main {
 
 .comment-markdown a { color: var(--accent); }
 
+.comment-editor {
+  margin-top: 4px;
+}
+
+.comment-reply-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .comment-actions button,
 .comment-reply-actions button {
   font-size: 12px;

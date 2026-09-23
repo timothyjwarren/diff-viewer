@@ -260,9 +260,7 @@ export function App() {
         await refreshThreads();
       },
       onEdit: async (threadId, commentId, body) => {
-        const next = window.prompt("Edit comment", body);
-        if (next == null) return;
-        await editComment(threadId, commentId, next);
+        await editComment(threadId, commentId, body);
         await refreshThreads();
       },
       onDelete: async (threadId, commentId) => {
