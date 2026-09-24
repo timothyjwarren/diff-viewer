@@ -365,7 +365,6 @@ textarea:focus {
   right: 8px;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
-  box-shadow: inset 2px 0 0 var(--accent);
   pointer-events: none;
   /* Glides between rows as files scroll in and out of view. */
   transition: top 0.2s ease, height 0.2s ease;
@@ -615,7 +614,6 @@ main::-webkit-scrollbar-thumb:hover {
 
 .commit-chooser-row-selected {
   background: var(--accent-soft);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .commit-chooser-check {
@@ -737,9 +735,8 @@ main {
   min-height: 48px;
   background: var(--file-header-bg);
   border: 1px solid var(--file-header-border);
-  /* A solid accent bar along the top edge marks each file boundary. */
-  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 55%, transparent), var(--file-header-shadow);
-  padding: 8px 8px 6px 6px;
+  box-shadow: var(--file-header-shadow);
+  padding: 6px 8px 6px 6px;
   font-size: 15px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
@@ -1093,7 +1090,6 @@ main {
    * width — pin to the pane's actual width via container query units so
    * comment text wraps at the panel edge regardless of how long code lines
    * in the file are. The margins are included: width + 2 × 12px = 100cqi. */
-  --thread-color: var(--accent);
   position: relative;
   width: calc(100cqi - 24px);
   margin: 8px 12px;
@@ -1101,7 +1097,6 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: inset 3px 0 0 var(--thread-color);
   font-family: var(--font-ui);
   font-size: 13px;
   white-space: normal;
@@ -1112,11 +1107,10 @@ main {
 }
 
 .comment-thread-pending {
-  --thread-color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
 }
 
 .comment-thread-resolved {
-  --thread-color: var(--border-strong);
   padding-bottom: 6px;
   background: transparent;
 }
