@@ -889,7 +889,7 @@ main {
    * over the length of the file. */
   height: 20px;
   cursor: default;
-  background: repeating-linear-gradient(-45deg, transparent 0 4px, var(--line-hover) 4px 8px);
+  background: var(--line-hover);
 }
 
 .diff-line-gutter {
