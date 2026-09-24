@@ -360,6 +360,14 @@ textarea:focus {
   background: var(--accent-soft);
   box-shadow: inset 2px 0 0 var(--accent);
   pointer-events: none;
+  /* Glides between rows as files scroll in and out of view. */
+  transition: top 0.2s ease, height 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-viewport-indicator {
+    transition: none;
+  }
 }
 
 .main-pane {
