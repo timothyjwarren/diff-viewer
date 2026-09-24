@@ -1,4 +1,5 @@
 import { EXPAND_CHUNK_SIZE } from "../lib/expandContext";
+import { ChevronIcon } from "./Icons";
 
 export function ExpandStrip({ showUp, showDown, hiddenCount, onExpandUp, onExpandDown, onExpandAll }: {
   showUp: boolean;
@@ -20,7 +21,7 @@ export function ExpandStrip({ showUp, showDown, hiddenCount, onExpandUp, onExpan
           aria-label="Expand down" title="Expand down"
           onClick={mergeAll ? onExpandAll : onExpandDown}
         >
-          <span className="expand-strip-chevron expand-strip-chevron-down" />
+          <ChevronIcon className="expand-strip-chevron-down" />
         </button>
       )}
       {showUp && (
@@ -29,7 +30,7 @@ export function ExpandStrip({ showUp, showDown, hiddenCount, onExpandUp, onExpan
           aria-label="Expand up" title="Expand up"
           onClick={mergeAll ? onExpandAll : onExpandUp}
         >
-          <span className="expand-strip-chevron expand-strip-chevron-up" />
+          <ChevronIcon className="expand-strip-chevron-up" />
         </button>
       )}
     </div>

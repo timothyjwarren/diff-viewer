@@ -1,13 +1,11 @@
 import { memo, useLayoutEffect, useRef, useState } from "react";
-import type { CommitInfo, CommitRange, DiffFile, FileStatus, RepoDiff } from "../types";
+import type { CommentThread, CommitInfo, CommitRange, DiffFile, RepoDiff } from "../types";
 import { CommitChooser } from "./CommitChooser";
 import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
 import type { ViewportSpan } from "../lib/viewportSpan";
-
-const STATUS_LETTER: Record<FileStatus, string> = {
-  added: "A", modified: "M", deleted: "D", renamed: "R",
-};
+import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
+import { CommentIcon } from "./Icons";
 
 let measureCanvas: HTMLCanvasElement | null = null;
 function textWidth(text: string, font: string): number {
@@ -49,7 +47,7 @@ const FileName = memo(function FileName({ dir, base }: { dir: string; base: stri
 
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
-  title = null, viewportSpan = null,
+  title = null, viewportSpan = null, threads = [],
 }: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
@@ -59,7 +57,13 @@ export function Sidebar({
   onOpenCommits?: (repoPath: string) => void;
   title?: string | null;
   viewportSpan?: ViewportSpan | null;
+  threads?: CommentThread[];
 }) {
+  const allFiles = repos.flatMap(r => r.files);
+  const stat = totalDiffStat(allFiles);
+  const openThreadCount = (file: DiffFile, name: string) =>
+    threads.filter(t => !t.resolved && t.repoPath === file.repoPath && t.file === name).length;
+
   const navRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +88,18 @@ export function Sidebar({
 
   return (
     <nav className="sidebar" ref={navRef}>
-      {title && <h1 className="sidebar-title">{title}</h1>}
+      {(title || allFiles.length > 0) && (
+        <header className="sidebar-header">
+          {title && <h1 className="sidebar-title">{title}</h1>}
+          {allFiles.length > 0 && (
+            <p className="sidebar-summary">
+              {allFiles.length} file{allFiles.length === 1 ? "" : "s"}
+              <span className="diffstat-added">+{stat.added}</span>
+              <span className="diffstat-deleted">−{stat.deleted}</span>
+            </p>
+          )}
+        </header>
+      )}
       {viewportSpan && <div ref={indicatorRef} className="sidebar-viewport-indicator" data-testid="viewport-indicator" />}
       {repos.map(repo => (
         <div
@@ -108,13 +123,19 @@ export function Sidebar({
               const slash = name.lastIndexOf("/");
               const base = slash >= 0 ? name.slice(slash + 1) : name;
               const dir = slash >= 0 ? name.slice(0, slash) : "";
+              const openThreads = openThreadCount(file, name);
               return (
                 <li key={name} title={name} data-file-id={fileAnchorId(file)}>
                   <button onClick={() => onSelectFile(file)}>
-                    <span className={`sidebar-file-status sidebar-file-status-${file.status}`}>
+                    <span className={`file-status file-status-${file.status}`}>
                       {STATUS_LETTER[file.status]}
                     </span>
                     <FileName dir={dir} base={base} />
+                    {openThreads > 0 && (
+                      <span className="sidebar-file-threads" aria-label={`${openThreads} open thread${openThreads === 1 ? "" : "s"}`}>
+                        <CommentIcon />{openThreads}
+                      </span>
+                    )}
                   </button>
                 </li>
               );

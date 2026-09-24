@@ -60,6 +60,7 @@ function captureSelectionQuote(sel: SelectionRange): string | null {
 
 export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
   const [dirtyFilesByRepo, setDirtyFilesByRepo] = useState<Record<string, string[]>>({});
@@ -116,6 +117,7 @@ export function App() {
   useEffect(() => {
     fetchDiffs().then(async loadedRepos => {
       setRepos(loadedRepos);
+      setLoaded(true);
       const entries = await Promise.all(
         loadedRepos.map(r => fetchCommits(r.repoPath).then(commits => [r.repoPath, commits] as const)),
       );
@@ -297,14 +299,22 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar
-        repos={repos} onSelectFile={scrollToFile}
-        commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-        onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan}
-      />
+      <div className="sidebar-column">
+        <Sidebar
+          repos={repos} onSelectFile={scrollToFile}
+          commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
+          onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan} threads={threads}
+        />
+        <ReviewBar
+          onSubmit={handleSubmitVerdict}
+          pendingCount={threads.reduce((n, t) => n + t.comments.filter(c => c.pending).length, 0)}
+        />
+      </div>
       <div className="main-pane">
       <main ref={mainRef}>
-        {repos.length === 0 && <p className="empty-state">No changes to review.</p>}
+        {repos.length === 0 && (
+          <p className="empty-state">{loaded ? "No changes to review." : "Loading changes…"}</p>
+        )}
         {repos.map(repo => repo.files.map(file => (
           <div key={fileAnchorId(file)} id={fileAnchorId(file)} className="file-anchor">
             <DiffView
@@ -323,7 +333,6 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
-      <ReviewBar onSubmit={handleSubmitVerdict} />
       {offscreenNewComments.length > 0 && (
         <button
           type="button"

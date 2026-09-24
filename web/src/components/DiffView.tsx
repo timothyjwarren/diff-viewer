@@ -10,6 +10,9 @@ import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
 import { ExpandStrip } from "./ExpandStrip";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
+import { SHIKI_THEMES } from "../lib/highlight";
+import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
+import { ChevronIcon, ExternalFileIcon } from "./Icons";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
 
@@ -23,7 +26,7 @@ async function highlightLineInner(content: string, lang: string, changes: Range[
   // (browser default `pre { margin }` plus shiki's own per-<pre> background-color), so
   // we discard the <pre>/<code> shell and keep only the highlighted <span> content.
   const html = await codeToHtml(content || " ", {
-    lang, theme: "github-dark",
+    lang, ...SHIKI_THEMES,
     decorations: changes.map(([start, end]) => ({ start, end, properties: { class: "diff-inline-change" } })),
   });
   const match = LINE_SPAN_RE.exec(html);
@@ -137,9 +140,9 @@ function Composer({ onSubmit, onCancel, quotedText }: {
         }}
       />
       <div className="comment-reply-actions">
-        <button onClick={() => submit(false)}>Add single comment</button>
-        <button onClick={() => submit(true)}>Add to review</button>
-        <button className="comment-cancel-button" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" title="⌘↵" onClick={() => submit(false)}>Add single comment</button>
+        <button className="btn" onClick={() => submit(true)}>Add to review</button>
+        <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -256,6 +259,10 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
   const isNewFile = file.status === "added";
+  const slash = fileId.lastIndexOf("/");
+  const dir = slash >= 0 ? fileId.slice(0, slash) : "";
+  const base = fileId.slice(slash + 1);
+  const stat = diffStat(file);
 
   function toggleCollapsed() {
     if (!collapsed) {
@@ -349,18 +356,31 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   }
 
   return (
-    <div className="diff-view">
+    <div className={`diff-view${collapsed ? " diff-view-collapsed" : ""}`}>
       <div className="diff-view-header-sticky" ref={headerRef}>
         <div className="diff-view-header">
           <button
-            className="diff-view-collapse-toggle"
+            className="btn-icon"
             aria-label={collapsed ? "Expand file" : "Collapse file"}
             onClick={toggleCollapsed}
           >
-            <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
+            <ChevronIcon className={`chevron${collapsed ? "" : " chevron-open"}`} />
           </button>
-          <span className="diff-view-title">{repoName} &rsaquo; {file.newPath || file.oldPath}</span>
-          <button onClick={openFileView}>View File</button>
+          <span className={`file-status file-status-${file.status}`} title={file.status}>
+            {STATUS_LETTER[file.status]}
+          </span>
+          <span className="diff-view-title" title={`${repoName} › ${fileId}`}>
+            <span className="diff-view-repo">{repoName}</span>
+            {dir && <span className="diff-view-dir">{dir}/</span>}
+            <span className="diff-view-base">{base}</span>
+          </span>
+          <span className="diffstat">
+            {stat.added > 0 && <span className="diffstat-added">+{stat.added}</span>}
+            {stat.deleted > 0 && <span className="diffstat-deleted">−{stat.deleted}</span>}
+          </span>
+          <button className="btn-icon" aria-label="View File" title="View full file" onClick={openFileView}>
+            <ExternalFileIcon />
+          </button>
         </div>
       </div>
       {showUncommittedBanner && (

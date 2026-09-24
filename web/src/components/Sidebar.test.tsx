@@ -44,6 +44,21 @@ describe("Sidebar", () => {
     expect(screen.getByRole("heading", { name: "my review" })).toBeInTheDocument();
   });
 
+  it("summarises the number of changed files", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} />);
+    expect(screen.getByText(/2 files/)).toBeInTheDocument();
+  });
+
+  it("counts open threads on each file, ignoring resolved ones", () => {
+    const thread = {
+      id: "t1", repoPath: "/r/a", file: "x.ts", lineStart: 1, lineEnd: 1, side: "new" as const,
+      resolved: false, pinnedRef: "HEAD", outdated: false, comments: [],
+    };
+    render(<Sidebar repos={repos} onSelectFile={() => {}} threads={[thread, { ...thread, id: "t2" }, { ...thread, id: "t3", resolved: true }]} />);
+    expect(screen.getByLabelText("2 open threads")).toHaveTextContent("2");
+    expect(screen.getAllByLabelText(/open thread/)).toHaveLength(1);
+  });
+
   it("keeps the full path in the row's hover title", () => {
     const nested: RepoDiff[] = [{
       ...repos[0],
