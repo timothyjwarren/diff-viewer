@@ -34,7 +34,7 @@ describe("Sidebar", () => {
   it("shows a viewport indicator only while files are on screen", () => {
     const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} />);
     expect(screen.queryByTestId("viewport-indicator")).not.toBeInTheDocument();
-    const span = { startId: fileAnchorId(repos[0].files[0]), startFraction: 0.5, endId: fileAnchorId(repos[1].files[0]), endFraction: 0.5 };
+    const span = { startId: fileAnchorId(repos[0].files[0]), endId: fileAnchorId(repos[1].files[0]) };
     rerender(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={span} />);
     expect(screen.getByTestId("viewport-indicator")).toBeInTheDocument();
   });

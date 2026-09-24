@@ -9,9 +9,9 @@ describe("computeViewportSpan", () => {
     expect(computeViewportSpan([], H)).toBeNull();
   });
 
-  it("covers the visible slice of a single tall file", () => {
+  it("covers just the one file when it fills the viewport", () => {
     const span = computeViewportSpan([{ id: "a", top: -500, bottom: 1500 }], H);
-    expect(span).toEqual({ startId: "a", startFraction: 0.25, endId: "a", endFraction: 0.5 });
+    expect(span).toEqual({ startId: "a", endId: "a" });
   });
 
   it("stretches across the tail of one file and the head of the next", () => {
@@ -19,7 +19,7 @@ describe("computeViewportSpan", () => {
       { id: "a", top: -800, bottom: 200 },
       { id: "b", top: 216, bottom: 1216 },
     ], H);
-    expect(span).toEqual({ startId: "a", startFraction: 0.8, endId: "b", endFraction: 0.284 });
+    expect(span).toEqual({ startId: "a", endId: "b" });
   });
 
   it("drops a file once its tail has scrolled off the top", () => {
@@ -27,8 +27,7 @@ describe("computeViewportSpan", () => {
       { id: "a", top: -1000, bottom: -10 },
       { id: "b", top: 6, bottom: 1006 },
     ], H);
-    expect(span?.startId).toBe("b");
-    expect(span?.startFraction).toBe(0);
+    expect(span).toEqual({ startId: "b", endId: "b" });
   });
 
   it("covers every file that is entirely on screen", () => {
@@ -38,7 +37,7 @@ describe("computeViewportSpan", () => {
       { id: "c", top: 216, bottom: 300 },
       { id: "d", top: 600, bottom: 700 },
     ], H);
-    expect(span).toEqual({ startId: "a", startFraction: 0, endId: "c", endFraction: 1 });
+    expect(span).toEqual({ startId: "a", endId: "c" });
   });
 
   it("returns null when no file is on screen", () => {

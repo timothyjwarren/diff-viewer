@@ -67,9 +67,8 @@ export function Sidebar({
   const navRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
-  // Position the viewport indicator from the rendered rows: its top edge
-  // sits `startFraction` of the way down the first visible file's row, its
-  // bottom edge `endFraction` of the way down the last's.
+  // Position the viewport indicator over the rows of the files on screen,
+  // from the top of the first one's row to the bottom of the last one's.
   useLayoutEffect(() => {
     const nav = navRef.current;
     const indicator = indicatorRef.current;
@@ -80,10 +79,8 @@ export function Sidebar({
     const origin = nav.getBoundingClientRect().top - nav.scrollTop;
     const start = startRow.getBoundingClientRect();
     const end = endRow.getBoundingClientRect();
-    const top = start.top - origin + viewportSpan.startFraction * start.height;
-    const bottom = end.top - origin + viewportSpan.endFraction * end.height;
-    indicator.style.top = `${top}px`;
-    indicator.style.height = `${Math.max(2, bottom - top)}px`;
+    indicator.style.top = `${start.top - origin}px`;
+    indicator.style.height = `${end.bottom - start.top}px`;
   }, [viewportSpan, repos]);
 
   return (
