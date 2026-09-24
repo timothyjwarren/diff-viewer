@@ -55,8 +55,8 @@
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
   --shadow-popover: 0 12px 32px rgba(15, 20, 30, 0.14), 0 2px 6px rgba(15, 20, 30, 0.06);
   /* File headers: tinted toward the accent so they stand out from code while scrolling. */
-  --file-header-bg: #dde3fb;
-  --file-header-border: #b3bef0;
+  --file-header-bg: #e5e8f3;
+  --file-header-border: #c5cadc;
   --file-header-shadow: 0 4px 10px -4px rgba(15, 20, 30, 0.18);
 }
 
@@ -102,8 +102,8 @@
     --scrollbar-thumb: rgba(255, 255, 255, 0.14);
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
     --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
-    --file-header-bg: #2b3354;
-    --file-header-border: #414c7a;
+    --file-header-bg: #252a38;
+    --file-header-border: #3a4054;
     --file-header-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.7);
   }
 }
@@ -738,8 +738,8 @@ main {
   background: var(--file-header-bg);
   border: 1px solid var(--file-header-border);
   /* A solid accent bar along the top edge marks each file boundary. */
-  box-shadow: inset 0 3px 0 var(--accent), var(--file-header-shadow);
-  padding: 9px 8px 6px 6px;
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 55%, transparent), var(--file-header-shadow);
+  padding: 8px 8px 6px 6px;
   font-size: 15px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
