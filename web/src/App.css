@@ -54,6 +54,10 @@
   --scrollbar-thumb: rgba(0, 0, 0, 0.16);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
   --shadow-popover: 0 12px 32px rgba(15, 20, 30, 0.14), 0 2px 6px rgba(15, 20, 30, 0.06);
+  /* File headers: tinted toward the accent so they stand out from code while scrolling. */
+  --file-header-bg: #e9ecf7;
+  --file-header-border: #c9cfe3;
+  --file-header-shadow: 0 4px 10px -4px rgba(15, 20, 30, 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -98,6 +102,9 @@
     --scrollbar-thumb: rgba(255, 255, 255, 0.14);
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
     --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --file-header-bg: #232735;
+    --file-header-border: #363c52;
+    --file-header-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.7);
   }
 }
 
@@ -727,11 +734,12 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  min-height: 44px;
+  background: var(--file-header-bg);
+  border: 1px solid var(--file-header-border);
+  box-shadow: var(--file-header-shadow);
   padding: 6px 8px 6px 6px;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
@@ -755,7 +763,7 @@ main {
 .diff-view-repo {
   margin-right: 8px;
   font-size: 12px;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 
 .diff-view-dir {
@@ -763,7 +771,7 @@ main {
 }
 
 .diff-view-base {
-  font-weight: 600;
+  font-weight: 650;
   color: var(--text);
 }
 
