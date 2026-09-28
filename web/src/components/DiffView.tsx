@@ -13,6 +13,7 @@ import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
 import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
 import { ChevronIcon, ExternalFileIcon } from "./Icons";
+import { useAlignedAnnotations } from "../lib/alignAnnotations";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
 
@@ -155,6 +156,28 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
   onExpand: (hunkIndex: number, direction: "up" | "down", amount?: number) => void;
   fileLineCount: number | null;
 }) {
+  const otherSide = side === "old" ? "new" : "old";
+
+  /** The threads and composer (if open) attached below `line` on side `s`. */
+  function annotationsAt(s: "old" | "new", line: DiffLine | null) {
+    const lineNumber = line == null ? null : s === "old" ? line.oldLineNumber : line.newLineNumber;
+    if (lineNumber == null) return { lineNumber, threads: [], composer: false };
+    const threads = comments.threads.filter(t => {
+      if (t.side !== s) return false;
+      // Uncommitted edits only shift "new"-side numbering; a thread's
+      // stored lineEnd is canonical (HEAD-relative), so project it into
+      // this view's displayed numbering before matching it to the line
+      // actually being rendered.
+      const displayLine = s === "new" ? shiftForUncommitted(hunks, t.lineEnd) : t.lineEnd;
+      return displayLine === lineNumber;
+    });
+    const composer = Boolean(
+      comments.composerArmed && comments.selection && comments.selection.side === s &&
+      lineNumber === comments.selection.end && threads.length === 0,
+    );
+    return { lineNumber, threads, composer };
+  }
+
   return (
     <div className="diff-pane" data-side={side} data-file={fileId}>
       <div className="diff-pane-content">
@@ -174,49 +197,52 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
               )}
               {rows.map((row, ri) => {
                 const l = row[side];
-                if (!l) return <EmptyLine key={ri} />;
+                const own = annotationsAt(side, l);
+                const opposite = annotationsAt(otherSide, row[otherSide]);
+                // Either side's annotations get a slot in both panes, sized
+                // to match by useAlignedAnnotations, so the rows below stay
+                // level across the split.
+                const slot = own.threads.length > 0 || own.composer || opposite.threads.length > 0 || opposite.composer
+                  ? (
+                    <div className="diff-row-annotations" data-row-key={`${hi}:${ri}`}>
+                      <div className="diff-row-annotations-inner">
+                        {own.threads.map(thread => (
+                          <CommentThread
+                            key={thread.id} thread={thread}
+                            onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
+                            onResolve={comments.onResolve} onFlag={comments.onFlag} onRead={comments.onRead}
+                          />
+                        ))}
+                        {own.composer && comments.selection && (
+                          <Composer
+                            onSubmit={(body, pending) => comments.onCreateThread(
+                              side, comments.selection!.start, comments.selection!.end, body, pending,
+                            )}
+                            onCancel={comments.onCancelSelection}
+                            quotedText={comments.quotedText}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )
+                  : null;
+                if (!l) {
+                  return slot ? <div key={ri}><EmptyLine />{slot}</div> : <EmptyLine key={ri} />;
+                }
 
-                const lineNumber = side === "old" ? l.oldLineNumber : l.newLineNumber;
+                const lineNumber = own.lineNumber;
                 const selected = Boolean(
                   comments.selection && comments.selection.side === side && lineNumber != null &&
                   lineNumber >= comments.selection.start && lineNumber <= comments.selection.end,
                 );
-                const threadsHere = comments.threads.filter(t => {
-                  if (t.side !== side || lineNumber == null) return false;
-                  // Uncommitted edits only shift "new"-side numbering; a
-                  // thread's stored lineEnd is canonical (HEAD-relative), so
-                  // project it into this view's displayed numbering before
-                  // matching it to the line actually being rendered.
-                  const displayLine = side === "new" ? shiftForUncommitted(hunks, t.lineEnd) : t.lineEnd;
-                  return displayLine === lineNumber;
-                });
-                const showComposer = Boolean(
-                  comments.composerArmed && comments.selection && comments.selection.side === side &&
-                  lineNumber === comments.selection.end && threadsHere.length === 0,
-                );
                 return (
                   <div key={ri}>
                     <Line
-                      line={l} counterpart={l.type === "context" ? null : row[side === "old" ? "new" : "old"]} lang={lang} repoName={repoName} side={side} selected={selected}
+                      line={l} counterpart={l.type === "context" ? null : row[otherSide]} lang={lang} repoName={repoName} side={side} selected={selected}
                       onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
                       onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
                     />
-                    {threadsHere.map(thread => (
-                      <CommentThread
-                        key={thread.id} thread={thread}
-                        onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
-                        onResolve={comments.onResolve} onFlag={comments.onFlag} onRead={comments.onRead}
-                      />
-                    ))}
-                    {showComposer && comments.selection && (
-                      <Composer
-                        onSubmit={(body, pending) => comments.onCreateThread(
-                          side, comments.selection!.start, comments.selection!.end, body, pending,
-                        )}
-                        onCancel={comments.onCancelSelection}
-                        quotedText={comments.quotedText}
-                      />
-                    )}
+                    {slot}
                   </div>
                 );
               })}
@@ -265,6 +291,7 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const dir = slash >= 0 ? fileId.slice(0, slash) : "";
   const base = fileId.slice(slash + 1);
   const stat = diffStat(file);
+  useAlignedAnnotations(bodyRef);
 
   function toggleCollapsed() {
     if (!collapsed) {
