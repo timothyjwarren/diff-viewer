@@ -82,6 +82,18 @@ export class SessionStore {
     this.data.description = description;
   }
 
+  /**
+   * Clears every thread (pending ones included), verdict, and content
+   * snapshot. The notification log stays: `watch`/`wait` hold numeric
+   * cursors into it, so shrinking it would make them skip new events.
+   */
+  reset(): void {
+    this.data.threads = [];
+    this.data.verdicts = [];
+    this.data.contentSnapshots = {};
+    this.data.resetAt = new Date().toISOString();
+  }
+
   private notify(event: Omit<NotificationEvent, "id" | "createdAt">): void {
     this.data.notifications.push({ id: randomUUID(), createdAt: new Date().toISOString(), ...event });
     this.emitter.emit("notification");

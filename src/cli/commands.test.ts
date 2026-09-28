@@ -10,7 +10,7 @@ import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand,
+  stopCommand, sessionsCommand, describeCommand, resetCommand,
 } from "./commands.js";
 
 const execFileAsync = promisify(execFile);
@@ -140,6 +140,17 @@ describe("cli commands", () => {
   it("describeCommand sets the session description", async () => {
     await describeCommand(sessionId, "Reviewing the auth refactor.");
     expect(store.snapshot.description).toBe("Reviewing the auth refactor.");
+  });
+
+  it("resetCommand clears the session's comments and verdicts", async () => {
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc",
+    });
+    store.addVerdict("comment");
+    await resetCommand(sessionId);
+    expect(store.snapshot.threads).toEqual([]);
+    expect(store.snapshot.verdicts).toEqual([]);
   });
 
   it("reviewCommand returns threads and verdicts with computed intent", async () => {

@@ -69,6 +69,23 @@ describe("api app", () => {
     expect(res.status).toBe(400);
   });
 
+  it("POST /api/session/reset clears comments, persists, and reports resetAt through meta", async () => {
+    const store = await buildStore();
+    store.addThread({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc",
+    });
+    const app = createApp(store);
+
+    const res = await request(app).post("/api/session/reset");
+    expect(res.status).toBe(204);
+    expect((await request(app).get("/api/threads")).body).toEqual([]);
+    const meta = (await request(app).get("/api/session/meta")).body;
+    expect(meta.resetAt).toBe(store.snapshot.resetAt);
+    const saved = JSON.parse(await fs.readFile(path.join(dataDir, "s1.json"), "utf-8"));
+    expect(saved.threads).toEqual([]);
+  });
+
   it("GET /api/diffs returns parsed diffs for each repo", async () => {
     const app = createApp(await buildStore());
     await commitAll("feature commit");

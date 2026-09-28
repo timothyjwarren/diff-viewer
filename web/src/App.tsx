@@ -3,13 +3,14 @@ import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchSession, fetchSessionMeta, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
+  fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
   submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState, flagThread, markCommentRead,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
 import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
+import { useSessionMeta } from "./lib/useSessionMeta";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import { findAdjacentComment, isEditableTarget } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
@@ -70,9 +71,7 @@ export function App() {
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const [title, setTitle] = useState<string | null>(null);
-  const [description, setDescription] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { sessionId, title, description, wasReset, dismissReset } = useSessionMeta();
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
@@ -126,26 +125,6 @@ export function App() {
       );
       setCommitsByRepo(Object.fromEntries(entries));
     });
-    fetchSession().then(session => {
-      document.title = session.title;
-      setSessionId(session.id);
-      setTitle(session.title);
-      setDescription(session.description ?? null);
-    });
-  }, []);
-
-  // The agent can update the description mid-session with `diff-viewer describe`.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchSessionMeta()
-        .then(meta => {
-          document.title = meta.title;
-          setTitle(meta.title);
-          setDescription(meta.description ?? null);
-        })
-        .catch(() => {});
-    }, 3000);
-    return () => clearInterval(interval);
   }, []);
 
   async function handleOpenCommits(repoPath: string) {
@@ -364,6 +343,12 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
+      {wasReset && (
+        <div className="reset-notice" role="status">
+          The agent cleared all comments.
+          <button type="button" className="reset-notice-dismiss" aria-label="Dismiss" onClick={dismissReset}>×</button>
+        </div>
+      )}
       {offscreenNewComments.length > 0 && (
         <button
           type="button"

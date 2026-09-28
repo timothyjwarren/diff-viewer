@@ -18,10 +18,16 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
 
   app.get("/api/session", (_req, res) => res.json(store.snapshot));
 
-  // Polled by the browser, so it returns just the header fields rather than the whole snapshot.
+  // Polled by the browser, so it returns just these small fields rather than the whole snapshot.
   app.get("/api/session/meta", (_req, res) => {
-    const { title, description } = store.snapshot;
-    res.json({ title, description });
+    const { title, description, resetAt } = store.snapshot;
+    res.json({ title, description, resetAt });
+  });
+
+  app.post("/api/session/reset", async (_req, res) => {
+    store.reset();
+    await store.persist();
+    res.status(204).end();
   });
 
   app.put("/api/session/description", async (req, res) => {

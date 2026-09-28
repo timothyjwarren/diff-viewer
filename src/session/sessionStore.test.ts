@@ -272,6 +272,32 @@ describe("SessionStore", () => {
     expect(store.snapshot.description).toBe("second");
   });
 
+  it("reset clears threads, verdicts, and snapshots but keeps the session and its notification log", () => {
+    const store = SessionStore.create(repos, "s-reset", "t", dataDir);
+    store.setDescription("d");
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc123",
+    });
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      author: "user", body: "draft", pending: true, pinnedRef: "abc123",
+    });
+    store.ensureContentSnapshot("abc123", "a.txt", "one\n");
+    store.addVerdict("comment");
+    const notifications = store.snapshot.notifications;
+
+    store.reset();
+
+    const snap = store.snapshot;
+    expect(snap.threads).toEqual([]);
+    expect(snap.verdicts).toEqual([]);
+    expect(snap.contentSnapshots).toEqual({});
+    expect(snap.notifications).toEqual(notifications);
+    expect(snap).toMatchObject({ title: "t", description: "d", repos });
+    expect(Date.parse(snap.resetAt!)).not.toBeNaN();
+  });
+
   describe("importFrom", () => {
     const newRepos = [{ path: "/repo2", name: "repo2", branch: "main", baseRef: "def456" }];
 

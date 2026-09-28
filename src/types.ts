@@ -106,6 +106,8 @@ export interface SessionData {
   title: string;
   /** Agent-written Markdown overview of what is under review and why, for a reader returning to the session. */
   description?: string;
+  /** When the agent last cleared the session's comments and verdicts. */
+  resetAt?: string;
   repos: RepoConfig[];
   createdAt: string;
   status: "active" | "stopped";

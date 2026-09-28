@@ -1463,6 +1463,43 @@ main {
   border-bottom: 5px solid currentColor;
 }
 
+.reset-notice {
+  position: fixed;
+  top: 16px;
+  /* Centred over the diff area, to the right of the sidebar. */
+  left: calc(50% + var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font: 13px var(--font-ui);
+  box-shadow: var(--shadow-popover);
+  z-index: 10;
+}
+
+.reset-notice-dismiss {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reset-notice-dismiss:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
 /* ---------- Review ---------- */
 
 .review-bar {

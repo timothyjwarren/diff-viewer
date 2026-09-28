@@ -178,6 +178,12 @@ export async function describeCommand(sessionId: string, description: string): P
   if (!res.ok) throw new Error(`diff-viewer describe: unexpected status ${res.status}`);
 }
 
+export async function resetCommand(sessionId: string): Promise<void> {
+  const url = await baseUrl(sessionId);
+  const res = await fetch(`${url}/api/session/reset`, { method: "POST" });
+  if (!res.ok) throw new Error(`diff-viewer reset: unexpected status ${res.status}`);
+}
+
 export async function stopCommand(sessionId: string): Promise<void> {
   const { pid } = await readRegistryEntry(sessionId);
   process.kill(pid, "SIGTERM");

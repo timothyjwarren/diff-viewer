@@ -101,7 +101,7 @@ Steps:
    })
    ```
    `persistent: true` is correct here: the watch is meant to span the whole
-   review session and is only ever torn down deliberately (step 6), not on a
+   review session and is only ever torn down deliberately (step 7), not on a
    timeout. `diff-viewer watch` prints one JSON line per notification and
    exits on its own (printing a final `{"type":"session_ended"}` line) once
    `diff-viewer stop` has been run — a forgotten `TaskStop` is harmless.
@@ -174,7 +174,7 @@ Steps:
      bundled comments and any single comments noted earlier in the session.
      Treat `discussion` verdicts (Comment/Approve) as conversation, not
      instructions.
-   - `type: "session_ended"` — the session was stopped (step 6 already ran,
+   - `type: "session_ended"` — the session was stopped (step 7 already ran,
      possibly by another agent/thread); nothing to do.
    The Monitor keeps running on its own after each notification — there is no
    need to re-arm it.
@@ -184,5 +184,11 @@ Steps:
    into it with `diff-viewer comment <sessionId> <repoPath> <file>
    <lineStart> <lineEnd> <old|new> "<text>"` instead of (or in addition to)
    normal output.
-6. When finished with the session, `diff-viewer stop <sessionId>` shuts down
+6. `diff-viewer reset <sessionId>` deletes every thread and verdict in the
+   session — including the user's pending comments from a review they
+   haven't submitted — and cannot be undone. Run it only when the user asks
+   for a clean slate, or when starting a new round of review they've agreed
+   to; never to clear away comments you haven't handled. If the goal of the
+   review changes with the reset, update the description with `describe` too.
+7. When finished with the session, `diff-viewer stop <sessionId>` shuts down
    its server, and `TaskStop` the Monitor started in step 3.
