@@ -3,7 +3,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
+  fetchDiffs, fetchSession, fetchSessionMeta, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
   submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState, flagThread, markCommentRead,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
@@ -71,6 +71,8 @@ export function App() {
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
   const [title, setTitle] = useState<string | null>(null);
+  const [description, setDescription] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
@@ -126,8 +128,24 @@ export function App() {
     });
     fetchSession().then(session => {
       document.title = session.title;
+      setSessionId(session.id);
       setTitle(session.title);
+      setDescription(session.description ?? null);
     });
+  }, []);
+
+  // The agent can update the description mid-session with `diff-viewer describe`.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchSessionMeta()
+        .then(meta => {
+          document.title = meta.title;
+          setTitle(meta.title);
+          setDescription(meta.description ?? null);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   async function handleOpenCommits(repoPath: string) {
@@ -316,7 +334,7 @@ export function App() {
         <Sidebar
           repos={repos} onSelectFile={scrollToFile}
           commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-          onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan} threads={threads}
+          onOpenCommits={handleOpenCommits} title={title} description={description} sessionId={sessionId} viewportSpan={viewportSpan} threads={threads}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}

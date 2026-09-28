@@ -168,6 +168,16 @@ export async function commentCommand(
   return res.json();
 }
 
+export async function describeCommand(sessionId: string, description: string): Promise<void> {
+  const url = await baseUrl(sessionId);
+  const res = await fetch(`${url}/api/session/description`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description }),
+  });
+  if (!res.ok) throw new Error(`diff-viewer describe: unexpected status ${res.status}`);
+}
+
 export async function stopCommand(sessionId: string): Promise<void> {
   const { pid } = await readRegistryEntry(sessionId);
   process.kill(pid, "SIGTERM");

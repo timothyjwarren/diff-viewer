@@ -2,7 +2,7 @@
 import { startCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, type CommentOverrides,
+  stopCommand, sessionsCommand, describeCommand, type CommentOverrides,
 } from "../cli/commands.js";
 import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
 
@@ -73,6 +73,11 @@ async function main(): Promise<void> {
     case "unack": {
       await unackCommand(rest[0], rest[1], rest[2]);
       console.log(JSON.stringify({ unacked: rest[2] }));
+      break;
+    }
+    case "describe": {
+      await describeCommand(rest[0], rest[1]);
+      console.log(JSON.stringify({ described: rest[0] }));
       break;
     }
     case "stop": {

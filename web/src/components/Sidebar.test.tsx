@@ -44,6 +44,46 @@ describe("Sidebar", () => {
     expect(screen.getByRole("heading", { name: "my review" })).toBeInTheDocument();
   });
 
+  it("shows a plain title, with no toggle, when there is no description", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} title="my review" />);
+    expect(screen.queryByRole("button", { name: "my review" })).not.toBeInTheDocument();
+  });
+
+  it("expands the description from the title, starting collapsed", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} title="my review" description="Reviewing **auth**." />);
+    const toggle = screen.getByRole("button", { name: "my review" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("auth")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("auth").tagName).toBe("STRONG");
+  });
+
+  it("remembers whether each session's description is open", () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+      removeItem: (k: string) => void stored.delete(k),
+    });
+    const { unmount } = render(
+      <Sidebar repos={repos} onSelectFile={() => {}} title="t" description="d" sessionId="s1" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "t" }));
+    unmount();
+
+    const { unmount: unmountAgain } = render(
+      <Sidebar repos={repos} onSelectFile={() => {}} title="t" description="d" sessionId="s1" />,
+    );
+    expect(screen.getByRole("button", { name: "t" })).toHaveAttribute("aria-expanded", "true");
+    unmountAgain();
+
+    render(<Sidebar repos={repos} onSelectFile={() => {}} title="t" description="d" sessionId="s2" />);
+    expect(screen.getByRole("button", { name: "t" })).toHaveAttribute("aria-expanded", "false");
+    vi.unstubAllGlobals();
+  });
+
   it("summarises the number of changed files", () => {
     render(<Sidebar repos={repos} onSelectFile={() => {}} />);
     expect(screen.getByText(/2 files/)).toBeInTheDocument();

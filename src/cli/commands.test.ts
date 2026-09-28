@@ -10,7 +10,7 @@ import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand,
+  stopCommand, sessionsCommand, describeCommand,
 } from "./commands.js";
 
 const execFileAsync = promisify(execFile);
@@ -135,6 +135,11 @@ describe("cli commands", () => {
 
     await unackCommand(sessionId, thread.id, commentId);
     expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("cleared");
+  });
+
+  it("describeCommand sets the session description", async () => {
+    await describeCommand(sessionId, "Reviewing the auth refactor.");
+    expect(store.snapshot.description).toBe("Reviewing the auth refactor.");
   });
 
   it("reviewCommand returns threads and verdicts with computed intent", async () => {

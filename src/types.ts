@@ -104,6 +104,8 @@ export interface NotificationEvent {
 export interface SessionData {
   id: string;
   title: string;
+  /** Agent-written Markdown overview of what is under review and why, for a reader returning to the session. */
+  description?: string;
   repos: RepoConfig[];
   createdAt: string;
   status: "active" | "stopped";

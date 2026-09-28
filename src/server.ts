@@ -21,7 +21,8 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
   const { value: titleArg, rest: afterTitle } = extractFlag(afterSessionId, "--title");
-  const { value: portArg, rest: afterPort } = extractFlag(afterTitle, "--port");
+  const { value: descriptionArg, rest: afterDescription } = extractFlag(afterTitle, "--description");
+  const { value: portArg, rest: afterPort } = extractFlag(afterDescription, "--port");
   const { value: importSessionId, rest: repoArgv } = extractFlag(afterPort, "--import-session");
   const repoArgs = parseRepoArgs(repoArgv);
 
@@ -77,6 +78,7 @@ async function main(): Promise<void> {
     const title = titleArg ?? defaultTitle(repos);
     store = SessionStore.create(repos, sessionId, title);
   }
+  if (descriptionArg !== undefined) store.setDescription(descriptionArg);
   await store.persist();
 
   const webDistDir = path.join(__dirname, "../web/dist");

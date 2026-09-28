@@ -59,7 +59,26 @@ Steps:
    *and* what's being reviewed (feature, branch, or task), not just the repo.
    Good: `"api-gateway: auth token refactor"`, `"checkout-web: PR 482 review"`.
    Bad: `"diff-viewer"`, `"review"`, a bare repo name with no task context.
-   Run `diff-viewer start --title "<title>" <path[:baseRef]>...` via Bash,
+
+   Also write a `--description`. The sidebar title expands to show it, and
+   its reader is the user coming back to this review after stepping away —
+   hours or days later, having lost the thread. Give them a brief overview
+   they can take in at a glance:
+   - what is being changed, and why (the problem or goal behind the work)
+   - what the review is for: what they should check, or what decision they
+     need to make
+   Keep it to 2–5 sentences or a short bullet list, in Markdown. Describe
+   the work as it stands, not a history of the conversation that produced
+   it, and don't list the changed files — the sidebar already shows them.
+   Good: `"Adds rate limiting to the public API so one client can't starve
+   the others. Check that the per-key limits in \`limits.ts\` look right and
+   that 429 responses carry \`Retry-After\`."`
+   Bad: `"Changes to the API."`, a file list, a play-by-play of what you did.
+   When the scope or goal of the review changes mid-session, rewrite it with
+   `diff-viewer describe <sessionId> "<markdown>"` (via a quoted heredoc, as
+   for comments); an open viewer picks up the change within a few seconds.
+
+   Run `diff-viewer start --title "<title>" --description "<description>" <path[:baseRef]>...` via Bash,
    using the paths determined above (not $ARGUMENTS verbatim unless it was
    already just paths). Parse the printed JSON for `sessionId` and `url`.
    If it fails instead, it prints exactly why (e.g. `Not a directory: ...` or

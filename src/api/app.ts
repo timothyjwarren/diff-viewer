@@ -18,6 +18,20 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
 
   app.get("/api/session", (_req, res) => res.json(store.snapshot));
 
+  // Polled by the browser, so it returns just the header fields rather than the whole snapshot.
+  app.get("/api/session/meta", (_req, res) => {
+    const { title, description } = store.snapshot;
+    res.json({ title, description });
+  });
+
+  app.put("/api/session/description", async (req, res) => {
+    const { description } = req.body as { description?: unknown };
+    if (typeof description !== "string") return res.status(400).json({ error: "description must be a string" });
+    store.setDescription(description);
+    await store.persist();
+    res.status(204).end();
+  });
+
   app.get("/api/diffs", async (_req, res) => {
     const session = store.snapshot;
     const results = await Promise.all(session.repos.map(async repo => ({

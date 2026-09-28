@@ -38,4 +38,5 @@ export interface CommentThread {
 export type VerdictType = "comment" | "approve" | "request_changes";
 export interface Verdict { id: string; type: VerdictType; summary?: string; submittedAt: string; }
 
-export interface SessionInfo { id: string; title: string; }
+export interface SessionInfo { id: string; title: string; description?: string; }
+export type SessionMeta = Pick<SessionInfo, "title" | "description">;

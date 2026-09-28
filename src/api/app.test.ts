@@ -46,6 +46,29 @@ describe("api app", () => {
     return SessionStore.create([{ path: repoPath, name: "repo", branch: "feature", baseRef }], "s1", "test session", dataDir);
   }
 
+  it("GET /api/session/meta returns only the title and description", async () => {
+    const store = await buildStore();
+    const app = createApp(store);
+    const res = await request(app).get("/api/session/meta");
+    expect(res.body).toEqual({ title: "test session" });
+  });
+
+  it("PUT /api/session/description sets and persists the description", async () => {
+    const store = await buildStore();
+    const app = createApp(store);
+    const res = await request(app).put("/api/session/description").send({ description: "Reviewing X." });
+    expect(res.status).toBe(204);
+    expect((await request(app).get("/api/session/meta")).body).toEqual({ title: "test session", description: "Reviewing X." });
+    const saved = JSON.parse(await fs.readFile(path.join(dataDir, "s1.json"), "utf-8"));
+    expect(saved.description).toBe("Reviewing X.");
+  });
+
+  it("PUT /api/session/description rejects a non-string description", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).put("/api/session/description").send({ description: 3 });
+    expect(res.status).toBe(400);
+  });
+
   it("GET /api/diffs returns parsed diffs for each repo", async () => {
     const app = createApp(await buildStore());
     await commitAll("feature commit");

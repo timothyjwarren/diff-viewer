@@ -78,6 +78,10 @@ export class SessionStore {
     await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2));
   }
 
+  setDescription(description: string): void {
+    this.data.description = description;
+  }
+
   private notify(event: Omit<NotificationEvent, "id" | "createdAt">): void {
     this.data.notifications.push({ id: randomUUID(), createdAt: new Date().toISOString(), ...event });
     this.emitter.emit("notification");

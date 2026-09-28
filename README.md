@@ -117,7 +117,8 @@ Monitor.
 
 | Command | Purpose |
 |---|---|
-| `diff-viewer start [--title <text>] [--port <n>] [--import-session <sessionId>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. `--port` and `--import-session` are described below. |
+| `diff-viewer start [--title <text>] [--description <markdown>] [--port <n>] [--import-session <sessionId>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. `--description` sets the session description (see `describe`). `--port` and `--import-session` are described below. |
+| `diff-viewer describe <sessionId> <markdown>` | Set the session description: a brief Markdown overview of what is under review and what the review is for. The title in the sidebar expands to show it, and an open viewer picks up changes within a few seconds. |
 | `diff-viewer watch <sessionId>` | Loops indefinitely, printing one JSON line per comment/verdict notification; built for `Monitor`. |
 | `diff-viewer wait <sessionId>` | Long-polls until the next single comment or verdict, then exits. |
 | `diff-viewer review <sessionId>` | Prints all comment threads and verdicts (with computed intent) as JSON. |
