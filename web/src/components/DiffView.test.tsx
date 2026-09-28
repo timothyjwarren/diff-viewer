@@ -146,6 +146,38 @@ describe("DiffView", () => {
     expect(insertedRow.nextElementSibling?.textContent ?? "").not.toContain("why is this here?");
   });
 
+  it("reserves a matching annotation slot in the opposite pane so rows below a thread stay aligned", () => {
+    const twoLineFile: DiffFile = {
+      repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
+      hunks: [{
+        oldStart: 1, oldLines: 2, newStart: 1, newLines: 2,
+        lines: [
+          { type: "context", oldLineNumber: 1, newLineNumber: 1, content: "first" },
+          { type: "context", oldLineNumber: 2, newLineNumber: 2, content: "second" },
+        ],
+      }],
+    };
+    const thread: CommentThreadData = {
+      id: "t1", repoPath: "/repo", file: "a.ts", lineStart: 1, lineEnd: 1, side: "old", resolved: false,
+      pinnedRef: "abc123", outdated: false,
+      comments: [{ id: "c1", author: "user", body: "old side note", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
+    };
+    const { container } = render(
+      <DiffView
+        file={twoLineFile} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, threads: [thread] }}
+      />,
+    );
+    const slotKeys = (side: string) => Array.from(
+      container.querySelectorAll<HTMLElement>(`.diff-pane[data-side='${side}'] .diff-row-annotations`),
+      el => el.dataset.rowKey,
+    );
+    expect(slotKeys("old")).toEqual(["0:0"]);
+    expect(slotKeys("new")).toEqual(["0:0"]);
+    const newSlot = container.querySelector(".diff-pane[data-side='new'] .diff-row-annotations") as HTMLElement;
+    expect(newSlot.textContent).toBe("");
+  });
+
   it("auto-expands a hidden gap to reveal a comment thread whose line is currently collapsed", async () => {
     // Plain identifiers (not "line 10"-style digits) so shiki's tokenizer
     // renders each as a single text node instead of splitting the number

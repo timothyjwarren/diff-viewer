@@ -1107,6 +1107,14 @@ main {
 
 /* ---------- Comments ---------- */
 
+/* A row's threads/composer, mirrored as an equal-height blank slot in the
+ * opposite pane (see alignAnnotations.ts). flow-root keeps the children's
+ * vertical margins inside the inner box, so its measured height is the
+ * full space the annotations take up. */
+.diff-row-annotations-inner {
+  display: flow-root;
+}
+
 .comment-thread,
 .comment-composer {
   /* .diff-pane-content is a display:table sized to its widest code line
