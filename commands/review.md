@@ -184,11 +184,17 @@ Steps:
    into it with `diff-viewer comment <sessionId> <repoPath> <file>
    <lineStart> <lineEnd> <old|new> "<text>"` instead of (or in addition to)
    normal output.
-6. `diff-viewer reset <sessionId>` deletes every thread and verdict in the
+6. `diff-viewer reset <sessionId>` clears every thread and verdict in the
    session — including the user's pending comments from a review they
-   haven't submitted — and cannot be undone. Run it only when the user asks
-   for a clean slate, or when starting a new round of review they've agreed
-   to; never to clear away comments you haven't handled. If the goal of the
-   review changes with the reset, update the description with `describe` too.
+   haven't submitted. Run it only when the user asks for a clean slate, or
+   when starting a new round of review they've agreed to; never to clear
+   away comments you haven't handled. If the goal of the review changes with
+   the reset, update the description with `describe` too.
+
+   A reset archives what it clears. If the user wants cleared comments
+   back, find the archive with `diff-viewer archives <sessionId>` (each
+   entry has an `id`, `archivedAt`, and thread/comment/verdict counts) and
+   run `diff-viewer restore <sessionId> <archiveId>`. Restoring archives the
+   current comments first, so nothing is lost either way.
 7. When finished with the session, `diff-viewer stop <sessionId>` shuts down
    its server, and `TaskStop` the Monitor started in step 3.

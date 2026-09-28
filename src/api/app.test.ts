@@ -69,7 +69,7 @@ describe("api app", () => {
     expect(res.status).toBe(400);
   });
 
-  it("POST /api/session/reset clears comments, persists, and reports resetAt through meta", async () => {
+  it("POST /api/session/reset clears comments, persists, and reports the change through meta", async () => {
     const store = await buildStore();
     store.addThread({
       repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
@@ -81,9 +81,51 @@ describe("api app", () => {
     expect(res.status).toBe(204);
     expect((await request(app).get("/api/threads")).body).toEqual([]);
     const meta = (await request(app).get("/api/session/meta")).body;
-    expect(meta.resetAt).toBe(store.snapshot.resetAt);
+    expect(meta.commentsReplaced).toEqual(store.snapshot.commentsReplaced);
     const saved = JSON.parse(await fs.readFile(path.join(dataDir, "s1.json"), "utf-8"));
     expect(saved.threads).toEqual([]);
+    expect(saved.archives).toHaveLength(1);
+  });
+
+  it("GET /api/archives lists archive summaries", async () => {
+    const store = await buildStore();
+    store.addThread({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc",
+    });
+    const app = createApp(store);
+    await request(app).post("/api/session/reset");
+
+    const res = await request(app).get("/api/archives");
+    expect(res.body).toEqual([expect.objectContaining({ threadCount: 1, commentCount: 1, verdictCount: 0 })]);
+  });
+
+  it("POST /api/archives/:id/restore restores comments and repositions them against the current code", async () => {
+    const app = createApp(await buildStore());
+    await commitAll("feature commit");
+    await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      body: "q", pending: false, toRef: "HEAD",
+    });
+    await request(app).get("/api/repo-state").query({ repoPath });
+    await request(app).post("/api/session/reset");
+
+    await fs.writeFile(path.join(repoPath, "a.txt"), "zero\none\ntwo\n");
+    await git(repoPath, ["commit", "-am", "shift"]);
+    await request(app).get("/api/repo-state").query({ repoPath });
+
+    const [archive] = (await request(app).get("/api/archives")).body;
+    expect((await request(app).post(`/api/archives/${archive.id}/restore`)).status).toBe(204);
+    await request(app).get("/api/repo-state").query({ repoPath });
+
+    const threads = (await request(app).get("/api/threads")).body;
+    expect(threads).toHaveLength(1);
+    expect(threads[0].lineStart).toBe(3);
+  });
+
+  it("POST /api/archives/:id/restore returns 404 for an unknown archive", async () => {
+    const app = createApp(await buildStore());
+    expect((await request(app).post("/api/archives/nope/restore")).status).toBe(404);
   });
 
   it("GET /api/diffs returns parsed diffs for each repo", async () => {

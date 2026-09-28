@@ -101,13 +101,36 @@ export interface NotificationEvent {
   createdAt: string;
 }
 
+export interface CommentsReplaced {
+  at: string;
+  by: "reset" | "restore";
+}
+
+export interface CommentArchive {
+  id: string;
+  archivedAt: string;
+  threads: CommentThread[];
+  verdicts: Verdict[];
+  contentSnapshots: Record<string, string>;
+}
+
+export interface CommentArchiveSummary {
+  id: string;
+  archivedAt: string;
+  threadCount: number;
+  commentCount: number;
+  verdictCount: number;
+}
+
 export interface SessionData {
   id: string;
   title: string;
   /** Agent-written Markdown overview of what is under review and why, for a reader returning to the session. */
   description?: string;
-  /** When the agent last cleared the session's comments and verdicts. */
-  resetAt?: string;
+  /** The last time the agent swapped out the session's comments, via `reset` or `restore`. */
+  commentsReplaced?: CommentsReplaced;
+  /** Comments set aside by `reset` or `restore`, oldest first. */
+  archives?: CommentArchive[];
   repos: RepoConfig[];
   createdAt: string;
   status: "active" | "stopped";

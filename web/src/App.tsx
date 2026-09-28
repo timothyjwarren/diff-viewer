@@ -71,7 +71,7 @@ export function App() {
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const { sessionId, title, description, wasReset, dismissReset } = useSessionMeta();
+  const { sessionId, title, description, commentsReplacedBy, dismissCommentsReplaced } = useSessionMeta();
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
@@ -343,10 +343,10 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
-      {wasReset && (
-        <div className="reset-notice" role="status">
-          The agent cleared all comments.
-          <button type="button" className="reset-notice-dismiss" aria-label="Dismiss" onClick={dismissReset}>×</button>
+      {commentsReplacedBy && (
+        <div className="comments-notice" role="status">
+          {commentsReplacedBy === "reset" ? "The agent cleared all comments." : "The agent restored archived comments."}
+          <button type="button" className="comments-notice-dismiss" aria-label="Dismiss" onClick={dismissCommentsReplaced}>×</button>
         </div>
       )}
       {offscreenNewComments.length > 0 && (

@@ -6,6 +6,7 @@ import { getDataDir } from "../paths.js";
 import type {
   SessionData, RepoConfig, CommentThread, Comment, CommentAuthor,
   Verdict, VerdictType, NotificationEvent, VerdictIntent,
+  CommentArchive, CommentArchiveSummary, CommentsReplaced,
 } from "../types.js";
 import { verdictIntent } from "../types.js";
 import { trackThreadDrift } from "./driftTracking.js";
@@ -84,14 +85,50 @@ export class SessionStore {
 
   /**
    * Clears every thread (pending ones included), verdict, and content
-   * snapshot. The notification log stays: `watch`/`wait` hold numeric
-   * cursors into it, so shrinking it would make them skip new events.
+   * snapshot, archiving them first so `restoreArchive` can bring them back.
+   * The notification log stays: `watch`/`wait` hold numeric cursors into it,
+   * so shrinking it would make them skip new events.
    */
   reset(): void {
-    this.data.threads = [];
-    this.data.verdicts = [];
-    this.data.contentSnapshots = {};
-    this.data.resetAt = new Date().toISOString();
+    this.archiveCurrentComments();
+    this.replaceComments({ threads: [], verdicts: [], contentSnapshots: {} }, "reset");
+  }
+
+  listArchives(): CommentArchiveSummary[] {
+    return (this.data.archives ?? []).map(a => ({
+      id: a.id,
+      archivedAt: a.archivedAt,
+      threadCount: a.threads.length,
+      commentCount: a.threads.reduce((n, t) => n + t.comments.length, 0),
+      verdictCount: a.verdicts.length,
+    }));
+  }
+
+  /** Swaps an archive back in, archiving the current comments so the restore can itself be undone. */
+  restoreArchive(archiveId: string): void {
+    const archive = this.data.archives?.find(a => a.id === archiveId);
+    if (!archive) throw new Error(`Archive not found: ${archiveId}`);
+    this.data.archives = this.data.archives!.filter(a => a !== archive);
+    this.archiveCurrentComments();
+    this.replaceComments(archive, "restore");
+  }
+
+  private archiveCurrentComments(): void {
+    const { threads, verdicts, contentSnapshots } = this.data;
+    if (threads.length === 0 && verdicts.length === 0) return;
+    (this.data.archives ??= []).push({
+      id: randomUUID(), archivedAt: new Date().toISOString(), threads, verdicts, contentSnapshots,
+    });
+  }
+
+  private replaceComments(
+    { threads, verdicts, contentSnapshots }: Pick<CommentArchive, "threads" | "verdicts" | "contentSnapshots">,
+    by: CommentsReplaced["by"],
+  ): void {
+    this.data.threads = threads;
+    this.data.verdicts = verdicts;
+    this.data.contentSnapshots = contentSnapshots;
+    this.data.commentsReplaced = { at: new Date().toISOString(), by };
   }
 
   private notify(event: Omit<NotificationEvent, "id" | "createdAt">): void {

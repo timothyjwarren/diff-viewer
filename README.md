@@ -125,7 +125,9 @@ Monitor.
 | `diff-viewer reply <sessionId> <threadId> <text> [--author <user\|agent>] [--created-at <iso8601>] [--pending]` | Post a reply into a thread. The three flags are described below. |
 | `diff-viewer comment <sessionId> <repoPath> <file> <lineStart> <lineEnd> <old\|new> <text> [--author <user\|agent>] [--created-at <iso8601>] [--pending]` | Post a new comment (e.g. from `/code-review`). The three flags are described below. |
 | `diff-viewer ack <sessionId> <threadId> <commentId>` / `unack ...` | Move a single, immediately-posted comment's status from the automatic "seen" indicator (set the moment `diff-viewer review` reads it) to a pulsing "agent is working on this" indicator, then to a cleared/no-badge state once `unack` runs -- a one-way seen -> acked -> cleared progression, never reverting. |
-| `diff-viewer reset <sessionId>` | Delete every comment thread (including the user's pending, unsubmitted ones) and verdict in the session, keeping its title and description. An open viewer clears its comments and shows a notice. There is no undo. |
+| `diff-viewer reset <sessionId>` | Clear every comment thread (including the user's pending, unsubmitted ones) and verdict in the session, keeping its title and description. The cleared comments are archived in the session file. An open viewer clears its comments and shows a notice. |
+| `diff-viewer archives <sessionId>` | List the session's archives as JSON: `id`, `archivedAt`, and thread/comment/verdict counts. |
+| `diff-viewer restore <sessionId> <archiveId>` | Bring an archive's comments and verdicts back. The comments it replaces are archived first, so a restore can itself be undone. |
 | `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
 

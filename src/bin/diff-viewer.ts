@@ -2,7 +2,7 @@
 import { startCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand, resetCommand, type CommentOverrides,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, type CommentOverrides,
 } from "../cli/commands.js";
 import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
 
@@ -83,6 +83,15 @@ async function main(): Promise<void> {
     case "reset": {
       await resetCommand(rest[0]);
       console.log(JSON.stringify({ reset: rest[0] }));
+      break;
+    }
+    case "archives": {
+      console.log(JSON.stringify(await archivesCommand(rest[0])));
+      break;
+    }
+    case "restore": {
+      await restoreCommand(rest[0], rest[1]);
+      console.log(JSON.stringify({ restored: rest[1] }));
       break;
     }
     case "stop": {

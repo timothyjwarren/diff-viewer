@@ -20,12 +20,28 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
 
   // Polled by the browser, so it returns just these small fields rather than the whole snapshot.
   app.get("/api/session/meta", (_req, res) => {
-    const { title, description, resetAt } = store.snapshot;
-    res.json({ title, description, resetAt });
+    const { title, description, commentsReplaced } = store.snapshot;
+    res.json({ title, description, commentsReplaced });
   });
 
   app.post("/api/session/reset", async (_req, res) => {
     store.reset();
+    await store.persist();
+    res.status(204).end();
+  });
+
+  app.get("/api/archives", (_req, res) => res.json(store.listArchives()));
+
+  app.post("/api/archives/:archiveId/restore", async (req, res) => {
+    try {
+      store.restoreArchive(req.params.archiveId);
+    } catch (err) {
+      return res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+    // The restored threads were last positioned against the code as it was
+    // when they were archived; forgetting the known repo state makes the
+    // next /api/repo-state poll reposition them against the current code.
+    lastKnownState.clear();
     await store.persist();
     res.status(204).end();
   });

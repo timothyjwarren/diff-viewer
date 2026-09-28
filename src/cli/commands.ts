@@ -3,7 +3,7 @@ import path from "node:path";
 import { getRegistryDir, getDataDir } from "../paths.js";
 import { readRegistryEntry, removeRegistryEntry } from "../registry.js";
 import { readCursor, writeCursor } from "./cursor.js";
-import { verdictIntent, type SessionData, type RepoConfig, type CommentThread, type CommentAuthor } from "../types.js";
+import { verdictIntent, type SessionData, type RepoConfig, type CommentThread, type CommentAuthor, type CommentArchiveSummary } from "../types.js";
 
 async function baseUrl(sessionId: string): Promise<string> {
   const { port } = await readRegistryEntry(sessionId);
@@ -182,6 +182,18 @@ export async function resetCommand(sessionId: string): Promise<void> {
   const url = await baseUrl(sessionId);
   const res = await fetch(`${url}/api/session/reset`, { method: "POST" });
   if (!res.ok) throw new Error(`diff-viewer reset: unexpected status ${res.status}`);
+}
+
+export async function archivesCommand(sessionId: string): Promise<CommentArchiveSummary[]> {
+  const url = await baseUrl(sessionId);
+  return await fetch(`${url}/api/archives`).then(r => r.json()) as CommentArchiveSummary[];
+}
+
+export async function restoreCommand(sessionId: string, archiveId: string): Promise<void> {
+  const url = await baseUrl(sessionId);
+  const res = await fetch(`${url}/api/archives/${encodeURIComponent(archiveId)}/restore`, { method: "POST" });
+  if (res.status === 404) throw new Error((await res.json() as { error: string }).error);
+  if (!res.ok) throw new Error(`diff-viewer restore: unexpected status ${res.status}`);
 }
 
 export async function stopCommand(sessionId: string): Promise<void> {

@@ -1463,7 +1463,7 @@ main {
   border-bottom: 5px solid currentColor;
 }
 
-.reset-notice {
+.comments-notice {
   position: fixed;
   top: 16px;
   /* Centred over the diff area, to the right of the sidebar. */
@@ -1482,7 +1482,7 @@ main {
   z-index: 10;
 }
 
-.reset-notice-dismiss {
+.comments-notice-dismiss {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -1495,7 +1495,7 @@ main {
   cursor: pointer;
 }
 
-.reset-notice-dismiss:hover {
+.comments-notice-dismiss:hover {
   background: var(--hover);
   color: var(--text);
 }

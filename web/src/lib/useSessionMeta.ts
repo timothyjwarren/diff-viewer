@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSession, fetchSessionMeta } from "../api/client";
+import type { CommentsReplaced } from "../types";
 
 export const SESSION_META_POLL_MS = 3000;
 
 /**
  * The session's id, title, and description, kept current by polling — the
- * agent can change the description (`diff-viewer describe`) or clear every
- * comment (`diff-viewer reset`) mid-session. `wasReset` turns on when a
- * reset happens while this page is open.
+ * agent can change the description (`diff-viewer describe`) or swap out every
+ * comment (`diff-viewer reset` / `restore`) mid-session. `commentsReplacedBy`
+ * says which of those last happened while this page was open, until dismissed.
  */
 export function useSessionMeta() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
-  const [wasReset, setWasReset] = useState(false);
-  // undefined until the session loads; null once loaded if it has never been reset.
-  const knownResetAt = useRef<string | null | undefined>(undefined);
+  const [commentsReplacedBy, setCommentsReplacedBy] = useState<CommentsReplaced["by"] | null>(null);
+  // undefined until the session loads; null once loaded if its comments have never been replaced.
+  const knownReplacedAt = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,7 +26,7 @@ export function useSessionMeta() {
       setSessionId(session.id);
       setTitle(session.title);
       setDescription(session.description ?? null);
-      knownResetAt.current = session.resetAt ?? null;
+      knownReplacedAt.current = session.commentsReplaced?.at ?? null;
     }).catch(() => {});
 
     const interval = setInterval(() => {
@@ -35,9 +36,12 @@ export function useSessionMeta() {
           document.title = meta.title;
           setTitle(meta.title);
           setDescription(meta.description ?? null);
-          const resetAt = meta.resetAt ?? null;
-          if (knownResetAt.current !== undefined && resetAt !== knownResetAt.current) setWasReset(true);
-          if (knownResetAt.current !== undefined) knownResetAt.current = resetAt;
+          if (knownReplacedAt.current === undefined) return;
+          const replaced = meta.commentsReplaced;
+          if (replaced && replaced.at !== knownReplacedAt.current) {
+            knownReplacedAt.current = replaced.at;
+            setCommentsReplacedBy(replaced.by);
+          }
         })
         .catch(() => {});
     }, SESSION_META_POLL_MS);
@@ -48,5 +52,8 @@ export function useSessionMeta() {
     };
   }, []);
 
-  return { sessionId, title, description, wasReset, dismissReset: () => setWasReset(false) };
+  return {
+    sessionId, title, description, commentsReplacedBy,
+    dismissCommentsReplaced: () => setCommentsReplacedBy(null),
+  };
 }

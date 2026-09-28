@@ -295,7 +295,64 @@ describe("SessionStore", () => {
     expect(snap.contentSnapshots).toEqual({});
     expect(snap.notifications).toEqual(notifications);
     expect(snap).toMatchObject({ title: "t", description: "d", repos });
-    expect(Date.parse(snap.resetAt!)).not.toBeNaN();
+    expect(snap.commentsReplaced?.by).toBe("reset");
+    expect(Date.parse(snap.commentsReplaced!.at)).not.toBeNaN();
+  });
+
+  function seedComments(store: SessionStore, body: string) {
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body, pending: false, pinnedRef: "abc123",
+    });
+    store.addReply(thread.id, "agent", "reply");
+    store.ensureContentSnapshot("abc123", "a.txt", `${body}\n`);
+    store.addVerdict("comment");
+  }
+
+  it("reset archives what it clears, and lists archives with counts", () => {
+    const store = SessionStore.create(repos, "s-arch", "t", dataDir);
+    seedComments(store, "first");
+    const before = store.snapshot;
+
+    store.reset();
+
+    const [archive] = store.snapshot.archives!;
+    expect(archive).toMatchObject({
+      threads: before.threads, verdicts: before.verdicts, contentSnapshots: before.contentSnapshots,
+    });
+    expect(store.listArchives()).toEqual([{
+      id: archive.id, archivedAt: archive.archivedAt, threadCount: 1, commentCount: 2, verdictCount: 1,
+    }]);
+  });
+
+  it("reset with nothing to clear adds no archive", () => {
+    const store = SessionStore.create(repos, "s-empty", "t", dataDir);
+    store.reset();
+    expect(store.listArchives()).toEqual([]);
+  });
+
+  it("restore brings an archive back and archives the comments it replaces", () => {
+    const store = SessionStore.create(repos, "s-restore", "t", dataDir);
+    seedComments(store, "first");
+    store.reset();
+    const firstArchiveId = store.listArchives()[0].id;
+    seedComments(store, "second");
+
+    store.restoreArchive(firstArchiveId);
+
+    const snap = store.snapshot;
+    expect(snap.threads[0].comments[0].body).toBe("first");
+    expect(snap.contentSnapshots).toEqual({ "abc123:a.txt": "first\n" });
+    expect(snap.commentsReplaced?.by).toBe("restore");
+    expect(snap.archives!.map(a => a.threads[0].comments[0].body)).toEqual(["second"]);
+  });
+
+  it("restore of an unknown archive throws and changes nothing", () => {
+    const store = SessionStore.create(repos, "s-missing", "t", dataDir);
+    seedComments(store, "first");
+    expect(() => store.restoreArchive("nope")).toThrow("Archive not found: nope");
+    expect(store.snapshot.threads).toHaveLength(1);
+    expect(store.listArchives()).toEqual([]);
   });
 
   describe("importFrom", () => {
