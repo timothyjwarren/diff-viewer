@@ -80,6 +80,18 @@ export async function resolveThread(threadId: string, resolved: boolean): Promis
   });
 }
 
+export async function flagThread(threadId: string, flagged: boolean): Promise<void> {
+  await fetch(`/api/threads/${threadId}/flag`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ flagged }),
+  });
+}
+
+export async function markCommentRead(threadId: string, commentId: string): Promise<void> {
+  await fetch(`/api/threads/${threadId}/comments/${commentId}/read`, { method: "POST" });
+}
+
 export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[] }> {
   return json(await fetch(`/api/repo-state?repoPath=${encodeURIComponent(repoPath)}`));
 }

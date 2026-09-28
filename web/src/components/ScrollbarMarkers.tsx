@@ -13,10 +13,24 @@ interface Tick {
   /** Position on the scrollbar track, 0 (top) to 1 (bottom). */
   fraction: number;
   status: "open" | "pending" | "resolved";
+  flagged: boolean;
+  /** Has an agent comment the user hasn't had on screen yet. */
+  unread: boolean;
   label: string;
 }
 
 const STATUS_LABELS = { open: null, pending: "Pending", resolved: "Resolved" };
+
+function hasUnread(thread: CommentThread): boolean {
+  return thread.comments.some(c => c.author === "agent" && !c.readByUser);
+}
+
+/** Paint order: later ticks draw over earlier ones where they overlap. */
+function tickPriority(thread: CommentThread): number {
+  if (hasUnread(thread)) return 3;
+  if (thread.flagged) return 2;
+  return thread.resolved ? 0 : 1;
+}
 
 function tickStatus(thread: CommentThread): Tick["status"] {
   if (thread.resolved) return "resolved";
@@ -25,7 +39,19 @@ function tickStatus(thread: CommentThread): Tick["status"] {
 
 function tickLabel(thread: CommentThread, status: Tick["status"]): string {
   const firstLine = thread.comments[0].body.split("\n")[0].slice(0, 80);
-  return [STATUS_LABELS[status], `${thread.file}:${thread.lineStart}`, firstLine].filter(Boolean).join(" · ");
+  return [
+    thread.flagged && "Flagged", hasUnread(thread) && "Unread", STATUS_LABELS[status],
+    `${thread.file}:${thread.lineStart}`, firstLine,
+  ].filter(Boolean).join(" · ");
+}
+
+function tickClassName(tick: Tick): string {
+  return [
+    "scrollbar-marker",
+    tick.status !== "open" && `scrollbar-marker-${tick.status}`,
+    tick.flagged && "scrollbar-marker-flagged",
+    tick.unread && "scrollbar-marker-unread",
+  ].filter(Boolean).join(" ");
 }
 
 /**
@@ -51,9 +77,9 @@ export function ScrollbarMarkers({ threads, scrollRef }: {
       setWidth(container.offsetWidth - container.clientWidth || FALLBACK_WIDTH);
       if (scrollHeight <= 0) return setTicks([]);
       const contentTop = container.getBoundingClientRect().top - container.scrollTop;
-      // Resolved ticks come first so open ones paint over them where they overlap.
-      const next = [...threads.filter(t => t.resolved), ...threads.filter(t => !t.resolved)]
+      const next = threads
         .filter(t => t.comments.length > 0)
+        .sort((a, b) => tickPriority(a) - tickPriority(b))
         .flatMap(t => {
           const el = document.getElementById(`thread-${t.id}`);
           if (!el) return [];
@@ -63,7 +89,10 @@ export function ScrollbarMarkers({ threads, scrollRef }: {
             contentCenter: rect.top + rect.height / 2 - contentTop,
             scrollHeight, clientHeight, minThumb: SCROLLBAR_MIN_THUMB,
           });
-          return [{ threadId: t.id, status, label: tickLabel(t, status), fraction }];
+          return [{
+            threadId: t.id, status, flagged: Boolean(t.flagged), unread: hasUnread(t),
+            label: tickLabel(t, status), fraction,
+          }];
         });
       setTicks(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
@@ -88,7 +117,7 @@ export function ScrollbarMarkers({ threads, scrollRef }: {
         <button
           key={t.threadId}
           type="button"
-          className={`scrollbar-marker${t.status === "open" ? "" : ` scrollbar-marker-${t.status}`}`}
+          className={tickClassName(t)}
           style={{ top: `${Math.round(t.fraction * 1000) / 10}%` }}
           title={t.label}
           aria-label={t.label}

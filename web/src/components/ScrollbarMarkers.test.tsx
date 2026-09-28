@@ -88,6 +88,41 @@ describe("ScrollbarMarkers", () => {
     expect(ticks(container)[1]).toHaveAttribute("title", "a.ts:7 · first line");
   });
 
+  it("marks and labels flagged threads", async () => {
+    const { container } = render(
+      <Harness threads={[thread("t1", { flagged: true })]} offsets={{ "t1": 100 }} />,
+    );
+    await waitFor(() => expect(ticks(container)).toHaveLength(1));
+    expect(ticks(container)[0]).toHaveClass("scrollbar-marker-flagged");
+    expect(ticks(container)[0]).toHaveAttribute("title", "Flagged · a.ts:7 · first line");
+  });
+
+  it("marks threads with an unread agent comment, ignoring read ones and the user's own", async () => {
+    const agent = (id: string, readByUser?: boolean) => ({
+      id, author: "agent" as const, body: "reply", pending: false, readByUser, createdAt: "2026-01-01T00:01:00Z",
+    });
+    const unread = thread("t1");
+    unread.comments.push(agent("a1"));
+    const read = thread("t2");
+    read.comments.push(agent("a2", true));
+    const { container } = render(
+      <Harness threads={[unread, read, thread("t3")]} offsets={{ "t1": 100, "t2": 300, "t3": 500 }} />,
+    );
+    await waitFor(() => expect(ticks(container)).toHaveLength(3));
+    const byTitle = (prefix: string) => ticks(container).filter(t => t.title.startsWith(prefix));
+    expect(byTitle("Unread")).toHaveLength(1);
+    expect(container.querySelectorAll(".scrollbar-marker-unread")).toHaveLength(1);
+  });
+
+  it("combines flagged and unread on one tick", async () => {
+    const t = thread("t1", { flagged: true });
+    t.comments.push({ id: "a1", author: "agent", body: "reply", pending: false, createdAt: "2026-01-01T00:01:00Z" });
+    const { container } = render(<Harness threads={[t]} offsets={{ "t1": 100 }} />);
+    await waitFor(() => expect(ticks(container)).toHaveLength(1));
+    expect(ticks(container)[0]).toHaveClass("scrollbar-marker-flagged", "scrollbar-marker-unread");
+    expect(ticks(container)[0]).toHaveAttribute("title", "Flagged · Unread · a.ts:7 · first line");
+  });
+
   it("scrolls a thread into view when its tick is clicked", async () => {
     const { container } = render(<Harness threads={[thread("t1")]} offsets={{ "t1": 600 }} />);
     await waitFor(() => expect(ticks(container)).toHaveLength(1));

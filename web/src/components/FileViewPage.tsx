@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { codeToHtml } from "shiki";
 import { detectLanguage } from "../lib/language";
 import { fetchFile } from "../api/client";
+import { SHIKI_THEMES } from "../lib/highlight";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
 
@@ -19,7 +20,7 @@ export function FileViewPage({ repoPath, filePath, gitRef, repoName }: {
     (async () => {
       const rawLines = await fetchFile(repoPath, filePath, gitRef);
       const content = rawLines.join("\n");
-      const html = await codeToHtml(content || " ", { lang: detectLanguage(filePath), theme: "github-dark" });
+      const html = await codeToHtml(content || " ", { lang: detectLanguage(filePath), ...SHIKI_THEMES });
       const match = LINE_SPAN_RE.exec(html);
       const inner = match ? match[1] : escapeHtml(content);
       if (!cancelled) setLines(inner.split("\n"));
@@ -29,7 +30,11 @@ export function FileViewPage({ repoPath, filePath, gitRef, repoName }: {
 
   return (
     <div className="file-view-page">
-      <div className="file-view-header">{repoName} &rsaquo; {filePath}</div>
+      <div className="file-view-header">
+        <span className="diff-view-repo">{repoName}</span>
+        <span className="diff-view-base">{filePath}</span>
+        <span className="file-view-ref">{gitRef}</span>
+      </div>
       <div className="file-view-body">
         {lines?.map((html, i) => (
           <div className="file-view-line" key={i}>

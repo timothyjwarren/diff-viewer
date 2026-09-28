@@ -28,6 +28,41 @@ describe("expandHunkContext", () => {
     const contents = result[0].lines.map(l => l.content);
     expect(contents.slice(0, 2)).toEqual(["three", "four"]);
   });
+
+  it("grows the hunk's line counts to cover the revealed lines", () => {
+    const up = expandHunkContext([hunk], fullFile, 0, "up");
+    expect(up[0]).toMatchObject({ oldStart: 1, oldLines: 4, newStart: 1, newLines: 4 });
+    const down = expandHunkContext([hunk], fullFile, 0, "down");
+    expect(down[0]).toMatchObject({ oldStart: 4, oldLines: 4, newStart: 4, newLines: 4 });
+  });
+
+  it("never reveals a line twice across repeated expansions", () => {
+    let hunks = expandHunkContext([hunk], fullFile, 0, "up", 2);
+    hunks = expandHunkContext(hunks, fullFile, 0, "down", 1);
+    hunks = expandHunkContext(hunks, fullFile, 0, "down", 1);
+    hunks = expandHunkContext(hunks, fullFile, 0, "up", 5);
+    expect(hunks[0].lines.map(l => l.newLineNumber)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("leaves a line inside an expanded hunk visible instead of reporting it hidden", () => {
+    const expanded = expandHunkContext([hunk], fullFile, 0, "up", 2);
+    expect(findGapExpansionForLine(expanded, 4)).toBeNull();
+  });
+
+  it("numbers revealed old-side lines by the hunk's own old/new offset", () => {
+    // Old file has one extra line above: old 5 is new 4.
+    const shifted: DiffHunk = {
+      oldStart: 4, oldLines: 2, newStart: 4, newLines: 1,
+      lines: [
+        { type: "del", oldLineNumber: 4, newLineNumber: null, content: "removed" },
+        { type: "context", oldLineNumber: 5, newLineNumber: 4, content: "four" },
+      ],
+    };
+    const down = expandHunkContext([shifted], fullFile, 0, "down", 1);
+    expect(down[0].lines.at(-1)).toMatchObject({ oldLineNumber: 6, newLineNumber: 5 });
+    const up = expandHunkContext([shifted], fullFile, 0, "up", 1);
+    expect(up[0].lines[0]).toMatchObject({ oldLineNumber: 3, newLineNumber: 3 });
+  });
 });
 
 describe("hiddenLinesBefore", () => {

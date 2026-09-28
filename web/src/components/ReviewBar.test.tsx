@@ -32,6 +32,20 @@ describe("ReviewBar", () => {
     expect(screen.getByText(/Request changes submitted/)).toBeInTheDocument();
   });
 
+  it("shows how many pending comments the review will submit", () => {
+    const { rerender } = render(<ReviewBar onSubmit={vi.fn()} pendingCount={0} />);
+    expect(screen.queryByText(/pending/)).not.toBeInTheDocument();
+    rerender(<ReviewBar onSubmit={vi.fn()} pendingCount={3} />);
+    expect(screen.getByText("3 pending")).toBeInTheDocument();
+  });
+
+  it("closes the popover on Escape", () => {
+    render(<ReviewBar onSubmit={vi.fn()} />);
+    openPopover();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByPlaceholderText("Leave a summary (optional)")).not.toBeInTheDocument();
+  });
+
   it("hides the popover until 'Finish your review' is clicked", () => {
     render(<ReviewBar onSubmit={vi.fn()} />);
     expect(screen.queryByPlaceholderText("Leave a summary (optional)")).not.toBeInTheDocument();

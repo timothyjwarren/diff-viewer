@@ -4,7 +4,7 @@ import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
-  submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState,
+  submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState, flagThread, markCommentRead,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
@@ -60,6 +60,7 @@ function captureSelectionQuote(sel: SelectionRange): string | null {
 
 export function App() {
   const [repos, setRepos] = useState<RepoDiff[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
   const [dirtyFilesByRepo, setDirtyFilesByRepo] = useState<Record<string, string[]>>({});
@@ -74,6 +75,7 @@ export function App() {
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
   const hasLoadedThreadsRef = useRef(false);
+  const readRequestedRef = useRef<Set<string>>(new Set());
   const lineSelectionRef = useRef(lineSelection);
   useEffect(() => { lineSelectionRef.current = lineSelection; }, [lineSelection]);
 
@@ -116,6 +118,7 @@ export function App() {
   useEffect(() => {
     fetchDiffs().then(async loadedRepos => {
       setRepos(loadedRepos);
+      setLoaded(true);
       const entries = await Promise.all(
         loadedRepos.map(r => fetchCommits(r.repoPath).then(commits => [r.repoPath, commits] as const)),
       );
@@ -287,6 +290,18 @@ export function App() {
         await resolveThread(threadId, resolved);
         await refreshThreads();
       },
+      onFlag: async (threadId, flagged) => {
+        await flagThread(threadId, flagged);
+        await refreshThreads();
+      },
+      onRead: async (threadId, commentId) => {
+        // A comment can report itself visible again before the refreshed
+        // threads arrive, so each one is only ever sent once.
+        if (readRequestedRef.current.has(commentId)) return;
+        readRequestedRef.current.add(commentId);
+        await markCommentRead(threadId, commentId);
+        await refreshThreads();
+      },
     };
   }
 
@@ -297,14 +312,22 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar
-        repos={repos} onSelectFile={scrollToFile}
-        commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-        onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan}
-      />
+      <div className="sidebar-column">
+        <Sidebar
+          repos={repos} onSelectFile={scrollToFile}
+          commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
+          onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan} threads={threads}
+        />
+        <ReviewBar
+          onSubmit={handleSubmitVerdict}
+          pendingCount={threads.reduce((n, t) => n + t.comments.filter(c => c.pending).length, 0)}
+        />
+      </div>
       <div className="main-pane">
       <main ref={mainRef}>
-        {repos.length === 0 && <p className="empty-state">No changes to review.</p>}
+        {repos.length === 0 && (
+          <p className="empty-state">{loaded ? "No changes to review." : "Loading changes…"}</p>
+        )}
         {repos.map(repo => repo.files.map(file => (
           <div key={fileAnchorId(file)} id={fileAnchorId(file)} className="file-anchor">
             <DiffView
@@ -323,7 +346,6 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
-      <ReviewBar onSubmit={handleSubmitVerdict} />
       {offscreenNewComments.length > 0 && (
         <button
           type="button"

@@ -18,25 +18,36 @@ export function expandHunkContext(
       ? hunks[hunkIndex - 1].newStart + hunks[hunkIndex - 1].newLines - 1
       : 0;
     const start = Math.max(previousHunkEnd, hunk.newStart - 1 - amount);
+    // Unchanged lines above the hunk sit at the same old/new offset as its start.
+    const oldOffset = hunk.oldStart - hunk.newStart;
     const newLines: DiffLine[] = [];
     for (let ln = start + 1; ln < hunk.newStart; ln++) {
-      newLines.push({ type: "context", oldLineNumber: ln, newLineNumber: ln, content: fullFileLines[ln - 1] });
+      newLines.push({ type: "context", oldLineNumber: ln + oldOffset, newLineNumber: ln, content: fullFileLines[ln - 1] });
     }
     result[hunkIndex] = {
       ...hunk,
       oldStart: hunk.oldStart - newLines.length,
+      oldLines: hunk.oldLines + newLines.length,
       newStart: hunk.newStart - newLines.length,
+      newLines: hunk.newLines + newLines.length,
       lines: [...newLines, ...hunk.lines],
     };
   } else {
     const hunkEnd = hunk.newStart + hunk.newLines - 1;
     const nextHunkStart = hunkIndex < hunks.length - 1 ? hunks[hunkIndex + 1].newStart : fullFileLines.length + 1;
     const end = Math.min(nextHunkStart - 1, hunkEnd + amount);
+    // Unchanged lines below the hunk sit at the same old/new offset as its end.
+    const oldOffset = (hunk.oldStart + hunk.oldLines) - (hunk.newStart + hunk.newLines);
     const newLines: DiffLine[] = [];
     for (let ln = hunkEnd + 1; ln <= end; ln++) {
-      newLines.push({ type: "context", oldLineNumber: ln, newLineNumber: ln, content: fullFileLines[ln - 1] });
+      newLines.push({ type: "context", oldLineNumber: ln + oldOffset, newLineNumber: ln, content: fullFileLines[ln - 1] });
     }
-    result[hunkIndex] = { ...hunk, lines: [...hunk.lines, ...newLines] };
+    result[hunkIndex] = {
+      ...hunk,
+      oldLines: hunk.oldLines + newLines.length,
+      newLines: hunk.newLines + newLines.length,
+      lines: [...hunk.lines, ...newLines],
+    };
   }
 
   return result;

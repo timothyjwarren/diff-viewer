@@ -29,7 +29,7 @@ const fileWithMixedAdds: DiffFile = {
 const comments: CommentHandlers = {
   threads: [], selection: null, composerArmed: false, quotedText: null,
   onGutterMouseDown: vi.fn(), onGutterMouseEnter: vi.fn(), onCreateThread: vi.fn(),
-  onCancelSelection: vi.fn(), onReply: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onResolve: vi.fn(),
+  onCancelSelection: vi.fn(), onReply: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn(), onResolve: vi.fn(), onFlag: vi.fn(), onRead: vi.fn(),
 };
 
 afterEach(() => vi.restoreAllMocks());

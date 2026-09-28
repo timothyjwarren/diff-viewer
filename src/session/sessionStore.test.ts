@@ -89,6 +89,46 @@ describe("SessionStore", () => {
     expect(store.snapshot.threads[0].resolved).toBe(false);
   });
 
+  it("flagThread toggles a thread's flag", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "question", pending: false, pinnedRef: "abc123",
+    });
+    expect(store.snapshot.threads[0].flagged).toBeFalsy();
+
+    store.flagThread(thread.id, true);
+    expect(store.snapshot.threads[0].flagged).toBe(true);
+
+    store.flagThread(thread.id, false);
+    expect(store.snapshot.threads[0].flagged).toBe(false);
+  });
+
+  it("markCommentRead marks an agent comment read by the user", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "question", pending: false, pinnedRef: "abc123",
+    });
+    const reply = store.addReply(thread.id, "agent", "answer");
+    expect(store.snapshot.threads[0].comments[1].readByUser).toBeFalsy();
+
+    store.markCommentRead(thread.id, reply.id);
+    expect(store.snapshot.threads[0].comments[1].readByUser).toBe(true);
+  });
+
+  it("resolving a thread marks its agent comments read", () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "question", pending: false, pinnedRef: "abc123",
+    });
+    store.addReply(thread.id, "agent", "answer");
+
+    store.resolveThread(thread.id, true);
+    expect(store.snapshot.threads[0].comments[1].readByUser).toBe(true);
+  });
+
   it("ackComment sets agentStatus to acked; unackComment clears it to a terminal cleared state", () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({

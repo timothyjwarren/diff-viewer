@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import type { CommentThread as CommentThreadData, CommentAuthor } from "../types";
 import { timeAgo } from "../lib/timeAgo";
 import { CommentMarkdown } from "./CommentMarkdown";
+import { ChevronIcon, FlagIcon } from "./Icons";
+import { useMarkReadWhenVisible } from "../lib/useMarkReadWhenVisible";
 
 function Avatar({ author }: { author: CommentAuthor }) {
   return (
@@ -40,19 +42,22 @@ function CommentEditor({ initialBody, onSave, onCancel }: {
         }}
       />
       <div className="comment-reply-actions">
-        <button onClick={save} disabled={!canSave}>Save</button>
-        <button className="comment-cancel-button" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" title="⌘↵" onClick={save} disabled={!canSave}>Save</button>
+        <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
 }
 
-export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: {
+export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
   onResolve: (threadId: string, resolved: boolean) => void;
+  onFlag?: (threadId: string, flagged: boolean) => void;
+  /** Called when an unread agent comment has been on screen. */
+  onRead?: (threadId: string, commentId: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -68,7 +73,12 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   const [editingId, setEditingId] = useState<string | null>(null);
   const expanded = focused || draft.length > 0;
   const collapsed = thread.resolved && !manualExpand;
+  const state = thread.resolved ? "resolved" : thread.comments.some(c => c.pending) ? "pending" : "open";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const unreadIds = collapsed
+    ? []
+    : thread.comments.filter(c => c.author === "agent" && !c.readByUser).map(c => c.id);
+  useMarkReadWhenVisible(unreadIds, onRead && (commentId => onRead(thread.id, commentId)));
 
   function submitReply(pending: boolean) {
     onReply(thread.id, draft, pending);
@@ -77,16 +87,16 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   }
 
   return (
-    <div id={`thread-${thread.id}`} className={`comment-thread${thread.resolved ? " comment-thread-resolved" : ""}`}>
+    <div id={`thread-${thread.id}`} className={`comment-thread comment-thread-${state}`}>
       <div className="comment-thread-header">
         {thread.resolved && (
           <button
             type="button"
-            className="diff-view-collapse-toggle"
+            className="btn-icon"
             aria-label={collapsed ? "Show resolved thread" : "Hide resolved thread"}
             onClick={() => setManualExpand(v => !v)}
           >
-            <span className={`diff-view-collapse-chevron${collapsed ? "" : " diff-view-collapse-chevron-open"}`} />
+            <ChevronIcon className={`chevron${collapsed ? "" : " chevron-open"}`} />
           </button>
         )}
         {thread.resolved && (
@@ -97,7 +107,17 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
         {thread.outdated && <span className="comment-thread-outdated-badge">Outdated</span>}
         <button
           type="button"
-          className="comment-thread-resolve-button"
+          className={`btn-icon comment-thread-flag-button${thread.flagged ? " comment-thread-flag-button-on" : ""}`}
+          aria-label={thread.flagged ? "Unflag thread" : "Flag thread"}
+          aria-pressed={Boolean(thread.flagged)}
+          title={thread.flagged ? "Unflag" : "Flag to come back to"}
+          onClick={() => onFlag?.(thread.id, !thread.flagged)}
+        >
+          <FlagIcon filled={thread.flagged} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm comment-thread-resolve-button"
           onClick={() => { onResolve(thread.id, !thread.resolved); setManualExpand(false); }}
         >
           {thread.resolved ? "Unresolve" : "Resolve"}
@@ -136,8 +156,8 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
                 )}
                 {comment.author === "user" && editingId !== comment.id && (
                   <div className="comment-actions">
-                    <button onClick={() => setEditingId(comment.id)}>Edit</button>
-                    <button onClick={() => onDelete(thread.id, comment.id)}>Delete</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingId(comment.id)}>Edit</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => onDelete(thread.id, comment.id)}>Delete</button>
                   </div>
                 )}
               </div>
@@ -159,10 +179,10 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
             />
             {expanded && (
               <div className="comment-reply-actions">
-                <button onMouseDown={e => e.preventDefault()} onClick={() => submitReply(false)}>
+                <button className="btn btn-primary" title="⌘↵" onMouseDown={e => e.preventDefault()} onClick={() => submitReply(false)}>
                   Add single comment
                 </button>
-                <button onMouseDown={e => e.preventDefault()} onClick={() => submitReply(true)}>
+                <button className="btn" onMouseDown={e => e.preventDefault()} onClick={() => submitReply(true)}>
                   Add to review
                 </button>
               </div>

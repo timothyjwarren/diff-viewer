@@ -1,20 +1,114 @@
+/*
+ * Design tokens. Light values are the default; dark values apply when the
+ * system prefers a dark colour scheme.
+ */
 :root {
-  color-scheme: dark;
-  --bg: #0d1117;
-  --bg-elevated: #161b22;
-  --border: #30363d;
-  --text: #c9d1d9;
-  --text-muted: #8b949e;
-  --accent: #58a6ff;
-  --add-bg: rgba(46, 160, 67, 0.15);
-  --add-bg-strong: rgba(46, 160, 67, 0.3);
-  --add-bg-inline: rgba(46, 160, 67, 0.4);
-  --del-bg: rgba(248, 81, 73, 0.15);
-  --del-bg-strong: rgba(248, 81, 73, 0.3);
-  --del-bg-inline: rgba(248, 81, 73, 0.4);
-  /* Same amber as .uncommitted-banner, for the added/context lines of a file with an uncommitted edit. */
-  --uncommitted-add-bg: rgba(242, 201, 138, 0.15);
-  --uncommitted-add-bg-strong: rgba(242, 201, 138, 0.3);
+  color-scheme: light dark;
+
+  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --sidebar-width: 272px;
+
+  --bg: #ffffff;
+  --surface: #f6f7f9;
+  --surface-raised: #ffffff;
+  --gutter: #fafafb;
+  --border: #e2e4e9;
+  --border-subtle: #eceef1;
+  --border-strong: #cfd2d9;
+  --text: #1c1d21;
+  --text-muted: #5f646e;
+  --text-faint: #8f949d;
+  --hover: rgba(0, 0, 0, 0.045);
+  --active: rgba(0, 0, 0, 0.07);
+  --line-hover: rgba(0, 0, 0, 0.025);
+
+  --accent: #4a63e7;
+  --accent-hover: #3b52d4;
+  --accent-soft: rgba(74, 99, 231, 0.1);
+  --on-accent: #ffffff;
+  --success: #1f883d;
+  --success-hover: #1a7433;
+  --success-soft: rgba(31, 136, 61, 0.1);
+  --on-success: #ffffff;
+  --danger: #cf2f3a;
+  --danger-soft: rgba(207, 47, 58, 0.09);
+  --warning: #946200;
+  --warning-soft: rgba(212, 160, 23, 0.16);
+  --agent: #7c4ddb;
+  /* Pink, kept clear of --danger so a flag never reads as a deletion. */
+  --flag: #d6307f;
+
+  --add-bg: rgba(31, 136, 61, 0.08);
+  --add-bg-strong: rgba(31, 136, 61, 0.15);
+  --add-bg-inline: rgba(31, 136, 61, 0.24);
+  --del-bg: rgba(207, 47, 58, 0.07);
+  --del-bg-strong: rgba(207, 47, 58, 0.14);
+  --del-bg-inline: rgba(207, 47, 58, 0.22);
+  /* Amber, like .uncommitted-banner, for the added lines of a file with an uncommitted edit. */
+  --uncommitted-add-bg: rgba(212, 160, 23, 0.14);
+  --uncommitted-add-bg-strong: rgba(212, 160, 23, 0.24);
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.16);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
+  --shadow-popover: 0 12px 32px rgba(15, 20, 30, 0.14), 0 2px 6px rgba(15, 20, 30, 0.06);
+  /* File headers: tinted toward the accent so they stand out from code while scrolling. */
+  --file-header-bg: #e5e8f3;
+  --file-header-border: #c5cadc;
+  --file-header-shadow: 0 4px 10px -4px rgba(15, 20, 30, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0f11;
+    --surface: #16171a;
+    --surface-raised: #1d1f23;
+    --gutter: #121316;
+    --border: #2a2c31;
+    --border-subtle: #1f2125;
+    --border-strong: #3a3d44;
+    --text: #e6e7ea;
+    --text-muted: #9a9ea8;
+    --text-faint: #6b6f79;
+    --hover: rgba(255, 255, 255, 0.05);
+    --active: rgba(255, 255, 255, 0.09);
+    --line-hover: rgba(255, 255, 255, 0.035);
+
+    --accent: #7b93ff;
+    --accent-hover: #93a6ff;
+    --accent-soft: rgba(123, 147, 255, 0.14);
+    --on-accent: #0e0f11;
+    --success: #4ac26b;
+    --success-hover: #5fd07e;
+    --success-soft: rgba(74, 194, 107, 0.14);
+    --on-success: #0e0f11;
+    --danger: #f26b6b;
+    --danger-soft: rgba(242, 107, 107, 0.13);
+    --warning: #e2a93b;
+    --warning-soft: rgba(226, 169, 59, 0.15);
+    --agent: #b28bff;
+    --flag: #f472b6;
+
+    --add-bg: rgba(74, 194, 107, 0.1);
+    --add-bg-strong: rgba(74, 194, 107, 0.18);
+    --add-bg-inline: rgba(74, 194, 107, 0.32);
+    --del-bg: rgba(242, 107, 107, 0.1);
+    --del-bg-strong: rgba(242, 107, 107, 0.18);
+    --del-bg-inline: rgba(242, 107, 107, 0.32);
+    --uncommitted-add-bg: rgba(226, 169, 59, 0.12);
+    --uncommitted-add-bg-strong: rgba(226, 169, 59, 0.22);
+
+    --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.26);
+    --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --file-header-bg: #252a38;
+    --file-header-border: #3a4054;
+    --file-header-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.7);
+  }
 }
 
 * {
@@ -24,15 +118,199 @@
 body {
   background: var(--bg);
   color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ---------- Shared controls ---------- */
+
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+}
+
+.chevron-open {
+  transform: rotate(90deg);
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="separator"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: 500 12.5px var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--accent-hover);
+}
+
+.btn-success {
+  border-color: transparent;
+  background: var(--success);
+  color: var(--on-success);
+}
+
+.btn-success:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--success-hover);
+}
+
+.btn-danger {
+  border-color: transparent;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+}
+
+.btn-sm {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.btn-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-icon:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: 13px/1.45 var(--font-ui);
+  resize: vertical;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, min-height 0.1s ease;
+}
+
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.file-status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  font: 700 10px var(--font-mono);
+}
+
+.file-status-added { color: var(--success); background: var(--success-soft); }
+.file-status-modified { color: var(--warning); background: var(--warning-soft); }
+.file-status-deleted { color: var(--danger); background: var(--danger-soft); }
+.file-status-renamed { color: var(--accent); background: var(--accent-soft); }
+
+.diffstat {
+  flex: none;
+  display: inline-flex;
+  gap: 6px;
+  font: 500 12px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.diffstat-added { color: var(--success); }
+.diffstat-deleted { color: var(--danger); }
+
+/* ---------- Layout ---------- */
 
 .app {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: var(--sidebar-width) 1fr;
   height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   font-size: 14px;
+}
+
+.sidebar-column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .sidebar {
@@ -41,21 +319,46 @@ body {
    * beneath the rows' transparent buttons. */
   position: relative;
   isolation: isolate;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  border-right: 1px solid var(--border);
-  padding: 12px 8px;
-  background: var(--bg-elevated);
+  padding: 0 8px 12px;
+  background: var(--surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.sidebar-header {
+  margin: 0 4px 4px;
+  padding: 16px 4px 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-title {
-  margin: 0 4px 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
+  margin: 0;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
   color: var(--text);
+}
+
+.sidebar-summary {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-title + .sidebar-summary {
+  margin-top: 6px;
+}
+
+.sidebar-summary .diffstat-added,
+.sidebar-summary .diffstat-deleted {
+  font-family: var(--font-mono);
 }
 
 .sidebar-viewport-indicator {
@@ -63,10 +366,17 @@ body {
   z-index: -1;
   left: 8px;
   right: 8px;
-  border-radius: 4px;
-  background: rgba(88, 166, 255, 0.12);
-  box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
   pointer-events: none;
+  /* Glides between rows as files scroll in and out of view. */
+  transition: top 0.2s ease, height 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-viewport-indicator {
+    transition: none;
+  }
 }
 
 .main-pane {
@@ -87,19 +397,19 @@ main::-webkit-scrollbar {
 
 main::-webkit-scrollbar-track {
   background: var(--bg);
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--border-subtle);
 }
 
 main::-webkit-scrollbar-thumb {
   min-height: 24px;
-  background: rgba(139, 148, 158, 0.35);
+  background: var(--scrollbar-thumb);
   background-clip: padding-box;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   border-radius: 6px;
 }
 
 main::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(139, 148, 158, 0.55);
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 /* Laid over main's scrollbar; width is set inline to the scrollbar's. Only
@@ -138,7 +448,7 @@ main::-webkit-scrollbar-thumb:hover {
 }
 
 .scrollbar-marker-pending::before {
-  background: #d29922;
+  background: var(--warning);
 }
 
 .scrollbar-marker-resolved::before {
@@ -146,11 +456,35 @@ main::-webkit-scrollbar-thumb:hover {
   opacity: 0.45;
 }
 
+.scrollbar-marker-flagged::before {
+  top: 0.5px;
+  height: 4px;
+  background: var(--flag);
+}
+
 .scrollbar-marker:hover::before {
   left: 0;
   right: 0;
-  filter: brightness(1.3);
+  filter: brightness(1.2);
 }
+
+/* Unread threads are dots rather than lines; colour still shows their state. */
+.scrollbar-marker-unread {
+  height: 9px;
+  margin-top: -4px;
+}
+
+.scrollbar-marker-unread::before,
+.scrollbar-marker-unread:hover::before {
+  left: calc(50% - 3.5px);
+  right: auto;
+  top: 1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* ---------- Sidebar ---------- */
 
 .sidebar-repo {
   position: relative;
@@ -164,136 +498,21 @@ main::-webkit-scrollbar-thumb:hover {
 .sidebar-repo-header {
   position: relative;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 6px;
-  margin: 12px 4px 4px;
+  margin: 14px 4px 4px 8px;
 }
 
 .sidebar-repo-name {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.commit-chooser {
-  flex: 0 0 auto;
-}
-
-.commit-chooser-trigger {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-.commit-chooser-trigger:hover {
-  background: rgba(177, 186, 196, 0.12);
-}
-
-.commit-chooser-trigger-narrowed {
-  color: var(--accent);
-}
-
-.commit-chooser-popover {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 10;
-  list-style: none;
-  margin: 0;
-  padding: 4px 0;
-  max-height: 320px;
-  overflow-y: auto;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
-  user-select: none;
-}
-
-.commit-chooser-reset-row {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 4px;
-  margin-bottom: 4px;
-}
-
-.commit-chooser-reset,
-.commit-chooser-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  color: var(--text);
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  gap: 8px;
-}
-
-.commit-chooser-reset:hover,
-.commit-chooser-row:hover {
-  background: rgba(177, 186, 196, 0.12);
-}
-
-.commit-chooser-row-selected {
-  background: var(--add-bg);
-  border-left: 2px solid var(--accent);
-}
-
-.commit-chooser-check {
-  color: var(--accent);
-}
-
-.commit-chooser-sha {
-  flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--text-muted);
-}
-
-.commit-chooser-subject {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.commit-chooser-author {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.commit-chooser-row-uncommitted .commit-chooser-subject {
-  font-style: italic;
-  color: #d8a53d;
-}
-
-.commit-chooser-row-uncommitted .commit-chooser-sha {
-  color: #d8a53d;
-}
-
-.commit-chooser-excluded-badge {
-  display: inline-block;
-  margin-left: 6px;
-  font-size: 0.75em;
-  background: #9e6a03;
-  color: #fff;
-  border-radius: 3px;
-  padding: 0 6px;
 }
 
 .sidebar ul {
@@ -305,33 +524,21 @@ main::-webkit-scrollbar-thumb:hover {
 .sidebar li button {
   display: flex;
   align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
   background: none;
   border: none;
   color: var(--text);
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 12.5px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  font: 12.5px/18px var(--font-ui);
   cursor: pointer;
 }
 
 .sidebar li button:hover {
-  background: rgba(177, 186, 196, 0.12);
+  background: var(--hover);
 }
-
-.sidebar-file-status {
-  flex: 0 0 14px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  margin-right: 6px;
-}
-
-.sidebar-file-status-added { color: #3fb950; }
-.sidebar-file-status-modified { color: #d29922; }
-.sidebar-file-status-deleted { color: #f85149; }
-.sidebar-file-status-renamed { color: var(--accent); }
 
 .sidebar-file-name {
   /* Zero basis: the width comes from the row, never from the text, so
@@ -344,8 +551,141 @@ main::-webkit-scrollbar-thumb:hover {
 }
 
 .sidebar-file-dir {
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
+
+.sidebar-file-threads {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Commit chooser ---------- */
+
+.commit-chooser {
+  flex: 0 0 auto;
+}
+
+.commit-chooser-trigger {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font: 11px var(--font-ui);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.commit-chooser-trigger:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.commit-chooser-trigger-narrowed {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.commit-chooser-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  user-select: none;
+}
+
+.commit-chooser-reset-row {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.commit-chooser-reset,
+.commit-chooser-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  padding: 5px 8px;
+  font: 12px var(--font-ui);
+  cursor: pointer;
+  gap: 8px;
+}
+
+.commit-chooser-reset:hover,
+.commit-chooser-row:hover {
+  background: var(--hover);
+}
+
+.commit-chooser-row-selected {
+  background: var(--accent-soft);
+}
+
+.commit-chooser-check {
+  color: var(--accent);
+}
+
+.commit-chooser-sha {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+
+.commit-chooser-subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-chooser-author {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.commit-chooser-row-uncommitted .commit-chooser-subject {
+  font-style: italic;
+  color: var(--warning);
+}
+
+.commit-chooser-row-uncommitted .commit-chooser-sha {
+  color: var(--warning);
+}
+
+.commit-chooser-excluded-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+/* ---------- Diff ---------- */
 
 main {
   overflow-y: auto;
@@ -354,10 +694,10 @@ main {
    * stuck header that isn't covered by anything — letting the file's
    * own already-scrolled-past content peek through it. Top spacing is
    * applied to the first file card instead (see .file-anchor). */
-  padding: 0 16px 16px;
+  padding: 0 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 28px;
   /* Collapsing a file removes its body, shrinking the page below it.
    * Without this, the browser's scroll-anchoring tries to keep whatever
    * content ends up under the old scroll position in view, which reads
@@ -366,17 +706,19 @@ main {
 }
 
 .file-anchor:first-child {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .empty-state {
+  margin: 64px auto;
   color: var(--text-muted);
+  font-size: 13px;
 }
 
 .diff-view {
   border: 1px solid var(--border);
-  border-radius: 6px;
-  scroll-margin-top: 16px;
+  border-radius: var(--radius-lg);
+  scroll-margin-top: 12px;
 }
 
 /*
@@ -405,19 +747,32 @@ main {
    * whenever both happen to be stuck in the same on-screen area. */
   z-index: 3;
   background: var(--bg);
-  padding-top: 6px;
+  padding-top: 8px;
+  /* Pulls the opaque strip over the file card's top border so the border
+   * doesn't show above the header's rounded corners when stuck. */
+  margin: -1px -1px 0;
 }
 
 .diff-view-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 6px 6px 0 0;
+  min-height: 48px;
+  background: var(--file-header-bg);
+  border: 1px solid var(--file-header-border);
+  box-shadow: var(--file-header-shadow);
+  padding: 6px 8px 6px 6px;
+  font-size: 15px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* A collapsed file is just its header, which draws the whole card outline. */
+.diff-view-collapsed {
+  border-color: transparent;
+}
+
+.diff-view-collapsed .diff-view-header {
+  border-radius: var(--radius-lg);
 }
 
 .diff-view-title {
@@ -428,58 +783,36 @@ main {
   white-space: nowrap;
 }
 
-.diff-view-collapse-toggle {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.diff-view-collapse-toggle:hover {
-  background: rgba(177, 186, 196, 0.12);
-  color: var(--text);
-}
-
-.diff-view-collapse-chevron {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 5px solid currentColor;
-  transition: transform 0.15s ease;
-}
-
-.diff-view-collapse-chevron-open {
-  transform: rotate(90deg);
-}
-
-.diff-view-header button:not(.diff-view-collapse-toggle) {
-  flex: 0 0 auto;
+.diff-view-repo {
+  margin-right: 8px;
   font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
+  color: var(--text-muted);
 }
 
-.diff-view-header button:not(.diff-view-collapse-toggle):hover {
-  background: rgba(177, 186, 196, 0.12);
+.diff-view-dir {
+  color: var(--text-muted);
+}
+
+.diff-view-base {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.uncommitted-banner {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-bottom: 1px solid var(--border);
 }
 
 .diff-view-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--bg);
 }
 
 .diff-view-body-single {
@@ -489,10 +822,11 @@ main {
 .diff-pane {
   overflow-x: auto;
   user-select: text;
-  border-left: 1px solid var(--border);
   /* Lets descendants size themselves against this pane's own (grid-determined,
    * scroll-independent) width via cqi units — see .comment-thread below. */
   container-type: inline-size;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 /*
@@ -518,13 +852,10 @@ main {
   min-width: 100%;
 }
 
-.diff-pane:first-child {
-  border-left: none;
-}
-
 .diff-pane-divider {
   cursor: col-resize;
   background: var(--border);
+  transition: background-color 0.12s ease;
 }
 
 .diff-pane-divider:hover {
@@ -543,9 +874,9 @@ main {
 .expand-strip {
   display: flex;
   flex-direction: column;
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .diff-hunk:first-child .expand-strip {
@@ -561,38 +892,29 @@ main {
   padding: 0;
   border: none;
   background: none;
+  color: var(--text-faint);
+  font-size: 13px;
   cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
 .expand-strip-button:hover {
-  background: rgba(88, 166, 255, 0.12);
-}
-
-.expand-strip-button:hover .expand-strip-chevron {
-  border-bottom-color: var(--accent);
-  border-top-color: var(--accent);
-}
-
-.expand-strip-chevron {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .expand-strip-chevron-up {
-  border-bottom: 5px solid var(--text-muted);
+  transform: rotate(-90deg);
 }
 
 .expand-strip-chevron-down {
-  border-top: 5px solid var(--text-muted);
+  transform: rotate(90deg);
 }
 
 .diff-line {
   display: flex;
   white-space: pre;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 20px;
   tab-size: 4;
@@ -606,36 +928,43 @@ main {
    * over the length of the file. */
   height: 20px;
   cursor: default;
-  background: rgba(110, 118, 129, 0.04);
+  background: var(--line-hover);
 }
 
 .diff-line-gutter {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 40px;
-  padding: 0 8px 0 4px;
+  flex: 0 0 48px;
+  padding: 0 10px 0 4px;
   user-select: none;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border-subtle);
   cursor: pointer;
+  font-variant-numeric: tabular-nums;
   /* Keeps the clickable line-number area reachable without scrolling back
    * left when a diff pane is scrolled horizontally. Needs an opaque
    * background since code content scrolls underneath it. */
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--bg-elevated);
+  background: var(--gutter);
 }
 
 .diff-line-number {
-  color: var(--text-muted);
-  opacity: 0.75;
+  color: var(--text-faint);
 }
 
 .diff-line-add-icon {
   display: none;
-  color: var(--accent);
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 700;
+  line-height: 1;
 }
 
 .diff-line-gutter:hover .diff-line-number {
@@ -643,23 +972,27 @@ main {
 }
 
 .diff-line-gutter:hover .diff-line-add-icon {
-  display: inline;
+  display: inline-flex;
 }
 
 .diff-line-marker {
-  flex: 0 0 16px;
+  flex: 0 0 18px;
   text-align: center;
   user-select: none;
-  opacity: 0.85;
+  color: var(--text-faint);
 }
+
+.diff-line-add .diff-line-marker { color: var(--success); }
+.diff-line-del .diff-line-marker { color: var(--danger); }
 
 .diff-line-code {
   flex: 1 1 auto;
   padding-right: 12px;
+  color: var(--text);
 }
 
 .diff-line:hover {
-  background: rgba(177, 186, 196, 0.08);
+  background: var(--line-hover);
 }
 
 .diff-line-add {
@@ -678,6 +1011,10 @@ main {
   background: var(--del-bg-strong);
 }
 
+.diff-inline-change {
+  border-radius: 2px;
+}
+
 .diff-line-add .diff-inline-change {
   background: var(--add-bg-inline);
 }
@@ -694,15 +1031,15 @@ main {
  * hover still wins over add/del at rest.
  */
 .diff-line:hover .diff-line-gutter {
-  background: linear-gradient(rgba(177, 186, 196, 0.08), rgba(177, 186, 196, 0.08)), var(--bg-elevated);
+  background: linear-gradient(var(--line-hover), var(--line-hover)), var(--gutter);
 }
 
 .diff-line-add .diff-line-gutter {
-  background: linear-gradient(var(--add-bg), var(--add-bg)), var(--bg-elevated);
+  background: linear-gradient(var(--add-bg), var(--add-bg)), var(--gutter);
 }
 
 .diff-line-add:hover .diff-line-gutter {
-  background: linear-gradient(var(--add-bg-strong), var(--add-bg-strong)), var(--bg-elevated);
+  background: linear-gradient(var(--add-bg-strong), var(--add-bg-strong)), var(--gutter);
 }
 
 /* An added line that only exists in the uncommitted working tree (not at HEAD) gets amber instead of green, matching .uncommitted-banner — the rest of the file's committed additions stay green. */
@@ -714,25 +1051,33 @@ main {
   background: var(--uncommitted-add-bg-strong);
 }
 
+.diff-line-uncommitted .diff-line-marker {
+  color: var(--warning);
+}
+
 .diff-line-uncommitted .diff-line-gutter {
-  background: linear-gradient(var(--uncommitted-add-bg), var(--uncommitted-add-bg)), var(--bg-elevated);
+  background: linear-gradient(var(--uncommitted-add-bg), var(--uncommitted-add-bg)), var(--gutter);
 }
 
 .diff-line-uncommitted:hover .diff-line-gutter {
-  background: linear-gradient(var(--uncommitted-add-bg-strong), var(--uncommitted-add-bg-strong)), var(--bg-elevated);
+  background: linear-gradient(var(--uncommitted-add-bg-strong), var(--uncommitted-add-bg-strong)), var(--gutter);
 }
 
 .diff-line-del .diff-line-gutter {
-  background: linear-gradient(var(--del-bg), var(--del-bg)), var(--bg-elevated);
+  background: linear-gradient(var(--del-bg), var(--del-bg)), var(--gutter);
 }
 
 .diff-line-del:hover .diff-line-gutter {
-  background: linear-gradient(var(--del-bg-strong), var(--del-bg-strong)), var(--bg-elevated);
+  background: linear-gradient(var(--del-bg-strong), var(--del-bg-strong)), var(--gutter);
 }
 
-.diff-line-selected {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+.diff-line.diff-line-selected {
+  background: var(--accent-soft);
+}
+
+.diff-line.diff-line-selected .diff-line-gutter {
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--gutter);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .diff-line-code span:not(.diff-inline-change),
@@ -743,6 +1088,25 @@ main {
   padding: 0;
 }
 
+/* Shiki gives each token both themes' colours; show the one for the current scheme. */
+.diff-line-code span,
+.file-view-line-code span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+}
+
+@media (prefers-color-scheme: dark) {
+  .diff-line-code span,
+  .file-view-line-code span {
+    color: var(--shiki-dark);
+    font-style: var(--shiki-dark-font-style);
+    font-weight: var(--shiki-dark-font-weight);
+  }
+}
+
+/* ---------- Comments ---------- */
+
 .comment-thread,
 .comment-composer {
   /* .diff-pane-content is a display:table sized to its widest code line
@@ -750,16 +1114,34 @@ main {
    * otherwise stretch to that content width instead of the pane's visible
    * width — pin to the pane's actual width via container query units so
    * comment text wraps at the panel edge regardless of how long code lines
-   * in the file are. */
-  width: 100cqi;
-  border-top: 1px solid var(--border);
-  padding: 8px 12px;
-  background: var(--bg-elevated);
+   * in the file are. The margins are included: width + 2 × 12px = 100cqi. */
+  position: relative;
+  width: calc(100cqi - 24px);
+  margin: 8px 12px;
+  padding: 6px 12px 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-family: var(--font-ui);
   font-size: 13px;
+  white-space: normal;
+}
+
+.comment-composer {
+  padding-top: 10px;
+}
+
+.comment-thread-pending {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+.comment-thread:has(.comment-thread-flag-button-on) {
+  border-color: color-mix(in srgb, var(--flag) 45%, var(--border));
 }
 
 .comment-thread-resolved {
-  background: var(--bg);
+  padding-bottom: 6px;
+  background: transparent;
 }
 
 .comment-thread-header {
@@ -768,49 +1150,59 @@ main {
   gap: 6px;
 }
 
+/* An open thread's header holds only its Resolve button (and maybe the
+ * Outdated badge), so it sits in the first comment's otherwise empty
+ * top-right corner instead of taking a row of its own. */
+.comment-thread-open .comment-thread-header,
+.comment-thread-pending .comment-thread-header {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 .comment-thread-resolved-label {
   flex: 1 1 auto;
   font-size: 12px;
   color: var(--text-muted);
 }
 
-.comment-thread-resolve-button {
+.comment-thread-flag-button {
   margin-left: auto;
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
 }
 
-.comment-thread-resolve-button:hover {
-  background: rgba(177, 186, 196, 0.12);
+.comment-thread-flag-button-on,
+.comment-thread-flag-button-on:hover {
+  color: var(--flag);
 }
 
 .comment {
   display: flex;
-  gap: 8px;
-  padding: 6px 0;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.comment + .comment {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .comment-avatar {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: #fff;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
-.comment-avatar-user { background: #388bfd; }
-.comment-avatar-agent { background: #8957e5; }
+.comment-avatar-user { background: var(--accent); color: var(--on-accent); }
+.comment-avatar-agent { background: var(--agent); color: var(--on-accent); }
 
 .comment-body {
   flex: 1 1 auto;
@@ -820,8 +1212,20 @@ main {
 .comment-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 22px;
   font-size: 12px;
+}
+
+/* Clears the absolutely positioned header of an open thread. */
+.comment-thread-open .comment-thread-header + .comment .comment-meta,
+.comment-thread-pending .comment-thread-header + .comment .comment-meta {
+  padding-right: 120px;
+}
+
+.comment-thread:has(.comment-thread-outdated-badge) .comment-thread-header + .comment .comment-meta {
+  padding-right: 200px;
 }
 
 .comment-author {
@@ -830,30 +1234,30 @@ main {
 }
 
 .comment-time {
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
-.comment-pending-badge {
-  font-size: 0.75em;
-  background: #9e6a03;
-  color: #fff;
-  border-radius: 3px;
-  padding: 0 6px;
+.comment-pending-badge,
+.comment-thread-outdated-badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .comment-thread-outdated-badge {
-  font-size: 0.75em;
-  background: #7a4a12;
-  color: #f2c98a;
-  border-radius: 3px;
-  padding: 0 6px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--warning-soft);
 }
 
 .comment-acked-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.75em;
+  font-size: 11px;
   color: var(--accent);
 }
 
@@ -874,67 +1278,20 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.75em;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--text-faint);
 }
 
 .comment-seen-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-muted);
-}
-
-.uncommitted-banner {
-  padding: 6px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f2c98a;
-  background: #4a2f0a;
-  border-bottom: 1px solid var(--border);
-}
-
-.new-comment-banner {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #0d1117;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  z-index: 10;
-}
-
-.new-comment-banner:hover {
-  filter: brightness(1.08);
-}
-
-.new-comment-banner-arrow {
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-}
-
-.new-comment-banner-arrow-down {
-  border-top: 5px solid currentColor;
-}
-
-.new-comment-banner-arrow-up {
-  border-bottom: 5px solid currentColor;
+  background: var(--text-faint);
 }
 
 .comment-markdown {
-  margin: 4px 0 2px;
+  margin: 2px 0;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -964,30 +1321,28 @@ main {
 
 .comment-markdown blockquote {
   padding: 0 10px;
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--border-strong);
   color: var(--text-muted);
 }
 
 .comment-markdown code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.9em;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--active);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
 }
 
 .comment-markdown pre {
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   padding: 8px 10px;
   overflow-x: auto;
 }
 
 .comment-markdown pre code {
   background: none;
-  border: none;
   padding: 0;
   font-size: 12px;
   white-space: pre;
@@ -999,146 +1354,164 @@ main {
   margin-top: 4px;
 }
 
-.comment-reply-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
+/* Edit/Delete stay out of the way until the comment is hovered or focused. */
+.comment-actions {
+  display: flex;
+  gap: 2px;
+  margin: 2px 0 0 -8px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
 }
 
-.comment-actions button,
-.comment-reply-actions button {
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  margin-right: 6px;
+.comment:hover .comment-actions,
+.comment:focus-within .comment-actions {
+  opacity: 1;
 }
 
-.comment-actions button:hover,
-.comment-reply-actions button:hover {
-  background: rgba(177, 186, 196, 0.12);
+.comment-reply {
+  margin-top: 4px;
 }
 
-.comment-cancel-button {
-  border-color: transparent !important;
-  color: var(--text-muted) !important;
-  background: transparent !important;
-}
-
-.comment-cancel-button:hover {
-  color: var(--text) !important;
-}
-
-.comment-thread textarea,
-.comment-composer textarea,
-.review-bar textarea {
-  width: 100%;
-  min-height: 32px;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-family: inherit;
-  font-size: 13px;
-  resize: vertical;
-  margin-bottom: 6px;
-  transition: min-height 0.1s ease;
+.comment-reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .comment-thread textarea.comment-reply-expanded {
-  min-height: 60px;
+  min-height: 64px;
 }
 
+.new-comment-banner {
+  position: fixed;
+  bottom: 24px;
+  /* Centred over the diff area, to the right of the sidebar. */
+  left: calc(50% + var(--sidebar-width) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 600 13px var(--font-ui);
+  cursor: pointer;
+  box-shadow: var(--shadow-popover);
+  z-index: 10;
+}
+
+.new-comment-banner:hover {
+  background: var(--accent-hover);
+}
+
+.new-comment-banner-arrow {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+.new-comment-banner-arrow-down {
+  border-top: 5px solid currentColor;
+}
+
+.new-comment-banner-arrow-up {
+  border-bottom: 5px solid currentColor;
+}
+
+/* ---------- Review ---------- */
+
 .review-bar {
-  grid-column: 1 / -1;
+  position: relative;
+  flex: none;
   border-top: 1px solid var(--border);
-  background: var(--bg-elevated);
+  padding: 10px 12px;
 }
 
 .review-bar-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 10px;
 }
 
 .review-bar-toggle {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  background: #238636;
-  color: #fff;
+  margin-left: auto;
 }
 
-.review-bar-toggle:hover {
-  background: #2ea043;
+.review-bar-pending {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
 }
 
 .review-bar-popover {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 12px;
+  z-index: 20;
+  width: 380px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+
+.review-bar-popover textarea {
+  min-height: 88px;
+  margin-bottom: 10px;
 }
 
 .review-bar-actions {
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
-.review-bar-actions button {
-  font-size: 13px;
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.review-bar-actions button:hover {
-  background: rgba(177, 186, 196, 0.12);
-}
-
-.review-bar-primary {
-  border-color: #2ea043 !important;
-  color: #3fb950;
-}
-
 .review-submitted-badge {
-  color: #3fb950;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
   font-size: 12px;
   font-weight: 600;
 }
 
+/* ---------- Full-file view ---------- */
+
 .file-view-page {
   min-height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   font-size: 14px;
 }
 
 .file-view-header {
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: var(--bg-elevated);
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 10px 16px;
   font-size: 13px;
-  font-weight: 600;
+}
+
+.file-view-ref {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--active);
+  color: var(--text-muted);
+  font: 11px var(--font-mono);
 }
 
 .file-view-body {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 20px;
   tab-size: 4;
@@ -1148,20 +1521,25 @@ main {
   display: flex;
 }
 
+.file-view-line:hover {
+  background: var(--line-hover);
+}
+
 .file-view-line-number {
-  flex: 0 0 48px;
+  flex: 0 0 56px;
   text-align: right;
   padding: 0 12px 0 4px;
-  color: var(--text-muted);
-  opacity: 0.75;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
   user-select: none;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border-subtle);
   position: sticky;
   left: 0;
-  background: var(--bg-elevated);
+  background: var(--gutter);
 }
 
 .file-view-line-code {
   padding: 0 12px;
   white-space: pre;
+  color: var(--text);
 }

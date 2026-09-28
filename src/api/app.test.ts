@@ -248,6 +248,51 @@ describe("api app", () => {
     expect(threads.body[0].comments[0].agentStatus).toBe("cleared");
   });
 
+  it("PATCH .../flag sets and clears a thread's flag", async () => {
+    const app = createApp(await buildStore());
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "come back to this", pending: false, toRef: "HEAD",
+    });
+
+    const flagRes = await request(app).patch(`/api/threads/${threadRes.body.id}/flag`).send({ flagged: true });
+    expect(flagRes.status).toBe(204);
+    let threads = await request(app).get("/api/threads");
+    expect(threads.body[0].flagged).toBe(true);
+
+    await request(app).patch(`/api/threads/${threadRes.body.id}/flag`).send({ flagged: false });
+    threads = await request(app).get("/api/threads");
+    expect(threads.body[0].flagged).toBe(false);
+  });
+
+  it("flag on an unknown thread returns 404", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).patch("/api/threads/nope/flag").send({ flagged: true });
+    expect(res.status).toBe(404);
+  });
+
+  it("POST .../read marks a comment read by the user", async () => {
+    const app = createApp(await buildStore());
+    const threadRes = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false, toRef: "HEAD",
+    });
+    const replyRes = await request(app).post(`/api/threads/${threadRes.body.id}/comments`).send({
+      author: "agent", body: "because",
+    });
+
+    const readRes = await request(app).post(`/api/threads/${threadRes.body.id}/comments/${replyRes.body.id}/read`);
+    expect(readRes.status).toBe(204);
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body[0].comments[1].readByUser).toBe(true);
+  });
+
+  it("read on an unknown thread/comment returns 404", async () => {
+    const app = createApp(await buildStore());
+    const res = await request(app).post("/api/threads/nope/comments/nope/read");
+    expect(res.status).toBe(404);
+  });
+
   it("ack on an unknown thread/comment returns 404", async () => {
     const app = createApp(await buildStore());
     const res = await request(app).post("/api/threads/nope/comments/nope/ack");
