@@ -264,6 +264,97 @@ describe("SessionStore", () => {
     expect(reply.createdAt).toBe("2020-06-15T12:00:00.000Z");
   });
 
+  it("setDescription sets and replaces the session description", () => {
+    const store = SessionStore.create(repos, "s-desc", "t", dataDir);
+    expect(store.snapshot.description).toBeUndefined();
+    store.setDescription("first");
+    store.setDescription("second");
+    expect(store.snapshot.description).toBe("second");
+  });
+
+  it("reset clears threads, verdicts, and snapshots but keeps the session and its notification log", () => {
+    const store = SessionStore.create(repos, "s-reset", "t", dataDir);
+    store.setDescription("d");
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc123",
+    });
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 2, lineEnd: 2, side: "new",
+      author: "user", body: "draft", pending: true, pinnedRef: "abc123",
+    });
+    store.ensureContentSnapshot("abc123", "a.txt", "one\n");
+    store.addVerdict("comment");
+    const notifications = store.snapshot.notifications;
+
+    store.reset();
+
+    const snap = store.snapshot;
+    expect(snap.threads).toEqual([]);
+    expect(snap.verdicts).toEqual([]);
+    expect(snap.contentSnapshots).toEqual({});
+    expect(snap.notifications).toEqual(notifications);
+    expect(snap).toMatchObject({ title: "t", description: "d", repos });
+    expect(snap.commentsReplaced?.by).toBe("reset");
+    expect(Date.parse(snap.commentsReplaced!.at)).not.toBeNaN();
+  });
+
+  function seedComments(store: SessionStore, body: string) {
+    const thread = store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body, pending: false, pinnedRef: "abc123",
+    });
+    store.addReply(thread.id, "agent", "reply");
+    store.ensureContentSnapshot("abc123", "a.txt", `${body}\n`);
+    store.addVerdict("comment");
+  }
+
+  it("reset archives what it clears, and lists archives with counts", () => {
+    const store = SessionStore.create(repos, "s-arch", "t", dataDir);
+    seedComments(store, "first");
+    const before = store.snapshot;
+
+    store.reset();
+
+    const [archive] = store.snapshot.archives!;
+    expect(archive).toMatchObject({
+      threads: before.threads, verdicts: before.verdicts, contentSnapshots: before.contentSnapshots,
+    });
+    expect(store.listArchives()).toEqual([{
+      id: archive.id, archivedAt: archive.archivedAt, threadCount: 1, commentCount: 2, verdictCount: 1,
+    }]);
+  });
+
+  it("reset with nothing to clear adds no archive", () => {
+    const store = SessionStore.create(repos, "s-empty", "t", dataDir);
+    store.reset();
+    expect(store.listArchives()).toEqual([]);
+  });
+
+  it("restore brings an archive back and archives the comments it replaces", () => {
+    const store = SessionStore.create(repos, "s-restore", "t", dataDir);
+    seedComments(store, "first");
+    store.reset();
+    const firstArchiveId = store.listArchives()[0].id;
+    seedComments(store, "second");
+
+    store.restoreArchive(firstArchiveId);
+
+    const snap = store.snapshot;
+    expect(snap.threads[0].comments[0].body).toBe("first");
+    expect(snap.contentSnapshots).toEqual({ "abc123:a.txt": "first\n" });
+    expect(snap.commentsReplaced?.by).toBe("restore");
+    expect(snap.archives!.map(a => a.threads[0].comments[0].body)).toEqual(["second"]);
+  });
+
+  it("restore of an unknown archive throws and changes nothing", () => {
+    const store = SessionStore.create(repos, "s-missing", "t", dataDir);
+    seedComments(store, "first");
+    expect(() => store.restoreArchive("nope")).toThrow("Archive not found: nope");
+    expect(store.snapshot.threads).toHaveLength(1);
+    expect(store.listArchives()).toEqual([]);
+  });
+
   describe("importFrom", () => {
     const newRepos = [{ path: "/repo2", name: "repo2", branch: "main", baseRef: "def456" }];
 
@@ -307,6 +398,17 @@ describe("SessionStore", () => {
         path.join(dataDir, "src2.json"), "new-id-2", newRepos, undefined, dataDir,
       );
       expect(imported.snapshot.threads[0].comments[0].pending).toBe(true);
+    });
+
+    it("carries over the source session's description", async () => {
+      const source = SessionStore.create(repos, "src4", "source session", dataDir);
+      source.setDescription("Reviewing the auth refactor.");
+      await source.persist();
+
+      const imported = await SessionStore.importFrom(
+        path.join(dataDir, "src4.json"), "new-id-4", newRepos, undefined, dataDir,
+      );
+      expect(imported.snapshot.description).toBe("Reviewing the auth refactor.");
     });
 
     it("uses an explicit title override instead of the source title", async () => {

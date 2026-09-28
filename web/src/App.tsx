@@ -3,13 +3,14 @@ import { Sidebar } from "./components/Sidebar";
 import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
-  fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
+  fetchDiffs, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
   submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState, flagThread, markCommentRead,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
 import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
+import { useSessionMeta } from "./lib/useSessionMeta";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import { findAdjacentComment, isEditableTarget } from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
@@ -70,7 +71,7 @@ export function App() {
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const [title, setTitle] = useState<string | null>(null);
+  const { sessionId, title, description, commentsReplacedBy, dismissCommentsReplaced } = useSessionMeta();
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
@@ -123,10 +124,6 @@ export function App() {
         loadedRepos.map(r => fetchCommits(r.repoPath).then(commits => [r.repoPath, commits] as const)),
       );
       setCommitsByRepo(Object.fromEntries(entries));
-    });
-    fetchSession().then(session => {
-      document.title = session.title;
-      setTitle(session.title);
     });
   }, []);
 
@@ -316,7 +313,7 @@ export function App() {
         <Sidebar
           repos={repos} onSelectFile={scrollToFile}
           commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
-          onOpenCommits={handleOpenCommits} title={title} viewportSpan={viewportSpan} threads={threads}
+          onOpenCommits={handleOpenCommits} title={title} description={description} sessionId={sessionId} viewportSpan={viewportSpan} threads={threads}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}
@@ -346,6 +343,12 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
+      {commentsReplacedBy && (
+        <div className="comments-notice" role="status">
+          {commentsReplacedBy === "reset" ? "The agent cleared all comments." : "The agent restored archived comments."}
+          <button type="button" className="comments-notice-dismiss" aria-label="Dismiss" onClick={dismissCommentsReplaced}>×</button>
+        </div>
+      )}
       {offscreenNewComments.length > 0 && (
         <button
           type="button"

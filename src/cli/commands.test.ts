@@ -10,7 +10,7 @@ import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand,
 } from "./commands.js";
 
 const execFileAsync = promisify(execFile);
@@ -135,6 +135,40 @@ describe("cli commands", () => {
 
     await unackCommand(sessionId, thread.id, commentId);
     expect(store.snapshot.threads[0].comments[0].agentStatus).toBe("cleared");
+  });
+
+  it("describeCommand sets the session description", async () => {
+    await describeCommand(sessionId, "Reviewing the auth refactor.");
+    expect(store.snapshot.description).toBe("Reviewing the auth refactor.");
+  });
+
+  it("resetCommand clears the session's comments and verdicts", async () => {
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc",
+    });
+    store.addVerdict("comment");
+    await resetCommand(sessionId);
+    expect(store.snapshot.threads).toEqual([]);
+    expect(store.snapshot.verdicts).toEqual([]);
+  });
+
+  it("archivesCommand lists archives and restoreCommand brings one back", async () => {
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "q", pending: false, pinnedRef: "abc",
+    });
+    await resetCommand(sessionId);
+
+    const archives = await archivesCommand(sessionId);
+    expect(archives).toEqual([expect.objectContaining({ threadCount: 1 })]);
+
+    await restoreCommand(sessionId, archives[0].id);
+    expect(store.snapshot.threads[0].comments[0].body).toBe("q");
+  });
+
+  it("restoreCommand fails for an unknown archive", async () => {
+    await expect(restoreCommand(sessionId, "nope")).rejects.toThrow("Archive not found: nope");
   });
 
   it("reviewCommand returns threads and verdicts with computed intent", async () => {

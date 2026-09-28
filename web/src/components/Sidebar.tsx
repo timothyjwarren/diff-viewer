@@ -5,7 +5,8 @@ import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
 import type { ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
-import { CommentIcon } from "./Icons";
+import { ChevronIcon, CommentIcon } from "./Icons";
+import { CommentMarkdown } from "./CommentMarkdown";
 
 let measureCanvas: HTMLCanvasElement | null = null;
 function textWidth(text: string, font: string): number {
@@ -45,9 +46,62 @@ const FileName = memo(function FileName({ dir, base }: { dir: string; base: stri
   );
 });
 
+function readDescriptionOpen(key: string | null): boolean {
+  if (!key) return false;
+  try {
+    return localStorage.getItem(key) === "open";
+  } catch {
+    return false;
+  }
+}
+
+function writeDescriptionOpen(key: string | null, open: boolean): void {
+  if (!key) return;
+  try {
+    if (open) localStorage.setItem(key, "open");
+    else localStorage.removeItem(key);
+  } catch {
+    // Storage can be unavailable (private windows, blocked site data); the toggle still works for this page.
+  }
+}
+
+/** The session title, which expands to show the agent's description of the review when there is one. */
+function SessionTitle({ title, description, sessionId }: {
+  title: string; description: string | null; sessionId: string | null;
+}) {
+  const storageKey = sessionId ? `diff-viewer:description-open:${sessionId}` : null;
+  const [open, setOpen] = useState(() => readDescriptionOpen(storageKey));
+
+  if (!description) return <h1 className="sidebar-title">{title}</h1>;
+
+  function toggle() {
+    setOpen(!open);
+    writeDescriptionOpen(storageKey, !open);
+  }
+
+  return (
+    <>
+      <h1 className="sidebar-title">
+        <button
+          type="button" className="sidebar-title-toggle" aria-expanded={open}
+          aria-controls="session-description" onClick={toggle}
+        >
+          <span>{title}</span>
+          <ChevronIcon className={`chevron${open ? " chevron-open" : ""}`} />
+        </button>
+      </h1>
+      {open && (
+        <div id="session-description" className="sidebar-description">
+          <CommentMarkdown body={description} />
+        </div>
+      )}
+    </>
+  );
+}
+
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
-  title = null, viewportSpan = null, threads = [],
+  title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
 }: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
@@ -56,6 +110,8 @@ export function Sidebar({
   onRangeChange?: (repoPath: string, range: CommitRange | null) => void;
   onOpenCommits?: (repoPath: string) => void;
   title?: string | null;
+  description?: string | null;
+  sessionId?: string | null;
   viewportSpan?: ViewportSpan | null;
   threads?: CommentThread[];
 }) {
@@ -87,7 +143,7 @@ export function Sidebar({
     <nav className="sidebar" ref={navRef}>
       {(title || allFiles.length > 0) && (
         <header className="sidebar-header">
-          {title && <h1 className="sidebar-title">{title}</h1>}
+          {title && <SessionTitle key={sessionId} title={title} description={description} sessionId={sessionId} />}
           {allFiles.length > 0 && (
             <p className="sidebar-summary">
               {allFiles.length} file{allFiles.length === 1 ? "" : "s"}

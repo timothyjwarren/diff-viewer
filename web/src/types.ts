@@ -38,4 +38,6 @@ export interface CommentThread {
 export type VerdictType = "comment" | "approve" | "request_changes";
 export interface Verdict { id: string; type: VerdictType; summary?: string; submittedAt: string; }
 
-export interface SessionInfo { id: string; title: string; }
+export interface CommentsReplaced { at: string; by: "reset" | "restore"; }
+export interface SessionInfo { id: string; title: string; description?: string; commentsReplaced?: CommentsReplaced; }
+export type SessionMeta = Pick<SessionInfo, "title" | "description" | "commentsReplaced">;
