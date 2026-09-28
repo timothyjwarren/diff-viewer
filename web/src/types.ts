@@ -22,11 +22,16 @@ export type CommentAuthor = "user" | "agent";
 export type CommentAgentStatus = "seen" | "acked" | "cleared";
 export interface Comment {
   id: string; author: CommentAuthor; body: string; suggestion?: string;
-  pending: boolean; verdictId?: string; agentStatus?: CommentAgentStatus; createdAt: string;
+  pending: boolean; verdictId?: string; agentStatus?: CommentAgentStatus;
+  /** Set on an agent comment once the user has had it on screen; unset means unread. */
+  readByUser?: boolean;
+  createdAt: string;
 }
 export interface CommentThread {
   id: string; repoPath: string; file: string; lineStart: number; lineEnd: number;
   side: "old" | "new"; resolved: boolean; pinnedRef: string | "uncommitted"; outdated: boolean;
+  /** Marked by the user to come back to. */
+  flagged?: boolean;
   comments: Comment[];
 }
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { CommentThread } from "./CommentThread";
 import type { CommentThread as CommentThreadData } from "../types";
 
@@ -262,5 +262,71 @@ describe("CommentThread", () => {
   it("shows no Outdated badge for a current thread", () => {
     render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} />);
     expect(screen.queryByText("Outdated")).not.toBeInTheDocument();
+  });
+
+  describe("flagging", () => {
+    it("flags an unflagged thread", () => {
+      const onFlag = vi.fn();
+      render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onFlag={onFlag} />);
+      fireEvent.click(screen.getByLabelText("Flag thread"));
+      expect(onFlag).toHaveBeenCalledWith("t1", true);
+    });
+
+    it("unflags a flagged thread", () => {
+      const onFlag = vi.fn();
+      render(<CommentThread thread={{ ...thread, flagged: true }} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onFlag={onFlag} />);
+      const button = screen.getByLabelText("Unflag thread");
+      expect(button).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(button);
+      expect(onFlag).toHaveBeenCalledWith("t1", false);
+    });
+  });
+
+  describe("marking comments read", () => {
+    type Callback = (entries: Partial<IntersectionObserverEntry>[]) => void;
+    let observed: Element[];
+    let fire: Callback;
+
+    beforeEach(() => {
+      observed = [];
+      vi.stubGlobal("IntersectionObserver", class {
+        constructor(callback: Callback) { fire = callback; }
+        observe(el: Element) { observed.push(el); }
+        unobserve(el: Element) { observed = observed.filter(o => o !== el); }
+        disconnect() { observed = []; }
+      });
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    const visible = (el: Element) => ({
+      target: el, isIntersecting: true, intersectionRatio: 1,
+      intersectionRect: { height: 40 } as DOMRectReadOnly, rootBounds: { height: 800 } as DOMRectReadOnly,
+    });
+
+    it("watches only unread agent comments", () => {
+      render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onRead={vi.fn()} />);
+      expect(observed.map(el => el.id)).toEqual(["comment-c2"]);
+    });
+
+    it("marks an unread agent comment read once it is on screen", () => {
+      const onRead = vi.fn();
+      render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onRead={onRead} />);
+      act(() => fire([visible(observed[0])]));
+      expect(onRead).toHaveBeenCalledWith("t1", "c2");
+    });
+
+    it("ignores a comment that is barely on screen", () => {
+      const onRead = vi.fn();
+      render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onRead={onRead} />);
+      act(() => fire([{ ...visible(observed[0]), intersectionRatio: 0.1, intersectionRect: { height: 4 } as DOMRectReadOnly }]));
+      expect(onRead).not.toHaveBeenCalled();
+    });
+
+    it("does not watch comments that are already read", () => {
+      const read = { ...thread, comments: thread.comments.map(c => ({ ...c, readByUser: true })) };
+      render(<CommentThread thread={read} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onRead={vi.fn()} />);
+      expect(observed).toEqual([]);
+    });
   });
 });

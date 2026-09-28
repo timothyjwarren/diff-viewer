@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import type { CommentThread as CommentThreadData, CommentAuthor } from "../types";
 import { timeAgo } from "../lib/timeAgo";
 import { CommentMarkdown } from "./CommentMarkdown";
-import { ChevronIcon } from "./Icons";
+import { ChevronIcon, FlagIcon } from "./Icons";
+import { useMarkReadWhenVisible } from "../lib/useMarkReadWhenVisible";
 
 function Avatar({ author }: { author: CommentAuthor }) {
   return (
@@ -48,12 +49,15 @@ function CommentEditor({ initialBody, onSave, onCancel }: {
   );
 }
 
-export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: {
+export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
   onDelete: (threadId: string, commentId: string) => void;
   onResolve: (threadId: string, resolved: boolean) => void;
+  onFlag?: (threadId: string, flagged: boolean) => void;
+  /** Called when an unread agent comment has been on screen. */
+  onRead?: (threadId: string, commentId: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -71,6 +75,10 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
   const collapsed = thread.resolved && !manualExpand;
   const state = thread.resolved ? "resolved" : thread.comments.some(c => c.pending) ? "pending" : "open";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const unreadIds = collapsed
+    ? []
+    : thread.comments.filter(c => c.author === "agent" && !c.readByUser).map(c => c.id);
+  useMarkReadWhenVisible(unreadIds, onRead && (commentId => onRead(thread.id, commentId)));
 
   function submitReply(pending: boolean) {
     onReply(thread.id, draft, pending);
@@ -97,6 +105,16 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve }: 
           </span>
         )}
         {thread.outdated && <span className="comment-thread-outdated-badge">Outdated</span>}
+        <button
+          type="button"
+          className={`btn-icon comment-thread-flag-button${thread.flagged ? " comment-thread-flag-button-on" : ""}`}
+          aria-label={thread.flagged ? "Unflag thread" : "Flag thread"}
+          aria-pressed={Boolean(thread.flagged)}
+          title={thread.flagged ? "Unflag" : "Flag to come back to"}
+          onClick={() => onFlag?.(thread.id, !thread.flagged)}
+        >
+          <FlagIcon filled={thread.flagged} />
+        </button>
         <button
           type="button"
           className="btn btn-ghost btn-sm comment-thread-resolve-button"

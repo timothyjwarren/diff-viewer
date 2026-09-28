@@ -28,6 +28,15 @@ export function CommentIcon() {
   return <Svg><path d="M3 3.5h10a.5.5 0 0 1 .5.5v6.5a.5.5 0 0 1-.5.5H7l-3 2.5V11H3a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z" /></Svg>;
 }
 
+export function FlagIcon({ filled = false }: { filled?: boolean }) {
+  return (
+    <Svg>
+      <path d="M4 14V2.5" />
+      <path d="M4 3h7.5l-1.75 3 1.75 3H4" fill={filled ? "currentColor" : "none"} />
+    </Svg>
+  );
+}
+
 export function CheckIcon() {
   return <Svg><path d="m3.5 8.5 3 3 6-7" /></Svg>;
 }

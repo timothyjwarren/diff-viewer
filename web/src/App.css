@@ -40,6 +40,8 @@
   --warning: #946200;
   --warning-soft: rgba(212, 160, 23, 0.16);
   --agent: #7c4ddb;
+  /* Pink, kept clear of --danger so a flag never reads as a deletion. */
+  --flag: #d6307f;
 
   --add-bg: rgba(31, 136, 61, 0.08);
   --add-bg-strong: rgba(31, 136, 61, 0.15);
@@ -89,6 +91,7 @@
     --warning: #e2a93b;
     --warning-soft: rgba(226, 169, 59, 0.15);
     --agent: #b28bff;
+    --flag: #f472b6;
 
     --add-bg: rgba(74, 194, 107, 0.1);
     --add-bg-strong: rgba(74, 194, 107, 0.18);
@@ -453,10 +456,32 @@ main::-webkit-scrollbar-thumb:hover {
   opacity: 0.45;
 }
 
+.scrollbar-marker-flagged::before {
+  top: 0.5px;
+  height: 4px;
+  background: var(--flag);
+}
+
 .scrollbar-marker:hover::before {
   left: 0;
   right: 0;
   filter: brightness(1.2);
+}
+
+/* Unread threads are dots rather than lines; colour still shows their state. */
+.scrollbar-marker-unread {
+  height: 9px;
+  margin-top: -4px;
+}
+
+.scrollbar-marker-unread::before,
+.scrollbar-marker-unread:hover::before {
+  left: calc(50% - 3.5px);
+  right: auto;
+  top: 1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 /* ---------- Sidebar ---------- */
@@ -1110,6 +1135,10 @@ main {
   border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
 }
 
+.comment-thread:has(.comment-thread-flag-button-on) {
+  border-color: color-mix(in srgb, var(--flag) 45%, var(--border));
+}
+
 .comment-thread-resolved {
   padding-bottom: 6px;
   background: transparent;
@@ -1137,8 +1166,16 @@ main {
   color: var(--text-muted);
 }
 
-.comment-thread-resolve-button {
+.comment-thread-flag-button {
   margin-left: auto;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
+.comment-thread-flag-button-on,
+.comment-thread-flag-button-on:hover {
+  color: var(--flag);
 }
 
 .comment {
@@ -1184,11 +1221,11 @@ main {
 /* Clears the absolutely positioned header of an open thread. */
 .comment-thread-open .comment-thread-header + .comment .comment-meta,
 .comment-thread-pending .comment-thread-header + .comment .comment-meta {
-  padding-right: 88px;
+  padding-right: 120px;
 }
 
 .comment-thread:has(.comment-thread-outdated-badge) .comment-thread-header + .comment .comment-meta {
-  padding-right: 170px;
+  padding-right: 200px;
 }
 
 .comment-author {

@@ -62,6 +62,8 @@ export interface Comment {
   /** set once this comment is bundled into a submitted verdict */
   verdictId?: string;
   agentStatus?: CommentAgentStatus;
+  /** Set on an agent comment once the user has had it on screen; unset means unread. */
+  readByUser?: boolean;
   createdAt: string;
 }
 
@@ -75,6 +77,8 @@ export interface CommentThread {
   resolved: boolean;
   pinnedRef: string | "uncommitted";
   outdated: boolean;
+  /** Marked by the user to come back to. */
+  flagged?: boolean;
   comments: Comment[];
 }
 

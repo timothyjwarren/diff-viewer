@@ -103,6 +103,16 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     }
   });
 
+  app.patch("/api/threads/:threadId/flag", async (req, res) => {
+    try {
+      store.flagThread(req.params.threadId, Boolean(req.body.flagged));
+      await store.persist();
+      res.status(204).end();
+    } catch {
+      res.status(404).end();
+    }
+  });
+
   app.post("/api/threads/:threadId/comments", async (req, res) => {
     const { author, body, suggestion, pending, createdAt } = req.body;
     try {
@@ -137,6 +147,16 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   app.post("/api/threads/:threadId/comments/:commentId/ack", async (req, res) => {
     try {
       store.ackComment(req.params.threadId, req.params.commentId);
+      await store.persist();
+      res.status(204).end();
+    } catch {
+      res.status(404).end();
+    }
+  });
+
+  app.post("/api/threads/:threadId/comments/:commentId/read", async (req, res) => {
+    try {
+      store.markCommentRead(req.params.threadId, req.params.commentId);
       await store.persist();
       res.status(204).end();
     } catch {

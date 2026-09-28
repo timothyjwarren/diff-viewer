@@ -4,7 +4,7 @@ import { DiffView, type CommentHandlers } from "./components/DiffView";
 import { ReviewBar } from "./components/ReviewBar";
 import {
   fetchDiffs, fetchSession, fetchThreads, createThread, addReply, editComment, deleteComment, resolveThread,
-  submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState,
+  submitVerdict, fetchCommits, fetchRepoDiff, fetchRepoState, flagThread, markCommentRead,
 } from "./api/client";
 import { selectionReducer, type SelectionRange } from "./lib/selection";
 import { newAgentCommentIds } from "./lib/newComments";
@@ -75,6 +75,7 @@ export function App() {
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
   const hasLoadedThreadsRef = useRef(false);
+  const readRequestedRef = useRef<Set<string>>(new Set());
   const lineSelectionRef = useRef(lineSelection);
   useEffect(() => { lineSelectionRef.current = lineSelection; }, [lineSelection]);
 
@@ -287,6 +288,18 @@ export function App() {
       },
       onResolve: async (threadId, resolved) => {
         await resolveThread(threadId, resolved);
+        await refreshThreads();
+      },
+      onFlag: async (threadId, flagged) => {
+        await flagThread(threadId, flagged);
+        await refreshThreads();
+      },
+      onRead: async (threadId, commentId) => {
+        // A comment can report itself visible again before the refreshed
+        // threads arrive, so each one is only ever sent once.
+        if (readRequestedRef.current.has(commentId)) return;
+        readRequestedRef.current.add(commentId);
+        await markCommentRead(threadId, commentId);
         await refreshThreads();
       },
     };

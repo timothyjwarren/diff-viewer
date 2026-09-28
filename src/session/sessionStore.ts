@@ -158,10 +158,26 @@ export class SessionStore {
     }
   }
 
+  markCommentRead(threadId: string, commentId: string): void {
+    this.findComment(threadId, commentId).readByUser = true;
+  }
+
+  flagThread(threadId: string, flagged: boolean): void {
+    const thread = this.data.threads.find(t => t.id === threadId);
+    if (!thread) throw new Error(`Thread not found: ${threadId}`);
+    thread.flagged = flagged;
+  }
+
   resolveThread(threadId: string, resolved: boolean): void {
     const thread = this.data.threads.find(t => t.id === threadId);
     if (!thread) throw new Error(`Thread not found: ${threadId}`);
     thread.resolved = resolved;
+    // A resolved thread collapses, hiding its comments, so resolving counts as reading them.
+    if (resolved) {
+      for (const comment of thread.comments) {
+        if (comment.author === "agent") comment.readByUser = true;
+      }
+    }
   }
 
   editComment(threadId: string, commentId: string, body: string): void {
