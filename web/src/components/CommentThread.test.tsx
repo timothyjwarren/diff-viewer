@@ -284,10 +284,22 @@ describe("CommentThread", () => {
 
   it("navigates to the previous and next comment from the header buttons", () => {
     const onNavigate = vi.fn();
-    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onNavigate={onNavigate} />);
+    render(<CommentThread
+      thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()}
+      onNavigate={onNavigate} canNavigate={{ previous: true, next: true }}
+    />);
     fireEvent.click(screen.getByLabelText("Previous comment"));
     fireEvent.click(screen.getByLabelText("Next comment"));
     expect(onNavigate.mock.calls).toEqual([["t1", "previous"], ["t1", "next"]]);
+  });
+
+  it("disables the previous/next buttons when there is no thread that way", () => {
+    render(<CommentThread
+      thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()}
+      onNavigate={vi.fn()} canNavigate={{ previous: false, next: true }}
+    />);
+    expect(screen.getByLabelText("Previous comment")).toBeDisabled();
+    expect(screen.getByLabelText("Next comment")).toBeEnabled();
   });
 
   describe("marking comments read", () => {

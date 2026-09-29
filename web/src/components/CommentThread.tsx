@@ -49,7 +49,7 @@ function CommentEditor({ initialBody, onSave, onCancel }: {
   );
 }
 
-export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead, onNavigate }: {
+export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead, onNavigate, canNavigate }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
@@ -60,6 +60,8 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, on
   onRead?: (threadId: string, commentId: string) => void;
   /** Scrolls to the thread above or below this one. */
   onNavigate?: (threadId: string, direction: "next" | "previous") => void;
+  /** Whether there is a thread above/below to go to; both disabled when absent. */
+  canNavigate?: { previous: boolean; next: boolean };
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -112,6 +114,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, on
           className="btn-icon comment-thread-nav-button comment-thread-nav-previous"
           aria-label="Previous comment"
           title="Previous comment (⌘⇧↑)"
+          disabled={!canNavigate?.previous}
           onClick={() => onNavigate?.(thread.id, "previous")}
         >
           <ChevronUpIcon />
@@ -121,6 +124,7 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, on
           className="btn-icon comment-thread-nav-button"
           aria-label="Next comment"
           title="Next comment (⌘⇧↓)"
+          disabled={!canNavigate?.next}
           onClick={() => onNavigate?.(thread.id, "next")}
         >
           <ChevronDownIcon />

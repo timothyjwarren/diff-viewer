@@ -12,7 +12,10 @@ import { fileAnchorId } from "./lib/fileAnchor";
 import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
 import { useSessionMeta } from "./lib/useSessionMeta";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
-import { findAdjacentComment, findCommentBeside, isEditableTarget, type CommentPosition } from "./lib/commentNav";
+import {
+  findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability,
+  type CommentPosition, type NavAvailability,
+} from "./lib/commentNav";
 import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
 
 function fileName(file: DiffFile): string {
@@ -237,6 +240,36 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [commentPositions, goToComment]);
 
+  const [navAvailability, setNavAvailability] = useState<NavAvailability>({});
+
+  // Relative thread positions only change when the DOM does (diffs load,
+  // threads expand or collapse), not on scroll, so a mutation observer is
+  // enough to keep the previous/next buttons' disabled states current.
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const threadPositions = threadsRef.current.flatMap(t => {
+        const el = document.getElementById(`thread-${t.id}`);
+        const rootId = t.comments[0]?.id;
+        return el && rootId ? [{ threadId: t.id, rootId, top: el.getBoundingClientRect().top }] : [];
+      });
+      const next = threadNavAvailability(threadPositions, commentPositions());
+      setNavAvailability(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+
+    schedule();
+    const observer = new MutationObserver(schedule);
+    observer.observe(main, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [threads, commentPositions]);
+
   function navigateFromThread(threadId: string, direction: "next" | "previous") {
     const threadEl = document.getElementById(`thread-${threadId}`);
     const thread = threadsRef.current.find(t => t.id === threadId);
@@ -307,6 +340,7 @@ export function App() {
         await flagThread(threadId, flagged);
         await refreshThreads();
       },
+      navAvailability,
       onNavigate: navigateFromThread,
       onRead: async (threadId, commentId) => {
         // A comment can report itself visible again before the refreshed

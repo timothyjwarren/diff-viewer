@@ -49,6 +49,22 @@ export function findCommentBeside(
   return above.length > 0 ? above[above.length - 1].id : null;
 }
 
+export interface ThreadPosition {
+  threadId: string;
+  rootId: string;
+  top: number;
+}
+
+export type NavAvailability = Record<string, { previous: boolean; next: boolean }>;
+
+/** Which threads' previous/next buttons have a thread to go to. */
+export function threadNavAvailability(threads: ThreadPosition[], entries: CommentPosition[]): NavAvailability {
+  return Object.fromEntries(threads.map(t => [t.threadId, {
+    previous: findCommentBeside(entries, "previous", t.top, t.rootId) !== null,
+    next: findCommentBeside(entries, "next", t.top, t.rootId) !== null,
+  }]));
+}
+
 /**
  * When no current comment is being tracked yet (e.g. the shortcut hasn't
  * been used this session), infers which chain the viewport is already

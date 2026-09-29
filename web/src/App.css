@@ -238,9 +238,14 @@ a:focus-visible,
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   background: var(--hover);
   color: var(--text);
+}
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 textarea {

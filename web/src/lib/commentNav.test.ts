@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findAdjacentComment, findCommentBeside, isEditableTarget } from "./commentNav";
+import { findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability } from "./commentNav";
 
 describe("findAdjacentComment", () => {
   // Flat entries with no reply chains -- every comment is its own root.
@@ -120,6 +120,35 @@ describe("findCommentBeside", () => {
   it("returns null with no wraparound at either end", () => {
     expect(findCommentBeside(entries, "previous", -510, "R1")).toBeNull();
     expect(findCommentBeside(entries, "next", 590, "R3")).toBeNull();
+  });
+});
+
+describe("threadNavAvailability", () => {
+  it("marks the first and last threads as having nowhere further to go", () => {
+    const entries = [
+      { id: "R1", rootId: "R1", top: 0 },
+      { id: "R2", rootId: "R2", top: 100 },
+      { id: "R3", rootId: "R3", top: 200 },
+    ];
+    const threads = [
+      { threadId: "t1", rootId: "R1", top: -10 },
+      { threadId: "t2", rootId: "R2", top: 90 },
+      { threadId: "t3", rootId: "R3", top: 190 },
+      // Collapsed, so it has no comment entries of its own.
+      { threadId: "t4", rootId: "R4", top: 300 },
+    ];
+    expect(threadNavAvailability(threads, entries)).toEqual({
+      t1: { previous: false, next: true },
+      t2: { previous: true, next: true },
+      t3: { previous: true, next: false },
+      t4: { previous: true, next: false },
+    });
+  });
+
+  it("gives a lone thread neither direction", () => {
+    const entries = [{ id: "R1", rootId: "R1", top: 0 }];
+    expect(threadNavAvailability([{ threadId: "t1", rootId: "R1", top: -10 }], entries))
+      .toEqual({ t1: { previous: false, next: false } });
   });
 });
 
