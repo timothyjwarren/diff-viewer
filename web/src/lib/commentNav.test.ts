@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findAdjacentComment, isEditableTarget } from "./commentNav";
+import { findAdjacentComment, findCommentBeside, isEditableTarget } from "./commentNav";
 
 describe("findAdjacentComment", () => {
   // Flat entries with no reply chains -- every comment is its own root.
@@ -93,6 +93,33 @@ describe("findAdjacentComment", () => {
       ];
       expect(findAdjacentComment(nearRootOnly, "previous")).toBe("R2");
     });
+  });
+});
+
+describe("findCommentBeside", () => {
+  const entries = [
+    { id: "R1", rootId: "R1", top: -500 },
+    { id: "R2", rootId: "R2", top: 100 },
+    { id: "R2-reply", rootId: "R2", top: 200 },
+    { id: "R3", rootId: "R3", top: 600 },
+  ];
+
+  it("finds the next thread root below the origin thread, skipping its replies", () => {
+    expect(findCommentBeside(entries, "next", 90, "R2")).toBe("R3");
+  });
+
+  it("finds the previous thread root above the origin thread", () => {
+    expect(findCommentBeside(entries, "previous", 90, "R2")).toBe("R1");
+  });
+
+  it("works from a collapsed thread with no comment entries of its own", () => {
+    expect(findCommentBeside(entries, "next", 300, "R9")).toBe("R3");
+    expect(findCommentBeside(entries, "previous", 300, "R9")).toBe("R2");
+  });
+
+  it("returns null with no wraparound at either end", () => {
+    expect(findCommentBeside(entries, "previous", -510, "R1")).toBeNull();
+    expect(findCommentBeside(entries, "next", 590, "R3")).toBeNull();
   });
 });
 

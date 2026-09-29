@@ -111,6 +111,7 @@ export interface CommentHandlers {
   onResolve: (threadId: string, resolved: boolean) => void;
   onFlag: (threadId: string, flagged: boolean) => void;
   onRead: (threadId: string, commentId: string) => void;
+  onNavigate: (threadId: string, direction: "next" | "previous") => void;
 }
 
 function formatQuote(text: string): string {
@@ -211,6 +212,7 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
                             key={thread.id} thread={thread}
                             onReply={comments.onReply} onEdit={comments.onEdit} onDelete={comments.onDelete}
                             onResolve={comments.onResolve} onFlag={comments.onFlag} onRead={comments.onRead}
+                            onNavigate={comments.onNavigate}
                           />
                         ))}
                         {own.composer && comments.selection && (

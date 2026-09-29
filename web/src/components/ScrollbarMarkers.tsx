@@ -6,7 +6,7 @@ import { tickFraction } from "../lib/scrollbarTicks";
 export const SCROLLBAR_MIN_THUMB = 24;
 
 /** Strip width when the scrollbar takes no layout width (e.g. overlay scrollbars). */
-const FALLBACK_WIDTH = 10;
+const FALLBACK_WIDTH = 16;
 
 interface Tick {
   threadId: string;

@@ -282,6 +282,14 @@ describe("CommentThread", () => {
     });
   });
 
+  it("navigates to the previous and next comment from the header buttons", () => {
+    const onNavigate = vi.fn();
+    render(<CommentThread thread={thread} onReply={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onResolve={vi.fn()} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByLabelText("Previous comment"));
+    fireEvent.click(screen.getByLabelText("Next comment"));
+    expect(onNavigate.mock.calls).toEqual([["t1", "previous"], ["t1", "next"]]);
+  });
+
   describe("marking comments read", () => {
     type Callback = (entries: Partial<IntersectionObserverEntry>[]) => void;
     let observed: Element[];
