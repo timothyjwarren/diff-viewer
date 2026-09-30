@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { CommentThread as CommentThreadData, CommentAuthor } from "../types";
 import { timeAgo } from "../lib/timeAgo";
 import { CommentMarkdown } from "./CommentMarkdown";
-import { ChevronIcon, FlagIcon } from "./Icons";
+import { ChevronDownIcon, ChevronIcon, ChevronUpIcon, FlagIcon } from "./Icons";
 import { useMarkReadWhenVisible } from "../lib/useMarkReadWhenVisible";
 
 function Avatar({ author }: { author: CommentAuthor }) {
@@ -49,7 +49,7 @@ function CommentEditor({ initialBody, onSave, onCancel }: {
   );
 }
 
-export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead }: {
+export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, onFlag, onRead, onNavigate, canNavigate }: {
   thread: CommentThreadData;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
@@ -58,6 +58,10 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, on
   onFlag?: (threadId: string, flagged: boolean) => void;
   /** Called when an unread agent comment has been on screen. */
   onRead?: (threadId: string, commentId: string) => void;
+  /** Scrolls to the thread above or below this one. */
+  onNavigate?: (threadId: string, direction: "next" | "previous") => void;
+  /** Whether there is a thread above/below to go to; both disabled when absent. */
+  canNavigate?: { previous: boolean; next: boolean };
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -105,6 +109,26 @@ export function CommentThread({ thread, onReply, onEdit, onDelete, onResolve, on
           </span>
         )}
         {thread.outdated && <span className="comment-thread-outdated-badge">Outdated</span>}
+        <button
+          type="button"
+          className="btn-icon comment-thread-nav-button comment-thread-nav-previous"
+          aria-label="Previous comment"
+          title="Previous comment (⌘⇧↑)"
+          disabled={!canNavigate?.previous}
+          onClick={() => onNavigate?.(thread.id, "previous")}
+        >
+          <ChevronUpIcon />
+        </button>
+        <button
+          type="button"
+          className="btn-icon comment-thread-nav-button"
+          aria-label="Next comment"
+          title="Next comment (⌘⇧↓)"
+          disabled={!canNavigate?.next}
+          onClick={() => onNavigate?.(thread.id, "next")}
+        >
+          <ChevronDownIcon />
+        </button>
         <button
           type="button"
           className={`btn-icon comment-thread-flag-button${thread.flagged ? " comment-thread-flag-button-on" : ""}`}

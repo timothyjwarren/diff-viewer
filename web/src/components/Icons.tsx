@@ -15,6 +15,14 @@ export function ChevronIcon({ className }: { className?: string }) {
   return <Svg className={className}><path d="M6 3.5 10.5 8 6 12.5" /></Svg>;
 }
 
+export function ChevronUpIcon() {
+  return <Svg><path d="M3.5 10 8 5.5 12.5 10" /></Svg>;
+}
+
+export function ChevronDownIcon() {
+  return <Svg><path d="M3.5 6 8 10.5 12.5 6" /></Svg>;
+}
+
 export function ExternalFileIcon() {
   return (
     <Svg>

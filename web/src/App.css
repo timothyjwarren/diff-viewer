@@ -238,9 +238,14 @@ a:focus-visible,
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   background: var(--hover);
   color: var(--text);
+}
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 textarea {
@@ -426,7 +431,7 @@ textarea:focus {
 /* Styled so the thumb has a known minimum length, which ScrollbarMarkers
  * needs to line ticks up with it (SCROLLBAR_MIN_THUMB must match). */
 main::-webkit-scrollbar {
-  width: 12px;
+  width: 16px;
 }
 
 main::-webkit-scrollbar-track {
@@ -438,8 +443,8 @@ main::-webkit-scrollbar-thumb {
   min-height: 24px;
   background: var(--scrollbar-thumb);
   background-clip: padding-box;
-  border: 3px solid transparent;
-  border-radius: 6px;
+  border: 4px solid transparent;
+  border-radius: 8px;
 }
 
 main::-webkit-scrollbar-thumb:hover {
@@ -456,13 +461,13 @@ main::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
 }
 
-/* A 3px line centred in a slightly taller hit area. */
+/* A 4px line centred in a taller hit area. */
 .scrollbar-marker {
   position: absolute;
   left: 0;
   right: 0;
-  height: 5px;
-  margin-top: -2px;
+  height: 11px;
+  margin-top: -5px;
   padding: 0;
   border: none;
   background: transparent;
@@ -475,8 +480,9 @@ main::-webkit-scrollbar-thumb:hover {
   position: absolute;
   left: 2px;
   right: 2px;
-  top: 1px;
-  height: 3px;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
   border-radius: 1px;
   background: var(--accent);
 }
@@ -491,8 +497,7 @@ main::-webkit-scrollbar-thumb:hover {
 }
 
 .scrollbar-marker-flagged::before {
-  top: 0.5px;
-  height: 4px;
+  height: 5px;
   background: var(--flag);
 }
 
@@ -504,17 +509,16 @@ main::-webkit-scrollbar-thumb:hover {
 
 /* Unread threads are dots rather than lines; colour still shows their state. */
 .scrollbar-marker-unread {
-  height: 9px;
-  margin-top: -4px;
+  height: 13px;
+  margin-top: -6px;
 }
 
 .scrollbar-marker-unread::before,
 .scrollbar-marker-unread:hover::before {
-  left: calc(50% - 3.5px);
+  left: calc(50% - 4.5px);
   right: auto;
-  top: 1px;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
@@ -1208,8 +1212,12 @@ main {
   color: var(--text-muted);
 }
 
-.comment-thread-flag-button {
+.comment-thread-nav-previous {
   margin-left: auto;
+}
+
+.comment-thread-nav-button,
+.comment-thread-flag-button {
   width: 24px;
   height: 24px;
   font-size: 13px;
@@ -1263,11 +1271,11 @@ main {
 /* Clears the absolutely positioned header of an open thread. */
 .comment-thread-open .comment-thread-header + .comment .comment-meta,
 .comment-thread-pending .comment-thread-header + .comment .comment-meta {
-  padding-right: 120px;
+  padding-right: 180px;
 }
 
 .comment-thread:has(.comment-thread-outdated-badge) .comment-thread-header + .comment .comment-meta {
-  padding-right: 200px;
+  padding-right: 260px;
 }
 
 .comment-author {
