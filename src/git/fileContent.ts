@@ -16,6 +16,35 @@ export async function readFileAtRef(repoPath: string, ref: string, relativePath:
 }
 
 /**
+ * Like `readWorkingTreeFile`, but a file that isn't on disk reads as empty
+ * rather than throwing — a file deleted from the working tree has no
+ * content to snapshot, yet its old-side lines can still carry comments.
+ */
+export async function readWorkingTreeFileOrEmpty(repoPath: string, relativePath: string): Promise<string[]> {
+  try {
+    return await readWorkingTreeFile(repoPath, relativePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
+}
+
+/**
+ * Like `readFileAtRef`, but a path that doesn't exist at `ref` reads as empty
+ * rather than throwing (`git show` exits 128 for a missing path) — a file
+ * deleted by `ref` has no content to snapshot, yet its old-side lines can
+ * still carry comments.
+ */
+export async function readFileAtRefOrEmpty(repoPath: string, ref: string, relativePath: string): Promise<string[]> {
+  try {
+    return await readFileAtRef(repoPath, ref, relativePath);
+  } catch (err) {
+    if ((err as { code?: unknown }).code === 128) return [];
+    throw err;
+  }
+}
+
+/**
  * Joins a lines array back into file content, normalizing away the trailing
  * empty element `readWorkingTreeFile` leaves for a file ending in a
  * newline — `readFileAtRef` never has one, since it strips the trailing

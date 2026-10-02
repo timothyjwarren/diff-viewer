@@ -2,7 +2,7 @@ import express from "express";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted, markUncommittedLines } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
-import { readWorkingTreeFile, readFileAtRef, linesToContent } from "../git/fileContent.js";
+import { readWorkingTreeFile, readFileAtRef, readWorkingTreeFileOrEmpty, readFileAtRefOrEmpty, linesToContent } from "../git/fileContent.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
   const repo = store.snapshot.repos.find(r => r.path === repoPath);
@@ -121,8 +121,8 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
     const repo = findRepo(store, rest.repoPath);
     const pinnedRef = toRef === "HEAD" ? await resolveHeadSha(repo.path) : toRef;
     const lines = pinnedRef === "uncommitted"
-      ? await readWorkingTreeFile(repo.path, rest.file)
-      : await readFileAtRef(repo.path, pinnedRef, rest.file);
+      ? await readWorkingTreeFileOrEmpty(repo.path, rest.file)
+      : await readFileAtRefOrEmpty(repo.path, pinnedRef, rest.file);
     store.ensureContentSnapshot(pinnedRef, rest.file, linesToContent(lines));
     const thread = store.addThread({ ...rest, pinnedRef });
     await store.persist();
@@ -237,8 +237,8 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
         await store.recomputeThreadPositions(
           repoPath, headSha, dirty,
           (pinnedRef, file) => pinnedRef === "uncommitted"
-            ? readWorkingTreeFile(repo.path, file).then(linesToContent)
-            : readFileAtRef(repo.path, pinnedRef, file).then(linesToContent),
+            ? readWorkingTreeFileOrEmpty(repo.path, file).then(linesToContent)
+            : readFileAtRefOrEmpty(repo.path, pinnedRef, file).then(linesToContent),
           // The "old" side is always baseRef's content, which never moves
           // during a session. For the "new" side: a thread pinned to
           // "uncommitted" tracks the working tree (that's its commit basis

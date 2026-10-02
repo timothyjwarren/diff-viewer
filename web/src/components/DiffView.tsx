@@ -104,7 +104,8 @@ export interface CommentHandlers {
   quotedText: string | null;
   onGutterMouseDown: (side: "old" | "new", line: number) => void;
   onGutterMouseEnter: (side: "old" | "new", line: number) => void;
-  onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void;
+  /** Resolves to `false` when the thread could not be saved. */
+  onCreateThread: (side: "old" | "new", lineStart: number, lineEnd: number, body: string, pending: boolean) => void | Promise<boolean | void>;
   onCancelSelection: () => void;
   onReply: (threadId: string, body: string, pending: boolean) => void;
   onEdit: (threadId: string, commentId: string, body: string) => void;
@@ -122,17 +123,24 @@ function formatQuote(text: string): string {
 }
 
 function Composer({ onSubmit, onCancel, quotedText }: {
-  onSubmit: (body: string, pending: boolean) => void;
+  onSubmit: (body: string, pending: boolean) => void | boolean | Promise<void | boolean>;
   onCancel: () => void;
   quotedText: string | null;
 }) {
   const [draft, setDraft] = useState(() => (quotedText ? formatQuote(quotedText) : ""));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  function submit(pending: boolean) {
-    onSubmit(draft, pending);
+  function reset() {
     setDraft("");
     if (textareaRef.current) textareaRef.current.style.height = "";
+  }
+
+  // A handler that returns (or resolves to) `false` reports the save failed;
+  // the draft stays so it can be retried.
+  function submit(pending: boolean) {
+    const result = onSubmit(draft, pending);
+    if (result instanceof Promise) void result.then(saved => { if (saved !== false) reset(); });
+    else if (result !== false) reset();
   }
 
   return (

@@ -73,6 +73,7 @@ export function App() {
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
   const [composerArmed, setComposerArmed] = useState(false);
   const [quotedText, setQuotedText] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
   const { sessionId, title, description, commentsReplacedBy, dismissCommentsReplaced } = useSessionMeta();
   const mainRef = useRef<HTMLElement>(null);
@@ -284,6 +285,18 @@ export function App() {
     document.getElementById(fileAnchorId(file))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /** Runs a comment action, reporting a failure in the error notice instead of letting it reject silently. */
+  async function attempt(action: string, run: () => Promise<void>): Promise<boolean> {
+    try {
+      await run();
+      setFailure(null);
+      return true;
+    } catch (err) {
+      setFailure(`Couldn't ${action}: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
   function commentHandlersFor(file: DiffFile): CommentHandlers {
     const name = fileName(file);
     return {
@@ -310,7 +323,7 @@ export function App() {
         setQuotedText(null);
         dispatchLineSelection({ type: "clear" });
       },
-      onCreateThread: async (side, lineStart, lineEnd, body, pending) => {
+      onCreateThread: (side, lineStart, lineEnd, body, pending) => attempt("save the comment", async () => {
         if (!body.trim()) return;
         const toRef = rangeByRepo[file.repoPath]?.to ?? "HEAD";
         await createThread({ repoPath: file.repoPath, file: name, lineStart, lineEnd, side, body, pending }, toRef);
@@ -318,28 +331,28 @@ export function App() {
         setQuotedText(null);
         dispatchLineSelection({ type: "clear" });
         await refreshThreads();
-      },
-      onReply: async (threadId, body, pending) => {
+      }),
+      onReply: (threadId, body, pending) => attempt("save the reply", async () => {
         if (!body.trim()) return;
         await addReply(threadId, body, pending);
         await refreshThreads();
-      },
-      onEdit: async (threadId, commentId, body) => {
+      }),
+      onEdit: (threadId, commentId, body) => attempt("save the edit", async () => {
         await editComment(threadId, commentId, body);
         await refreshThreads();
-      },
-      onDelete: async (threadId, commentId) => {
+      }),
+      onDelete: (threadId, commentId) => attempt("delete the comment", async () => {
         await deleteComment(threadId, commentId);
         await refreshThreads();
-      },
-      onResolve: async (threadId, resolved) => {
+      }),
+      onResolve: (threadId, resolved) => attempt("update the thread", async () => {
         await resolveThread(threadId, resolved);
         await refreshThreads();
-      },
-      onFlag: async (threadId, flagged) => {
+      }),
+      onFlag: (threadId, flagged) => attempt("update the thread", async () => {
         await flagThread(threadId, flagged);
         await refreshThreads();
-      },
+      }),
       navAvailability,
       onNavigate: navigateFromThread,
       onRead: async (threadId, commentId) => {
@@ -394,6 +407,12 @@ export function App() {
       </main>
       <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
       </div>
+      {failure && (
+        <div className="comments-notice comments-notice-error" role="alert">
+          {failure}
+          <button type="button" className="comments-notice-dismiss" aria-label="Dismiss" onClick={() => setFailure(null)}>×</button>
+        </div>
+      )}
       {commentsReplacedBy && (
         <div className="comments-notice" role="status">
           {commentsReplacedBy === "reset" ? "The agent cleared all comments." : "The agent restored archived comments."}

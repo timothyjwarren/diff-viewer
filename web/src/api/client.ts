@@ -1,7 +1,13 @@
 import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, SessionMeta, Verdict, VerdictType } from "../types";
 
+/** Throws for a non-2xx response, so a failed request surfaces to the caller instead of being read as a success. */
+function ensureOk(res: Response): Response {
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText || "request failed"}`.trim());
+  return res;
+}
+
 async function json<T>(res: Response): Promise<T> {
-  return res.json() as Promise<T>;
+  return ensureOk(res).json() as Promise<T>;
 }
 
 export async function fetchDiffs(): Promise<RepoDiff[]> {
@@ -57,43 +63,43 @@ export async function createThread(input: NewThreadInput, toRef: string): Promis
 }
 
 export async function addReply(threadId: string, body: string, pending: boolean, suggestion?: string): Promise<void> {
-  await fetch(`/api/threads/${threadId}/comments`, {
+  ensureOk(await fetch(`/api/threads/${threadId}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ author: "user", body, pending, suggestion }),
-  });
+  }));
 }
 
 export async function editComment(threadId: string, commentId: string, body: string): Promise<void> {
-  await fetch(`/api/threads/${threadId}/comments/${commentId}`, {
+  ensureOk(await fetch(`/api/threads/${threadId}/comments/${commentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ body }),
-  });
+  }));
 }
 
 export async function deleteComment(threadId: string, commentId: string): Promise<void> {
-  await fetch(`/api/threads/${threadId}/comments/${commentId}`, { method: "DELETE" });
+  ensureOk(await fetch(`/api/threads/${threadId}/comments/${commentId}`, { method: "DELETE" }));
 }
 
 export async function resolveThread(threadId: string, resolved: boolean): Promise<void> {
-  await fetch(`/api/threads/${threadId}/resolve`, {
+  ensureOk(await fetch(`/api/threads/${threadId}/resolve`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resolved }),
-  });
+  }));
 }
 
 export async function flagThread(threadId: string, flagged: boolean): Promise<void> {
-  await fetch(`/api/threads/${threadId}/flag`, {
+  ensureOk(await fetch(`/api/threads/${threadId}/flag`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ flagged }),
-  });
+  }));
 }
 
 export async function markCommentRead(threadId: string, commentId: string): Promise<void> {
-  await fetch(`/api/threads/${threadId}/comments/${commentId}/read`, { method: "POST" });
+  ensureOk(await fetch(`/api/threads/${threadId}/comments/${commentId}/read`, { method: "POST" }));
 }
 
 export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[] }> {

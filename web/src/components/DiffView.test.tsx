@@ -350,6 +350,25 @@ describe("DiffView", () => {
     expect(textarea.style.height).toBe("");
   });
 
+  it("keeps the composer draft when the thread could not be saved", async () => {
+    const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
+    const onCreateThread = vi.fn().mockResolvedValue(false);
+    render(
+      <DiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText("Leave a comment...") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "keep me" } });
+
+    fireEvent.click(screen.getByText("Add single comment"));
+    await Promise.resolve();
+
+    expect(onCreateThread).toHaveBeenCalled();
+    expect(textarea.value).toBe("keep me");
+  });
+
   it("cancels the composer on Escape when its draft is empty", () => {
     const onCancelSelection = vi.fn();
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };

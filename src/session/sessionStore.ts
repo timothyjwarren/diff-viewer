@@ -299,6 +299,13 @@ export class SessionStore {
 
     for (const thread of this.data.threads) {
       if (thread.repoPath !== repoPath || thread.outdated) continue;
+      // An old-side line belongs to baseRef's content, which never moves
+      // during a session, so its position needs no tracking (and a file
+      // deleted since baseRef has no later content to track against).
+      if (thread.side === "old") {
+        if (thread.pinnedRef === "uncommitted" && !dirty) thread.pinnedRef = headSha;
+        continue;
+      }
       const key = `${thread.pinnedRef}:${thread.file}`;
       if (!(key in this.data.contentSnapshots)) {
         this.data.contentSnapshots[key] = await readSnapshot(thread.pinnedRef, thread.file);

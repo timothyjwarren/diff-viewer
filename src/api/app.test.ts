@@ -220,6 +220,29 @@ describe("api app", () => {
     expect(res.body.pinnedRef).toBe(headSha);
   });
 
+  it("accepts an old-side thread on a file deleted since baseRef, and keeps it in place across later commits", async () => {
+    const app = createApp(await buildStore());
+    await git(repoPath, ["rm", "-f", "a.txt"]);
+    const deletedAt = await commitAll("delete a.txt");
+
+    const res = await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "old",
+      body: "why remove this?", pending: false, toRef: "HEAD",
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.pinnedRef).toBe(deletedAt);
+
+    await fs.writeFile(path.join(repoPath, "b.txt"), "unrelated\n");
+    await git(repoPath, ["add", "b.txt"]);
+    await git(repoPath, ["commit", "-m", "unrelated"]);
+    await request(app).get("/api/repo-state").query({ repoPath });
+
+    const threads = await request(app).get("/api/threads");
+    expect(threads.body).toHaveLength(1);
+    expect(threads.body[0].lineStart).toBe(1);
+    expect(threads.body[0].outdated).toBe(false);
+  });
+
   it("resolves toRef=uncommitted to the uncommitted sentinel", async () => {
     const app = createApp(await buildStore());
     const res = await request(app).post("/api/threads").send({

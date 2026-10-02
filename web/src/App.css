@@ -1490,6 +1490,11 @@ main {
   z-index: 10;
 }
 
+.comments-notice-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .comments-notice-dismiss {
   width: 22px;
   height: 22px;
