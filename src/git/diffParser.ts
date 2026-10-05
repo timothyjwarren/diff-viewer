@@ -1,5 +1,19 @@
 import type { DiffFile, DiffHunk, DiffLine, FileStatus } from "../types.js";
 
+/**
+ * Extracts the path from a `diff --git a/P b/P` header. Only unambiguous when
+ * both sides name the same path (no rename), which is the only case where git
+ * omits the `---`/`+++` lines this is needed for. Splitting by length rather
+ * than on whitespace keeps paths containing spaces intact.
+ */
+function pathFromGitHeader(header: string): string {
+  const rest = header.slice("diff --git ".length);
+  const pathLength = (rest.length - "a/ b/".length) / 2;
+  if (!Number.isInteger(pathLength) || pathLength <= 0) return "";
+  const path = rest.slice(2, 2 + pathLength);
+  return rest === `a/${path} b/${path}` ? path : "";
+}
+
 export function parseUnifiedDiff(diffText: string, repoPath: string): DiffFile[] {
   if (!diffText.trim()) return [];
   const lines = diffText.split("\n");
@@ -12,6 +26,7 @@ export function parseUnifiedDiff(diffText: string, repoPath: string): DiffFile[]
       i++;
       continue;
     }
+    const headerPath = pathFromGitHeader(lines[i]);
     i++;
 
     let oldPath = "";
@@ -35,6 +50,12 @@ export function parseUnifiedDiff(diffText: string, repoPath: string): DiffFile[]
         newPath = p === "/dev/null" ? "" : p.replace(/^b\//, "");
       }
       i++;
+    }
+
+    // Empty files, mode-only changes and binary files carry no ---/+++ lines.
+    if (!oldPath && !newPath) {
+      oldPath = headerPath;
+      newPath = headerPath;
     }
 
     const hunks: DiffHunk[] = [];
