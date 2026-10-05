@@ -400,6 +400,52 @@ textarea:focus {
   font-family: var(--font-mono);
 }
 
+.sidebar-reviewed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-reviewed-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.sidebar-reviewed-toggle:hover {
+  text-decoration: underline;
+}
+
+.diff-view-threads {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-view-reviewed {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 .sidebar-viewport-indicator {
   position: absolute;
   z-index: -1;
@@ -484,21 +530,27 @@ main::-webkit-scrollbar-thumb:hover {
   height: 4px;
   transform: translateY(-50%);
   border-radius: 1px;
-  background: var(--accent);
+  background: var(--marker-color, var(--accent));
 }
 
-.scrollbar-marker-pending::before {
-  background: var(--warning);
+.scrollbar-marker-pending {
+  --marker-color: var(--warning);
+}
+
+.scrollbar-marker-resolved {
+  --marker-color: var(--text-muted);
 }
 
 .scrollbar-marker-resolved::before {
-  background: var(--text-muted);
   opacity: 0.45;
+}
+
+.scrollbar-marker-flagged {
+  --marker-color: var(--flag);
 }
 
 .scrollbar-marker-flagged::before {
   height: 5px;
-  background: var(--flag);
 }
 
 .scrollbar-marker:hover::before {
@@ -520,6 +572,19 @@ main::-webkit-scrollbar-thumb:hover {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+
+/* A collapsed file's threads aren't on the page: same colour and shape, drawn as an outline. */
+.scrollbar-marker-collapsed::before {
+  box-sizing: border-box;
+  height: 6px;
+  border: 1px solid var(--marker-color, var(--accent));
+  background: transparent;
+}
+
+.scrollbar-marker-collapsed.scrollbar-marker-unread::before,
+.scrollbar-marker-collapsed.scrollbar-marker-unread:hover::before {
+  height: 9px;
 }
 
 /* ---------- Sidebar ---------- */
@@ -557,6 +622,13 @@ main::-webkit-scrollbar-thumb:hover {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.sidebar-file-reviewed {
+  flex: none;
+  display: inline-flex;
+  color: var(--success);
+  font-size: 13px;
 }
 
 .sidebar li button {

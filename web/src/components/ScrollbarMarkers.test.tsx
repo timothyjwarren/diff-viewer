@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, waitFor, fireEvent } from "@testing-library/react";
 import { useRef } from "react";
 import { ScrollbarMarkers } from "./ScrollbarMarkers";
+import { fileAnchorIdFor } from "../lib/fileAnchor";
 import type { CommentThread } from "../types";
 
 function thread(id: string, overrides: Partial<CommentThread> = {}, pending = false): CommentThread {
@@ -22,7 +23,12 @@ function rectAt(top: number, height = 20): DOMRect {
  * 40px, above the minimum), scrolled 300px down, holding one 20px thread
  * element per `offsets` entry (content offsets of the thread's top).
  */
-function Harness({ threads, offsets }: { threads: CommentThread[]; offsets: Record<string, number> }) {
+function Harness({ threads, offsets, anchors = {}, onExpandFile }: {
+  threads: CommentThread[]; offsets: Record<string, number>;
+  /** Extra elements by DOM id, such as a collapsed file's anchor. */
+  anchors?: Record<string, number>;
+  onExpandFile?: (repoPath: string, file: string) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const scrollTop = 300;
   return (
@@ -44,8 +50,11 @@ function Harness({ threads, offsets }: { threads: CommentThread[]; offsets: Reco
             ref={el => { if (el) el.getBoundingClientRect = () => rectAt(offset - scrollTop); }}
           />
         ))}
+        {Object.entries(anchors).map(([id, offset]) => (
+          <div key={id} id={id} ref={el => { if (el) el.getBoundingClientRect = () => rectAt(offset - scrollTop); }} />
+        ))}
       </div>
-      <ScrollbarMarkers threads={threads} scrollRef={ref} />
+      <ScrollbarMarkers threads={threads} scrollRef={ref} onExpandFile={onExpandFile} />
     </>
   );
 }
@@ -67,6 +76,47 @@ describe("ScrollbarMarkers", () => {
       <Harness threads={[thread("t1"), thread("t2")]} offsets={{ "t1": 100 }} />,
     );
     await waitFor(() => expect(ticks(container)).toHaveLength(1));
+  });
+
+  it("places a thread in a collapsed file at the file's header, and expands the file when clicked", async () => {
+    const onExpandFile = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+    const { container } = render(
+      <Harness
+        threads={[thread("t1")]} offsets={{}} anchors={{ [fileAnchorIdFor("/r", "a.ts")]: 100 }}
+        onExpandFile={onExpandFile}
+      />,
+    );
+    await waitFor(() => expect(ticks(container)).toHaveLength(1));
+    expect(ticks(container)[0].style.top).toBe("11%");
+
+    fireEvent.click(ticks(container)[0]);
+    expect(onExpandFile).toHaveBeenCalledWith("/r", "a.ts");
+    vi.unstubAllGlobals();
+  });
+
+  it("draws one outlined tick per collapsed file, styled as its most important open thread", async () => {
+    const anchor = fileAnchorIdFor("/r", "a.ts");
+    const { container } = render(
+      <Harness
+        threads={[thread("t1"), thread("t2", { flagged: true }), thread("t3", { resolved: true })]}
+        offsets={{}} anchors={{ [anchor]: 100 }}
+      />,
+    );
+    await waitFor(() => expect(ticks(container)).toHaveLength(1));
+    expect(ticks(container)[0]).toHaveClass("scrollbar-marker-collapsed", "scrollbar-marker-flagged");
+    expect(ticks(container)[0]).toHaveAttribute("title", "2 open threads in a.ts (collapsed)");
+  });
+
+  it("draws no tick for a collapsed file whose threads are all resolved", async () => {
+    const { container } = render(
+      <Harness
+        threads={[thread("t1", { resolved: true })]} offsets={{}}
+        anchors={{ [fileAnchorIdFor("/r", "a.ts")]: 100 }}
+      />,
+    );
+    await new Promise(r => setTimeout(r, 50));
+    expect(ticks(container)).toHaveLength(0);
   });
 
   it("marks and labels resolved threads", async () => {

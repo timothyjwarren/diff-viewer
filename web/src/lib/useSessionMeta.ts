@@ -9,12 +9,15 @@ export const SESSION_META_POLL_MS = 3000;
  * agent can change the description (`diff-viewer describe`) or swap out every
  * comment (`diff-viewer reset` / `restore`) mid-session. `commentsReplacedBy`
  * says which of those last happened while this page was open, until dismissed.
+ * `commentsReplacedAt` is when the comments were last replaced (null if never,
+ * undefined until the session loads).
  */
 export function useSessionMeta() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   const [commentsReplacedBy, setCommentsReplacedBy] = useState<CommentsReplaced["by"] | null>(null);
+  const [commentsReplacedAt, setCommentsReplacedAt] = useState<string | null | undefined>(undefined);
   // undefined until the session loads; null once loaded if its comments have never been replaced.
   const knownReplacedAt = useRef<string | null | undefined>(undefined);
 
@@ -27,6 +30,7 @@ export function useSessionMeta() {
       setTitle(session.title);
       setDescription(session.description ?? null);
       knownReplacedAt.current = session.commentsReplaced?.at ?? null;
+      setCommentsReplacedAt(knownReplacedAt.current);
     }).catch(() => {});
 
     const interval = setInterval(() => {
@@ -40,6 +44,7 @@ export function useSessionMeta() {
           const replaced = meta.commentsReplaced;
           if (replaced && replaced.at !== knownReplacedAt.current) {
             knownReplacedAt.current = replaced.at;
+            setCommentsReplacedAt(replaced.at);
             setCommentsReplacedBy(replaced.by);
           }
         })
@@ -53,7 +58,7 @@ export function useSessionMeta() {
   }, []);
 
   return {
-    sessionId, title, description, commentsReplacedBy,
+    sessionId, title, description, commentsReplacedBy, commentsReplacedAt,
     dismissCommentsReplaced: () => setCommentsReplacedBy(null),
   };
 }

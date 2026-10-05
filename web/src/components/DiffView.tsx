@@ -13,7 +13,7 @@ import { ExpandStrip } from "./ExpandStrip";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
 import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
-import { ChevronIcon, ExternalFileIcon } from "./Icons";
+import { ChevronIcon, CommentIcon, ExternalFileIcon } from "./Icons";
 import { useAlignedAnnotations } from "../lib/alignAnnotations";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
@@ -280,15 +280,21 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
   );
 }
 
-export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBanner, comments }: {
+export function DiffView({
+  file, repoPath, repoName, gitRef, showUncommittedBanner, comments,
+  collapsed, reviewed, onToggleCollapsed, onToggleReviewed,
+}: {
   file: DiffFile; repoPath: string; repoName: string; gitRef: string;
+  collapsed: boolean;
+  reviewed: boolean;
+  onToggleCollapsed: () => void;
+  onToggleReviewed: () => void;
   /** Only when the active range targets uncommitted AND this specific file actually has an uncommitted edit. */
   showUncommittedBanner?: boolean;
   comments: CommentHandlers;
 }) {
   const [hunks, setHunks] = useState<DiffHunk[]>(file.hunks);
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   const [paneSplit, setPaneSplit] = useState(50);
   const [dragging, setDragging] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -304,14 +310,22 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   const dir = slash >= 0 ? fileId.slice(0, slash) : "";
   const base = fileId.slice(slash + 1);
   const stat = diffStat(file);
+  const openThreads = comments.threads.filter(t => !t.resolved).length;
   useAlignedAnnotations(bodyRef);
 
+  function noteHeaderTopBeforeCollapse() {
+    beforeCollapseTopRef.current = headerRef.current?.getBoundingClientRect().top ?? null;
+    justCollapsedRef.current = true;
+  }
+
   function toggleCollapsed() {
-    if (!collapsed) {
-      beforeCollapseTopRef.current = headerRef.current?.getBoundingClientRect().top ?? null;
-      justCollapsedRef.current = true;
-    }
-    setCollapsed(c => !c);
+    if (!collapsed) noteHeaderTopBeforeCollapse();
+    onToggleCollapsed();
+  }
+
+  function toggleReviewed() {
+    if (!reviewed && !collapsed) noteHeaderTopBeforeCollapse();
+    onToggleReviewed();
   }
 
   // Collapsing removes the file's body, which can un-stick this file's
@@ -321,9 +335,9 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
   // weren't scrolled that far), this measures how far the header actually
   // moved on screen and scrolls by exactly that much to cancel it out —
   // a no-op when the header didn't move. Runs in an effect (after the
-  // collapse commits, not as a side effect inside the setCollapsed updater,
-  // which StrictMode invokes twice) guarded by a ref so it still fires only
-  // once per real toggle.
+  // collapse commits) guarded by a ref so it still fires only once per
+  // toggle the user makes here; collapsing from elsewhere (the sidebar's
+  // collapse-reviewed button) doesn't set the ref and isn't compensated.
   useEffect(() => {
     if (!collapsed || !justCollapsedRef.current) return;
     justCollapsedRef.current = false;
@@ -420,6 +434,15 @@ export function DiffView({ file, repoPath, repoName, gitRef, showUncommittedBann
             {stat.added > 0 && <span className="diffstat-added">+{stat.added}</span>}
             {stat.deleted > 0 && <span className="diffstat-deleted">−{stat.deleted}</span>}
           </span>
+          {openThreads > 0 && (
+            <span className="diff-view-threads" aria-label={`${openThreads} open thread${openThreads === 1 ? "" : "s"}`}>
+              <CommentIcon />{openThreads}
+            </span>
+          )}
+          <label className="diff-view-reviewed">
+            <input type="checkbox" checked={reviewed} onChange={toggleReviewed} />
+            Reviewed
+          </label>
           <button className="btn-icon" aria-label="View File" title="View full file" onClick={openFileView}>
             <ExternalFileIcon />
           </button>

@@ -1,7 +1,8 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { DiffView, type CommentHandlers } from "./DiffView";
+import type { ComponentProps } from "react";
 import type { CommentThread as CommentThreadData, DiffFile } from "../types";
 import { fetchFile } from "../api/client";
 
@@ -34,11 +35,65 @@ const comments: CommentHandlers = {
 
 afterEach(() => vi.restoreAllMocks());
 
+type DiffViewProps = ComponentProps<typeof DiffView>;
+
+/** Holds the collapsed and reviewed state that the app keeps above DiffView. */
+function TestDiffView(
+  props: Omit<DiffViewProps, "collapsed" | "reviewed" | "onToggleCollapsed" | "onToggleReviewed">,
+) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [reviewed, setReviewed] = useState(false);
+  return (
+    <DiffView
+      {...props} collapsed={collapsed} reviewed={reviewed}
+      onToggleCollapsed={() => setCollapsed(c => !c)}
+      onToggleReviewed={() => { setReviewed(r => !r); setCollapsed(!reviewed); }}
+    />
+  );
+}
+
 describe("DiffView", () => {
+  it("shows the count of open threads in the header, whether or not the file is collapsed", () => {
+    const thread = (id: string, resolved: boolean): CommentThreadData => ({
+      id, repoPath: "/repo", file: "a.ts", lineStart: 1, lineEnd: 1, side: "new", resolved,
+      pinnedRef: "abc123", outdated: false,
+      comments: [{ id: `${id}-c`, author: "user", body: "hi", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
+    });
+    render(
+      <TestDiffView
+        file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
+        comments={{ ...comments, threads: [thread("t1", false), thread("t2", false), thread("t3", true)] }}
+      />,
+    );
+    expect(screen.getByLabelText("2 open threads")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Collapse file"));
+    expect(screen.getByLabelText("2 open threads")).toBeInTheDocument();
+  });
+
+  it("shows no thread count when there are no open threads", () => {
+    render(<TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />);
+    expect(screen.queryByLabelText(/open thread/)).not.toBeInTheDocument();
+  });
+
+  it("collapses the file when Reviewed is checked and expands it when unchecked", () => {
+    const { container } = render(
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const checkbox = screen.getByRole("checkbox", { name: "Reviewed" });
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    expect(container.querySelectorAll(".diff-pane")).toHaveLength(0);
+
+    fireEvent.click(checkbox);
+    expect(container.querySelectorAll(".diff-pane")).toHaveLength(2);
+  });
+
   it("opens the raw file view in a new tab at the given ref, instead of toggling in place", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="abc123" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="abc123" comments={comments} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "View File" }));
@@ -57,7 +112,7 @@ describe("DiffView", () => {
   it("keeps showing the diff panes after clicking View File, since it no longer toggles in place", () => {
     vi.spyOn(window, "open").mockImplementation(() => null);
     const { container } = render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "View File" }));
@@ -67,26 +122,26 @@ describe("DiffView", () => {
 
   it("shows an uncommitted-changes banner when showUncommittedBanner is true", () => {
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner comments={comments} />,
     );
     expect(screen.getByText(/Viewing uncommitted changes/)).toBeInTheDocument();
   });
 
   it("shows no banner when showUncommittedBanner is false or omitted", () => {
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner={false} comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner={false} comments={comments} />,
     );
     expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
 
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     expect(screen.queryByText(/Viewing uncommitted changes/)).not.toBeInTheDocument();
   });
 
   it("tints only the specific lines flagged uncommitted, not the whole file's other additions", () => {
     render(
-      <DiffView file={fileWithMixedAdds} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner comments={comments} />,
+      <TestDiffView file={fileWithMixedAdds} repoPath="/repo" repoName="repo:main" gitRef="working" showUncommittedBanner comments={comments} />,
     );
     expect(screen.getByText("committed addition").closest(".diff-line")).not.toHaveClass("diff-line-uncommitted");
     expect(screen.getByText("uncommitted addition").closest(".diff-line")).toHaveClass("diff-line-uncommitted");
@@ -104,7 +159,7 @@ describe("DiffView", () => {
       }],
     };
     const { container } = render(
-      <DiffView file={changedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={changedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     const marks = (side: string) => Array.from(
       container.querySelectorAll(`.diff-pane[data-side='${side}'] .diff-inline-change`), el => el.textContent,
@@ -134,7 +189,7 @@ describe("DiffView", () => {
       comments: [{ id: "c1", author: "user", body: "why is this here?", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
     };
     const { container } = render(
-      <DiffView
+      <TestDiffView
         file={fileWithShift} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, threads: [thread] }}
       />,
@@ -163,7 +218,7 @@ describe("DiffView", () => {
       comments: [{ id: "c1", author: "user", body: "old side note", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
     };
     const { container } = render(
-      <DiffView
+      <TestDiffView
         file={twoLineFile} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, threads: [thread] }}
       />,
@@ -198,7 +253,7 @@ describe("DiffView", () => {
       comments: [{ id: "c1", author: "user", body: "why hidden?", pending: false, createdAt: "2026-01-01T00:00:00Z" }],
     };
     render(
-      <DiffView
+      <TestDiffView
         file={fileWithHiddenThread} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, threads: [thread] }}
       />,
@@ -216,7 +271,7 @@ describe("DiffView", () => {
       .mockReturnValueOnce({ top: 0 } as DOMRect);
     const { container } = render(
       <main>
-        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+        <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
       </main>,
     );
     const mainEl = container.querySelector("main") as HTMLElement;
@@ -232,7 +287,7 @@ describe("DiffView", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
     const { container } = render(
       <main>
-        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+        <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
       </main>,
     );
     const mainEl = container.querySelector("main") as HTMLElement;
@@ -251,7 +306,7 @@ describe("DiffView", () => {
     const { container } = render(
       <StrictMode>
         <main>
-          <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+          <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
         </main>
       </StrictMode>,
     );
@@ -268,7 +323,7 @@ describe("DiffView", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 0 } as DOMRect);
     const { container } = render(
       <main>
-        <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+        <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
       </main>,
     );
     const mainEl = container.querySelector("main") as HTMLElement;
@@ -285,7 +340,7 @@ describe("DiffView", () => {
   it("renders a single full-width pane for a newly added file", () => {
     const addedFile: DiffFile = { ...file, status: "added" };
     const { container } = render(
-      <DiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     const panes = container.querySelectorAll(".diff-pane");
     expect(panes).toHaveLength(1);
@@ -294,14 +349,14 @@ describe("DiffView", () => {
 
   it("still renders two panes for a modified file", () => {
     const { container } = render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     expect(container.querySelectorAll(".diff-pane")).toHaveLength(2);
   });
 
   it("prevents native text selection when starting a divider drag", () => {
     render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     const divider = screen.getByRole("separator");
     const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 100 });
@@ -313,7 +368,7 @@ describe("DiffView", () => {
 
   it("resizes the two panes by dragging the divider between them", () => {
     const { container } = render(
-      <DiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     const body = container.querySelector(".diff-view-body") as HTMLElement;
     vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ width: 200 } as DOMRect);
@@ -329,7 +384,7 @@ describe("DiffView", () => {
   it("does not show a divider for a single-pane (new) file", () => {
     const addedFile: DiffFile = { ...file, status: "added" };
     render(
-      <DiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      <TestDiffView file={addedFile} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
     );
     expect(screen.queryByRole("separator")).not.toBeInTheDocument();
   });
@@ -337,7 +392,7 @@ describe("DiffView", () => {
   it("resets a manually-enlarged composer textarea's height after submitting", () => {
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true }}
       />,
@@ -354,7 +409,7 @@ describe("DiffView", () => {
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     const onCreateThread = vi.fn().mockResolvedValue(false);
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
       />,
@@ -373,7 +428,7 @@ describe("DiffView", () => {
     const onCancelSelection = vi.fn();
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true, onCancelSelection }}
       />,
@@ -389,7 +444,7 @@ describe("DiffView", () => {
     const onCancelSelection = vi.fn();
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true, onCancelSelection }}
       />,
@@ -406,7 +461,7 @@ describe("DiffView", () => {
     const onCreateThread = vi.fn();
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
       />,
@@ -423,7 +478,7 @@ describe("DiffView", () => {
     const onCreateThread = vi.fn();
     const selection = { file: "a.ts", side: "new" as const, start: 1, end: 1 };
     render(
-      <DiffView
+      <TestDiffView
         file={file} repoPath="/repo" repoName="repo:main" gitRef="working"
         comments={{ ...comments, selection, composerArmed: true, onCreateThread }}
       />,

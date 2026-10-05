@@ -107,4 +107,42 @@ describe("Sidebar", () => {
     render(<Sidebar repos={nested} onSelectFile={() => {}} />);
     expect(screen.getByText("d.ts").closest("li")).toHaveAttribute("title", "a/b/c/d.ts");
   });
+
+  it("shows the reviewed tally and a checkmark only on reviewed files", () => {
+    render(
+      <Sidebar
+        repos={repos} onSelectFile={() => {}} reviewedCount={1}
+        isReviewed={file => file === repos[0].files[0]}
+      />,
+    );
+    expect(screen.getByText("1 / 2 reviewed")).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "Reviewed" })).toHaveLength(1);
+    expect(screen.getByText("x.ts").closest("li")).toContainElement(screen.getByRole("img", { name: "Reviewed" }));
+  });
+
+  it("offers to expand or collapse reviewed files only when there are some", () => {
+    const onToggleAllReviewed = vi.fn();
+    const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} />);
+    expect(screen.queryByRole("button", { name: /reviewed/i })).not.toBeInTheDocument();
+
+    rerender(
+      <Sidebar repos={repos} onSelectFile={() => {}} reviewedCount={1} anyReviewedCollapsed onToggleAllReviewed={onToggleAllReviewed} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Expand reviewed" }));
+    expect(onToggleAllReviewed).toHaveBeenCalledTimes(1);
+
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} reviewedCount={1} />);
+    expect(screen.getByRole("button", { name: "Collapse reviewed" })).toBeInTheDocument();
+  });
+
+  it("still shows open-thread counts on a reviewed file", () => {
+    const thread = {
+      id: "t", repoPath: "/r/a", file: "x.ts", lineStart: 1, lineEnd: 1, side: "new" as const,
+      resolved: false, pinnedRef: "working", outdated: false, comments: [],
+    };
+    render(
+      <Sidebar repos={repos} onSelectFile={() => {}} threads={[thread]} reviewedCount={1} isReviewed={() => true} />,
+    );
+    expect(screen.getByLabelText("1 open thread")).toBeInTheDocument();
+  });
 });

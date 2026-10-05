@@ -11,6 +11,7 @@ import { newAgentCommentIds } from "./lib/newComments";
 import { fileAnchorId } from "./lib/fileAnchor";
 import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
 import { useSessionMeta } from "./lib/useSessionMeta";
+import { useReviewedFiles } from "./lib/useReviewedFiles";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import {
   findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability,
@@ -75,7 +76,8 @@ export function App() {
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const { sessionId, title, description, commentsReplacedBy, dismissCommentsReplaced } = useSessionMeta();
+  const { sessionId, title, description, commentsReplacedBy, commentsReplacedAt, dismissCommentsReplaced } = useSessionMeta();
+  const reviewed = useReviewedFiles(sessionId, commentsReplacedAt, repos.flatMap(r => r.files));
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const threadsRef = useRef<CommentThread[]>([]);
@@ -378,6 +380,9 @@ export function App() {
           repos={repos} onSelectFile={scrollToFile}
           commitsByRepo={commitsByRepo} rangeByRepo={rangeByRepo} onRangeChange={handleRangeChange}
           onOpenCommits={handleOpenCommits} title={title} description={description} sessionId={sessionId} viewportSpan={viewportSpan} threads={threads}
+          isReviewed={reviewed.isReviewed}
+          reviewedCount={reviewed.reviewedCount} anyReviewedCollapsed={reviewed.anyReviewedCollapsed}
+          onToggleAllReviewed={reviewed.toggleAllReviewed}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}
@@ -401,11 +406,21 @@ export function App() {
                 && Boolean(dirtyFilesByRepo[repo.repoPath]?.includes(fileName(file)))
               }
               comments={commentHandlersFor(file)}
+              collapsed={reviewed.isCollapsed(file)}
+              reviewed={reviewed.isReviewed(file)}
+              onToggleCollapsed={() => reviewed.toggleCollapsed(file)}
+              onToggleReviewed={() => reviewed.toggleReviewed(file)}
             />
           </div>
         )))}
       </main>
-      <ScrollbarMarkers threads={threads} scrollRef={mainRef} />
+      <ScrollbarMarkers
+        threads={threads} scrollRef={mainRef}
+        onExpandFile={(repoPath, name) => {
+          const file = repos.find(r => r.repoPath === repoPath)?.files.find(f => fileName(f) === name);
+          if (file && reviewed.isCollapsed(file)) reviewed.toggleCollapsed(file);
+        }}
+      />
       </div>
       {failure && (
         <div className="comments-notice comments-notice-error" role="alert">

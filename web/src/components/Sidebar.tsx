@@ -5,7 +5,7 @@ import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
 import type { ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
-import { ChevronIcon, CommentIcon } from "./Icons";
+import { CheckIcon, ChevronIcon, CommentIcon } from "./Icons";
 import { CommentMarkdown } from "./CommentMarkdown";
 
 let measureCanvas: HTMLCanvasElement | null = null;
@@ -102,6 +102,8 @@ function SessionTitle({ title, description, sessionId }: {
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
   title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
+  isReviewed = () => false, reviewedCount = 0,
+  anyReviewedCollapsed = false, onToggleAllReviewed = () => {},
 }: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
@@ -114,6 +116,11 @@ export function Sidebar({
   sessionId?: string | null;
   viewportSpan?: ViewportSpan | null;
   threads?: CommentThread[];
+  isReviewed?: (file: DiffFile) => boolean;
+  reviewedCount?: number;
+  /** Whether any reviewed file is collapsed, which decides if the bulk button expands or collapses them. */
+  anyReviewedCollapsed?: boolean;
+  onToggleAllReviewed?: () => void;
 }) {
   const allFiles = repos.flatMap(r => r.files);
   const stat = totalDiffStat(allFiles);
@@ -151,6 +158,16 @@ export function Sidebar({
               <span className="diffstat-deleted">−{stat.deleted}</span>
             </p>
           )}
+          {allFiles.length > 0 && (
+            <div className="sidebar-reviewed">
+              <span>{reviewedCount} / {allFiles.length} reviewed</span>
+              {reviewedCount > 0 && (
+                <button type="button" className="sidebar-reviewed-toggle" onClick={onToggleAllReviewed}>
+                  {anyReviewedCollapsed ? "Expand reviewed" : "Collapse reviewed"}
+                </button>
+              )}
+            </div>
+          )}
         </header>
       )}
       {viewportSpan && <div ref={indicatorRef} className="sidebar-viewport-indicator" data-testid="viewport-indicator" />}
@@ -184,6 +201,9 @@ export function Sidebar({
                       {STATUS_LETTER[file.status]}
                     </span>
                     <FileName dir={dir} base={base} />
+                    {isReviewed(file) && (
+                      <span className="sidebar-file-reviewed" role="img" aria-label="Reviewed"><CheckIcon /></span>
+                    )}
                     {openThreads > 0 && (
                       <span className="sidebar-file-threads" aria-label={`${openThreads} open thread${openThreads === 1 ? "" : "s"}`}>
                         <CommentIcon />{openThreads}
