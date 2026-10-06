@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
@@ -46,11 +46,32 @@ describe("api app", () => {
     return SessionStore.create([{ path: repoPath, name: "repo", branch: "feature", baseRef }], "s1", "test session", dataDir);
   }
 
-  it("GET /api/session/meta returns only the title and description", async () => {
+  it("GET /api/session/meta returns only the title, description and whether an agent is listening", async () => {
     const store = await buildStore();
     const app = createApp(store);
     const res = await request(app).get("/api/session/meta");
-    expect(res.body).toEqual({ title: "test session" });
+    expect(res.body).toEqual({ title: "test session", agentListening: false });
+  });
+
+  it("reports an agent as listening while a wait request is open, then for the grace period after", async () => {
+    const app = createApp(await buildStore(), undefined, 55000, 150);
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as { port: number };
+      const meta = async () => (await (await fetch(`http://127.0.0.1:${port}/api/session/meta`)).json()).agentListening;
+      expect(await meta()).toBe(false);
+
+      const abort = new AbortController();
+      fetch(`http://127.0.0.1:${port}/api/wait?since=999`, { signal: abort.signal }).catch(() => {});
+      await vi.waitFor(async () => expect(await meta()).toBe(true));
+
+      abort.abort();
+      await vi.waitFor(async () => expect(await meta()).toBe(true));
+      await new Promise(r => setTimeout(r, 200));
+      expect(await meta()).toBe(false);
+    } finally {
+      server.close();
+    }
   });
 
   it("PUT /api/session/description sets and persists the description", async () => {
@@ -58,7 +79,7 @@ describe("api app", () => {
     const app = createApp(store);
     const res = await request(app).put("/api/session/description").send({ description: "Reviewing X." });
     expect(res.status).toBe(204);
-    expect((await request(app).get("/api/session/meta")).body).toEqual({ title: "test session", description: "Reviewing X." });
+    expect((await request(app).get("/api/session/meta")).body).toEqual({ title: "test session", description: "Reviewing X.", agentListening: false });
     const saved = JSON.parse(await fs.readFile(path.join(dataDir, "s1.json"), "utf-8"));
     expect(saved.description).toBe("Reviewing X.");
   });

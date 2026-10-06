@@ -76,7 +76,7 @@ export function App() {
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const { sessionId, title, description, commentsReplacedBy, commentsReplacedAt, dismissCommentsReplaced } = useSessionMeta();
+  const { sessionId, title, description, commentsReplacedBy, commentsReplacedAt, dismissCommentsReplaced, serverReachable, agentListening } = useSessionMeta();
   const reviewed = useReviewedFiles(sessionId, commentsReplacedAt, repos.flatMap(r => r.files));
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -383,6 +383,7 @@ export function App() {
           isReviewed={reviewed.isReviewed}
           reviewedCount={reviewed.reviewedCount} anyReviewedCollapsed={reviewed.anyReviewedCollapsed}
           onToggleAllReviewed={reviewed.toggleAllReviewed}
+          agentListening={serverReachable ? agentListening : null}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}
@@ -390,6 +391,11 @@ export function App() {
         />
       </div>
       <div className="main-pane">
+      {!serverReachable && (
+        <div className="connection-lost" role="alert">
+          Lost connection to the diff viewer server. It may have been stopped. Comments can't be saved until it's back.
+        </div>
+      )}
       <main ref={mainRef}>
         {repos.length === 0 && (
           <p className="empty-state">{loaded ? "No changes to review." : "Loading changes…"}</p>

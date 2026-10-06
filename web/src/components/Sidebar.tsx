@@ -5,7 +5,7 @@ import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
 import type { ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
-import { CheckIcon, ChevronIcon, CommentIcon } from "./Icons";
+import { CheckIcon, ChevronIcon, CommentIcon, WarningIcon } from "./Icons";
 import { CommentMarkdown } from "./CommentMarkdown";
 
 let measureCanvas: HTMLCanvasElement | null = null;
@@ -103,7 +103,7 @@ export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
   title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
   isReviewed = () => false, reviewedCount = 0,
-  anyReviewedCollapsed = false, onToggleAllReviewed = () => {},
+  anyReviewedCollapsed = false, onToggleAllReviewed = () => {}, agentListening = null,
 }: {
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
@@ -121,6 +121,8 @@ export function Sidebar({
   /** Whether any reviewed file is collapsed, which decides if the bulk button expands or collapses them. */
   anyReviewedCollapsed?: boolean;
   onToggleAllReviewed?: () => void;
+  /** Whether an agent is waiting on the session; null hides the status (e.g. while the server is unreachable). */
+  agentListening?: boolean | null;
 }) {
   const allFiles = repos.flatMap(r => r.files);
   const stat = totalDiffStat(allFiles);
@@ -148,6 +150,15 @@ export function Sidebar({
 
   return (
     <nav className="sidebar" ref={navRef}>
+      {agentListening === false && (
+        <div className="sidebar-agent-warning" role="alert">
+          <WarningIcon />
+          <div>
+            <strong>No agent listening</strong>
+            <span>Comments won't get a response until an agent connects.</span>
+          </div>
+        </div>
+      )}
       {(title || allFiles.length > 0) && (
         <header className="sidebar-header">
           {title && <SessionTitle key={sessionId} title={title} description={description} sessionId={sessionId} />}
@@ -169,6 +180,12 @@ export function Sidebar({
             </div>
           )}
         </header>
+      )}
+      {agentListening && (
+        <p className="sidebar-agent-status" role="status">
+          <span className="sidebar-agent-dot" aria-hidden="true" />
+          Agent listening
+        </p>
       )}
       {viewportSpan && <div ref={indicatorRef} className="sidebar-viewport-indicator" data-testid="viewport-indicator" />}
       {repos.map(repo => (

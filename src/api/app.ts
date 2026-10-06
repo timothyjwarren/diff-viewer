@@ -12,16 +12,26 @@ function findRepo(store: SessionStore, repoPath: string) {
 
 const lastKnownState = new Map<string, { headSha: string; dirty: boolean }>();
 
-export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutMs = 55000): express.Express {
+/**
+ * `listeningGraceMs` is how long after its last `/api/wait` request ends an
+ * agent still counts as listening, covering the gap while `watch` re-arms.
+ */
+export function createApp(
+  store: SessionStore, webDistDir?: string, waitTimeoutMs = 55000, listeningGraceMs = 10000,
+): express.Express {
   const app = express();
   app.use(express.json());
+
+  let openWaits = 0;
+  let lastWaitEndedAt = -Infinity;
+  const agentListening = () => openWaits > 0 || Date.now() - lastWaitEndedAt < listeningGraceMs;
 
   app.get("/api/session", (_req, res) => res.json(store.snapshot));
 
   // Polled by the browser, so it returns just these small fields rather than the whole snapshot.
   app.get("/api/session/meta", (_req, res) => {
     const { title, description, commentsReplaced } = store.snapshot;
-    res.json({ title, description, commentsReplaced });
+    res.json({ title, description, commentsReplaced, agentListening: agentListening() });
   });
 
   app.post("/api/session/reset", async (_req, res) => {
@@ -264,6 +274,11 @@ export function createApp(store: SessionStore, webDistDir?: string, waitTimeoutM
   });
 
   app.get("/api/wait", (req, res) => {
+    openWaits += 1;
+    res.on("close", () => {
+      openWaits -= 1;
+      lastWaitEndedAt = Date.now();
+    });
     const since = Number(req.query.since ?? store.notificationCount);
     const already = store.notificationsSince(since);
     if (already.length > 0) {

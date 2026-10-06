@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useSessionMeta, SESSION_META_POLL_MS } from "./useSessionMeta";
+import { useSessionMeta, SESSION_META_POLL_MS, UNREACHABLE_AFTER_FAILURES } from "./useSessionMeta";
 import * as client from "../api/client";
 import type { SessionMeta } from "../types";
 
@@ -11,7 +11,7 @@ describe("useSessionMeta", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    meta = { title: "t", description: "first" };
+    meta = { title: "t", description: "first", agentListening: false };
     vi.mocked(client.fetchSession).mockImplementation(async () => ({ id: "s1", ...meta }));
     vi.mocked(client.fetchSessionMeta).mockImplementation(async () => ({ ...meta }));
   });
@@ -59,5 +59,34 @@ describe("useSessionMeta", () => {
     await act(async () => {});
     await poll();
     expect(result.current.commentsReplacedBy).toBeNull();
+  });
+
+  it("reports whether an agent is listening", async () => {
+    const { result } = renderHook(() => useSessionMeta());
+    await act(async () => {});
+    await poll();
+    expect(result.current.agentListening).toBe(false);
+
+    meta = { ...meta, agentListening: true };
+    await poll();
+    expect(result.current.agentListening).toBe(true);
+  });
+
+  it("reports the server unreachable after repeated failed polls, and reachable again once one succeeds", async () => {
+    const { result } = renderHook(() => useSessionMeta());
+    await act(async () => {});
+    expect(result.current.serverReachable).toBe(true);
+
+    vi.mocked(client.fetchSessionMeta).mockRejectedValue(new Error("down"));
+    for (let i = 1; i < UNREACHABLE_AFTER_FAILURES; i++) {
+      await poll();
+      expect(result.current.serverReachable).toBe(true);
+    }
+    await poll();
+    expect(result.current.serverReachable).toBe(false);
+
+    vi.mocked(client.fetchSessionMeta).mockImplementation(async () => ({ ...meta }));
+    await poll();
+    expect(result.current.serverReachable).toBe(true);
   });
 });

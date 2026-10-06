@@ -45,6 +45,15 @@ export function FlagIcon({ filled = false }: { filled?: boolean }) {
   );
 }
 
+export function WarningIcon() {
+  return (
+    <Svg>
+      <path d="M8 2.5 14 13H2z" />
+      <path d="M8 6.5v3.2M8 11.5v.1" />
+    </Svg>
+  );
+}
+
 export function CheckIcon() {
   return <Svg><path d="m3.5 8.5 3 3 6-7" /></Svg>;
 }

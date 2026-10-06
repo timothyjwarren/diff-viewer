@@ -40,4 +40,7 @@ export interface Verdict { id: string; type: VerdictType; summary?: string; subm
 
 export interface CommentsReplaced { at: string; by: "reset" | "restore"; }
 export interface SessionInfo { id: string; title: string; description?: string; commentsReplaced?: CommentsReplaced; }
-export type SessionMeta = Pick<SessionInfo, "title" | "description" | "commentsReplaced">;
+export type SessionMeta = Pick<SessionInfo, "title" | "description" | "commentsReplaced"> & {
+  /** Whether an agent is currently waiting on this session's notifications. */
+  agentListening: boolean;
+};

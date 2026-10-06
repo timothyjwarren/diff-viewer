@@ -145,4 +145,18 @@ describe("Sidebar", () => {
     );
     expect(screen.getByLabelText("1 open thread")).toBeInTheDocument();
   });
+
+  it("warns loudly when no agent is listening, shows a quiet status when one is, and nothing when unknown", () => {
+    const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} agentListening />);
+    expect(screen.getByRole("status")).toHaveTextContent("Agent listening");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} agentListening={false} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("No agent listening");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });
