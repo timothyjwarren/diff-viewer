@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
+import { ViewerTracker } from "./viewerTracker.js";
 import { createApp } from "./app.js";
 import { SessionStore } from "../session/sessionStore.js";
 import { resolveBaseRef } from "../git/gitRepo.js";
@@ -72,6 +73,44 @@ describe("api app", () => {
     } finally {
       server.close();
     }
+  });
+
+  it("ends held waits with a viewer_closed reason when the viewer tracker closes", async () => {
+    const viewers = new ViewerTracker();
+    const app = createApp(await buildStore(), undefined, 55000, 10000, viewers);
+    const server = app.listen(0);
+    try {
+      const { port } = server.address() as { port: number };
+      const pending = fetch(`http://127.0.0.1:${port}/api/wait?since=999`).then(r => r.json());
+      await vi.waitFor(async () => {
+        expect((await (await fetch(`http://127.0.0.1:${port}/api/session/meta`)).json()).agentListening).toBe(true);
+      });
+      viewers.close();
+      expect(await pending).toEqual({ notifications: [], cursor: 999, ended: "viewer_closed" });
+    } finally {
+      server.close();
+    }
+  });
+
+  it("counts polls as viewer heartbeats and POST /api/session/bye as a departure", async () => {
+    const now = 0;
+    const viewers = new ViewerTracker({ firstConnectMs: 1000, heartbeatMs: 500, byeGraceMs: 0 }, () => now);
+    const app = createApp(await buildStore(), undefined, 55000, 10000, viewers);
+    expect(viewers.shouldClose()).toBe(false);
+    await request(app).get("/api/session/meta?viewer=v1");
+    await request(app).get("/api/session?viewer=v2");
+    expect((await request(app).post("/api/session/bye?viewer=v1")).status).toBe(204);
+    expect(viewers.shouldClose()).toBe(false);
+    await request(app).post("/api/session/bye?viewer=v2");
+    expect(viewers.shouldClose()).toBe(true);
+  });
+
+  it("does not count requests without a viewer id as viewers", async () => {
+    const viewers = new ViewerTracker({ firstConnectMs: 0, heartbeatMs: 500, byeGraceMs: 0 });
+    const app = createApp(await buildStore(), undefined, 55000, 10000, viewers);
+    await request(app).get("/api/session/meta");
+    await request(app).get("/api/session");
+    expect(viewers.shouldClose()).toBe(true);
   });
 
   it("PUT /api/session/description sets and persists the description", async () => {

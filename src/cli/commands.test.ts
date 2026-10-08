@@ -6,6 +6,7 @@ import type { Server } from "node:http";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createApp } from "../api/app.js";
+import { ViewerTracker } from "../api/viewerTracker.js";
 import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
@@ -257,6 +258,40 @@ describe("cli commands", () => {
     expect(JSON.parse(lines[0]).type).toBe("verdict");
     expect(JSON.parse(lines[1]).type).toBe("verdict");
     expect(JSON.parse(lines[2])).toEqual({ type: "session_ended" });
+  });
+
+  it("watchCommand reports why the session ended when the server closes its last viewer", async () => {
+    const viewers = new ViewerTracker();
+    const app = createApp(store, undefined, 55000, 10000, viewers);
+    const viewerServer = app.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => viewerServer.once("listening", resolve));
+    const address = viewerServer.address();
+    await writeRegistryEntry(sessionId, { port: typeof address === "object" && address ? address.port : 0, pid: process.pid });
+    try {
+      const lines: string[] = [];
+      const watchPromise = watchCommand(sessionId, line => lines.push(line));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      viewers.close();
+      await watchPromise;
+      expect(lines.map(l => JSON.parse(l))).toEqual([{ type: "session_ended", reason: "viewer_closed" }]);
+    } finally {
+      viewerServer.close();
+    }
+  });
+
+  it("reviewCommand reads the persisted comments once the server has exited", async () => {
+    store.addThread({
+      repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "left open", pending: false, pinnedRef: "abc",
+    });
+    store.addThread({
+      repoPath: "/repo", file: "b.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "queued", pending: true, pinnedRef: "abc",
+    });
+    await store.persist();
+    await removeRegistryEntry(sessionId);
+    const review = await reviewCommand(sessionId) as { threads: Array<{ comments: Array<{ body: string }> }> };
+    expect(review.threads.map(t => t.comments[0].body)).toEqual(["left open"]);
   });
 
   it("stopCommand kills the process referenced by the registry entry", async () => {

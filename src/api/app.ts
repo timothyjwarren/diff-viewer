@@ -1,4 +1,5 @@
 import express from "express";
+import { ViewerTracker } from "./viewerTracker.js";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted, markUncommittedLines } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
@@ -18,6 +19,7 @@ const lastKnownState = new Map<string, { headSha: string; dirty: boolean }>();
  */
 export function createApp(
   store: SessionStore, webDistDir?: string, waitTimeoutMs = 55000, listeningGraceMs = 10000,
+  viewers = new ViewerTracker(),
 ): express.Express {
   const app = express();
   app.use(express.json());
@@ -26,12 +28,31 @@ export function createApp(
   let lastWaitEndedAt = -Infinity;
   const agentListening = () => openWaits > 0 || Date.now() - lastWaitEndedAt < listeningGraceMs;
 
-  app.get("/api/session", (_req, res) => res.json(store.snapshot));
+  // Browsers identify themselves with a per-page `viewer` id on their polls;
+  // requests without one (the CLI, curl) are not viewers.
+  const viewerId = (req: express.Request) => typeof req.query.viewer === "string" ? req.query.viewer : null;
+  const heartbeat = (req: express.Request) => {
+    const id = viewerId(req);
+    if (id) viewers.heartbeat(id);
+  };
+
+  app.get("/api/session", (req, res) => {
+    heartbeat(req);
+    res.json(store.snapshot);
+  });
 
   // Polled by the browser, so it returns just these small fields rather than the whole snapshot.
-  app.get("/api/session/meta", (_req, res) => {
+  app.get("/api/session/meta", (req, res) => {
+    heartbeat(req);
     const { title, description, commentsReplaced } = store.snapshot;
     res.json({ title, description, commentsReplaced, agentListening: agentListening() });
+  });
+
+  // Sent by a page as it closes, so the server can stop soon after the last viewer leaves.
+  app.post("/api/session/bye", (req, res) => {
+    const id = viewerId(req);
+    if (id) viewers.leave(id);
+    res.status(204).end();
   });
 
   app.post("/api/session/reset", async (_req, res) => {
@@ -285,16 +306,24 @@ export function createApp(
       res.json({ notifications: already, cursor: since + already.length });
       return;
     }
+    const onClosed = () => {
+      clearTimeout(timeout);
+      store.emitter.off("notification", onUpdate);
+      res.json({ notifications: [], cursor: since, ended: "viewer_closed" });
+    };
     const onUpdate = () => {
       clearTimeout(timeout);
+      viewers.emitter.off("closed", onClosed);
       const events = store.notificationsSince(since);
       res.json({ notifications: events, cursor: since + events.length });
     };
     const timeout = setTimeout(() => {
       store.emitter.off("notification", onUpdate);
+      viewers.emitter.off("closed", onClosed);
       res.status(204).end();
     }, waitTimeoutMs);
     store.emitter.once("notification", onUpdate);
+    viewers.emitter.once("closed", onClosed);
   });
 
   if (webDistDir) {

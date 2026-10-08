@@ -4,13 +4,14 @@ import { useSessionMeta, SESSION_META_POLL_MS, UNREACHABLE_AFTER_FAILURES } from
 import * as client from "../api/client";
 import type { SessionMeta } from "../types";
 
-vi.mock("../api/client", () => ({ fetchSession: vi.fn(), fetchSessionMeta: vi.fn() }));
+vi.mock("../api/client", () => ({ fetchSession: vi.fn(), fetchSessionMeta: vi.fn(), sendViewerBye: vi.fn() }));
 
 describe("useSessionMeta", () => {
   let meta: SessionMeta;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.mocked(client.sendViewerBye).mockClear();
     meta = { title: "t", description: "first", agentListening: false };
     vi.mocked(client.fetchSession).mockImplementation(async () => ({ id: "s1", ...meta }));
     vi.mocked(client.fetchSessionMeta).mockImplementation(async () => ({ ...meta }));
@@ -23,6 +24,21 @@ describe("useSessionMeta", () => {
   async function poll() {
     await act(async () => { await vi.advanceTimersByTimeAsync(SESSION_META_POLL_MS); });
   }
+
+  it("tells the server when the page is hidden for good, and stops once unmounted", () => {
+    const { unmount } = renderHook(() => useSessionMeta());
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    expect(client.sendViewerBye).toHaveBeenCalledTimes(1);
+    unmount();
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    expect(client.sendViewerBye).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet when the page is going into the back/forward cache", () => {
+    renderHook(() => useSessionMeta());
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+    expect(client.sendViewerBye).not.toHaveBeenCalled();
+  });
 
   it("loads the session and picks up a new description on the next poll", async () => {
     const { result } = renderHook(() => useSessionMeta());

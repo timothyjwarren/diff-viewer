@@ -110,7 +110,8 @@ agent's live notifications come from `diff-viewer watch`, a long-polling CLI
 command meant to run under Claude Code's `Monitor` tool (`persistent: true`)
 so the agent is woken up automatically every time something happens, for the
 life of the review session, without any new tool surface. It prints one JSON
-line per notification and exits on its own once the session is stopped.
+line per notification and exits on its own once the session is stopped or
+every browser viewer has closed (see below).
 `diff-viewer wait` is the one-shot primitive `watch` loops on; it resolves
 once, on the next notification, and is meant for scripting rather than
 Monitor.
@@ -130,6 +131,18 @@ Monitor.
 | `diff-viewer restore <sessionId> <archiveId>` | Bring an archive's comments and verdicts back. The comments it replaces are archived first, so a restore can itself be undone. |
 | `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
+
+### Shutting down when no viewer is open
+
+Open pages heartbeat by polling the server and send a goodbye as they close.
+The server shuts itself down once no viewer remains: 90 seconds after the last
+heartbeat (10 seconds after a goodbye, so a reload doesn't count as closing),
+or 10 minutes after starting if no browser ever connected. `start` accepts
+`--first-connect-timeout <seconds>` and `--idle-timeout <seconds>` to change the
+10-minute and 90-second windows. Held-open `watch`/`wait` calls end with
+`{"type":"session_ended","reason":"viewer_closed"}`, and `diff-viewer review`
+keeps working afterwards by reading the saved session, so the agent can bring
+unanswered comments back to the user.
 
 ### `--port`
 

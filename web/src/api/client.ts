@@ -14,12 +14,20 @@ export async function fetchDiffs(): Promise<RepoDiff[]> {
   return json(await fetch("/api/diffs"));
 }
 
+/** Identifies this page to the server, which stops itself once no viewer is left. */
+const viewerId = crypto.randomUUID();
+
 export async function fetchSession(): Promise<SessionInfo> {
-  return json(await fetch("/api/session"));
+  return json(await fetch(`/api/session?viewer=${viewerId}`));
 }
 
 export async function fetchSessionMeta(): Promise<SessionMeta> {
-  return json(await fetch("/api/session/meta"));
+  return json(await fetch(`/api/session/meta?viewer=${viewerId}`));
+}
+
+/** Tells the server this page is closing; survives the page unloading. */
+export function sendViewerBye(): void {
+  navigator.sendBeacon(`/api/session/bye?viewer=${viewerId}`);
 }
 
 export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {

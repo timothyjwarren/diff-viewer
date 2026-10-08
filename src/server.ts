@@ -2,9 +2,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./api/app.js";
+import { ViewerTracker, DEFAULT_VIEWER_TIMEOUTS } from "./api/viewerTracker.js";
 import { SessionStore } from "./session/sessionStore.js";
 import { resolveBaseRef, getCurrentBranch, assertValidRepoPath } from "./git/gitRepo.js";
-import { writeRegistryEntry } from "./registry.js";
+import { writeRegistryEntry, removeRegistryEntry } from "./registry.js";
 import { parseRepoArgs } from "./parseRepoArgs.js";
 import { extractFlag, validatePort } from "./cli/flags.js";
 import { getDataDir } from "./paths.js";
@@ -23,7 +24,9 @@ async function main(): Promise<void> {
   const { value: titleArg, rest: afterTitle } = extractFlag(afterSessionId, "--title");
   const { value: descriptionArg, rest: afterDescription } = extractFlag(afterTitle, "--description");
   const { value: portArg, rest: afterPort } = extractFlag(afterDescription, "--port");
-  const { value: importSessionId, rest: repoArgv } = extractFlag(afterPort, "--import-session");
+  const { value: firstConnectArg, rest: afterFirstConnect } = extractFlag(afterPort, "--first-connect-timeout");
+  const { value: idleArg, rest: afterIdle } = extractFlag(afterFirstConnect, "--idle-timeout");
+  const { value: importSessionId, rest: repoArgv } = extractFlag(afterIdle, "--import-session");
   const repoArgs = parseRepoArgs(repoArgv);
 
   let port: number;
@@ -82,7 +85,12 @@ async function main(): Promise<void> {
   await store.persist();
 
   const webDistDir = path.join(__dirname, "../web/dist");
-  const app = createApp(store, webDistDir);
+  const viewers = new ViewerTracker({
+    ...DEFAULT_VIEWER_TIMEOUTS,
+    ...(firstConnectArg !== undefined && { firstConnectMs: Number(firstConnectArg) * 1000 }),
+    ...(idleArg !== undefined && { heartbeatMs: Number(idleArg) * 1000 }),
+  });
+  const app = createApp(store, webDistDir, undefined, undefined, viewers);
   const server = app.listen(port, "127.0.0.1");
 
   server.once("error", (err: NodeJS.ErrnoException) => {
@@ -101,6 +109,22 @@ async function main(): Promise<void> {
       console.log(JSON.stringify({ sessionId, port: boundPort, url: `http://127.0.0.1:${boundPort}/session/${sessionId}` }));
     });
   });
+
+  // With no browser viewing the session, nobody can answer an agent: tell the
+  // agent's waits why, then exit. Comments are already persisted on each change.
+  const idleCheck = setInterval(() => {
+    if (!viewers.shouldClose()) return;
+    clearInterval(idleCheck);
+    viewers.close();
+    // Give the ended waits a moment to flush before the connections are cut.
+    setTimeout(() => {
+      void removeRegistryEntry(sessionId).then(() => {
+        server.close(() => process.exit(0));
+        server.closeAllConnections();
+      });
+    }, 200);
+  }, 1000);
+  idleCheck.unref();
 
   process.on("SIGTERM", () => {
     server.close(() => process.exit(0));

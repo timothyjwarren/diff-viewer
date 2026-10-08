@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchSession, fetchSessionMeta } from "../api/client";
+import { fetchSession, fetchSessionMeta, sendViewerBye } from "../api/client";
 import type { CommentsReplaced } from "../types";
 
 export const SESSION_META_POLL_MS = 3000;
@@ -67,9 +67,18 @@ export function useSessionMeta() {
         });
     }, SESSION_META_POLL_MS);
 
+    // pagehide, not unload: unload is unreliable on mobile and disables the
+    // back/forward cache. A page headed into that cache may be restored, so it
+    // says nothing and relies on the server's heartbeat timeout if it never returns.
+    const onPageHide = (event: PageTransitionEvent) => {
+      if (!event.persisted) sendViewerBye();
+    };
+    window.addEventListener("pagehide", onPageHide);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, []);
 

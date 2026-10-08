@@ -24,7 +24,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Thrown by waitCommand when the session's registry entry is gone — i.e. `diff-viewer stop` ran. */
-class SessionEndedError extends Error {}
+class SessionEndedError extends Error {
+  /** Why the server ended itself, when it said so (e.g. "viewer_closed"). */
+  constructor(readonly reason?: string) {
+    super("session ended");
+  }
+}
 
 const MAX_WAIT_RETRIES = 5;
 
@@ -52,7 +57,8 @@ export async function waitCommand(sessionId: string): Promise<{ notifications: u
       continue;
     }
     if (res.status === 200) {
-      const body = await res.json() as { notifications: unknown[]; cursor: number };
+      const body = await res.json() as { notifications: unknown[]; cursor: number; ended?: string };
+      if (body.ended) throw new SessionEndedError(body.ended);
       await writeCursor(sessionId, body.cursor);
       return { notifications: body.notifications };
     }
@@ -85,7 +91,7 @@ export async function watchCommand(sessionId: string, log: (line: string) => voi
       result = await waitCommand(sessionId);
     } catch (err) {
       if (err instanceof SessionEndedError) {
-        log(JSON.stringify({ type: "session_ended" }));
+        log(JSON.stringify(err.reason ? { type: "session_ended", reason: err.reason } : { type: "session_ended" }));
         return;
       }
       throw err;
@@ -97,6 +103,7 @@ export async function watchCommand(sessionId: string, log: (line: string) => voi
 }
 
 export async function reviewCommand(sessionId: string): Promise<unknown> {
+  if (!(await registryExists(sessionId))) return reviewStoppedSession(sessionId);
   const url = await baseUrl(sessionId);
   const [rawThreads, verdicts] = await Promise.all([
     fetch(`${url}/api/threads`).then(r => r.json()) as Promise<CommentThread[]>,
@@ -107,15 +114,29 @@ export async function reviewCommand(sessionId: string): Promise<unknown> {
     // seen instantly (before the agent ever looked at it).
     fetch(`${url}/api/mark-seen`, { method: "POST" }),
   ]);
+  return presentReview(rawThreads, verdicts as ReviewVerdict[]);
+}
+
+type ReviewVerdict = { type: "comment" | "approve" | "request_changes" };
+
+function presentReview(rawThreads: CommentThread[], verdicts: ReviewVerdict[]): unknown {
   // Pending comments are queued in the user's in-progress review and stay
   // invisible to the agent until bundled into a submitted verdict.
   const threads = rawThreads
     .map(t => ({ ...t, comments: t.comments.filter(c => !c.pending) }))
     .filter(t => t.comments.length > 0);
-  const verdictsWithIntent = (verdicts as Array<{ type: "comment" | "approve" | "request_changes" }>).map(v => ({
-    ...v, intent: verdictIntent(v.type),
-  }));
-  return { threads, verdicts: verdictsWithIntent };
+  return { threads, verdicts: verdicts.map(v => ({ ...v, intent: verdictIntent(v.type) })) };
+}
+
+/** Reads the comments of a session whose server has exited (e.g. after its last viewer closed) from disk. */
+async function reviewStoppedSession(sessionId: string): Promise<unknown> {
+  let data: SessionData;
+  try {
+    data = JSON.parse(await fs.readFile(path.join(getDataDir(), `${sessionId}.json`), "utf-8")) as SessionData;
+  } catch {
+    throw new SessionEndedError();
+  }
+  return presentReview(data.threads, data.verdicts as ReviewVerdict[]);
 }
 
 /**
