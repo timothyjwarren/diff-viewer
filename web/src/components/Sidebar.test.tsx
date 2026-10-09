@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { Sidebar } from "./Sidebar";
 import { fileAnchorId } from "../lib/fileAnchor";
 import type { RepoDiff } from "../types";
@@ -37,6 +37,33 @@ describe("Sidebar", () => {
     const span = { startId: fileAnchorId(repos[0].files[0]), endId: fileAnchorId(repos[1].files[0]) };
     rerender(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={span} />);
     expect(screen.getByTestId("viewport-indicator")).toBeInTheDocument();
+  });
+
+  it("repositions the viewport indicator when the layout above the file rows changes", () => {
+    let rowTop = 100;
+    const callbacks: Array<(entries: unknown[]) => void> = [];
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(cb: (entries: unknown[]) => void) { callbacks.push(cb); }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const top = this.hasAttribute("data-file-id") ? rowTop : 0;
+      return { top, bottom: top + 26, height: 26, left: 0, right: 0, width: 0, x: 0, y: top, toJSON() {} } as DOMRect;
+    });
+    try {
+      const id = fileAnchorId(repos[0].files[0]);
+      render(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={{ startId: id, endId: id }} />);
+      const indicator = screen.getByTestId("viewport-indicator");
+      expect(indicator.style.top).toBe("100px");
+      rowTop = 40;
+      act(() => callbacks.forEach(cb => cb([{ contentRect: { width: 100 } }])));
+      expect(indicator.style.top).toBe("40px");
+    } finally {
+      rectSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("shows the session title", () => {

@@ -74,6 +74,11 @@ range in the gutter (click for one line, click-and-drag for a range) to
 comment, or use the review bar at the bottom to submit Comment / Approve /
 Request Changes.
 
+HTML files get a **Rendered** view alongside the source view: old and new
+versions side by side with the changed elements outlined. Click an element
+to comment on it; comments attach to source lines in both views. The page's
+own scripts don't run unless you tick **Run scripts** for that file.
+
 **Inline comment** (posted immediately) is always a question or
 discussion -- never a request for changes. **Add to review** queues the
 comment until you submit; only a **Request Changes** verdict tells the

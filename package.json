@@ -19,7 +19,8 @@
   "type": "module",
   "dependencies": {
     "diff": "^9.0.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "parse5": "^8.0.1"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",

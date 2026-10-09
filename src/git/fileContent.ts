@@ -11,6 +11,8 @@ export async function readWorkingTreeFile(repoPath: string, relativePath: string
 }
 
 export async function readFileAtRef(repoPath: string, ref: string, relativePath: string): Promise<string[]> {
+  // `git show` would parse a leading "-" as an option (e.g. --output=<path>).
+  if (ref.startsWith("-")) throw new Error(`Invalid ref: ${ref}`);
   const { stdout } = await execFileAsync("git", ["show", `${ref}:${relativePath}`], { cwd: repoPath });
   return stdout.replace(/\n$/, "").split("\n");
 }

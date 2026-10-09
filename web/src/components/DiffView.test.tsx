@@ -6,7 +6,7 @@ import type { ComponentProps } from "react";
 import type { CommentThread as CommentThreadData, DiffFile } from "../types";
 import { fetchFile } from "../api/client";
 
-vi.mock("../api/client", () => ({ fetchFile: vi.fn() }));
+vi.mock("../api/client", () => ({ fetchFile: vi.fn(), fetchRendered: vi.fn().mockResolvedValue("<p>x</p>") }));
 
 const file: DiffFile = {
   repoPath: "/repo", oldPath: "a.ts", newPath: "a.ts", status: "modified",
@@ -489,5 +489,24 @@ describe("DiffView", () => {
     fireEvent.keyDown(textarea, { key: "Enter" });
 
     expect(onCreateThread).not.toHaveBeenCalled();
+  });
+
+  it("offers a Source/Rendered toggle only for HTML files", () => {
+    const htmlFile: DiffFile = { ...file, oldPath: "doc.html", newPath: "doc.html" };
+    const { rerender } = render(
+      <TestDiffView file={htmlFile} repoPath="/repo" repoName="repo" gitRef="working" comments={comments} />,
+    );
+    expect(screen.getByRole("button", { name: "Rendered" })).toBeTruthy();
+    rerender(<TestDiffView file={file} repoPath="/repo" repoName="repo" gitRef="working" comments={comments} />);
+    expect(screen.queryByRole("button", { name: "Rendered" })).toBeNull();
+  });
+
+  it("shows sandboxed previews after switching to Rendered and back to source", async () => {
+    const htmlFile: DiffFile = { ...file, oldPath: "doc.html", newPath: "doc.html" };
+    render(<TestDiffView file={htmlFile} repoPath="/repo" repoName="repo" gitRef="working" comments={comments} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rendered" }));
+    expect((await screen.findByTitle("new rendered")).getAttribute("sandbox")).toBe("allow-scripts");
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    expect(screen.queryByTitle("new rendered")).toBeNull();
   });
 });

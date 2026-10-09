@@ -134,7 +134,7 @@ export function Sidebar({
 
   // Position the viewport indicator over the rows of the files on screen,
   // from the top of the first one's row to the bottom of the last one's.
-  useLayoutEffect(() => {
+  function placeIndicator() {
     const nav = navRef.current;
     const indicator = indicatorRef.current;
     if (!nav || !indicator || !viewportSpan) return;
@@ -146,7 +146,22 @@ export function Sidebar({
     const end = endRow.getBoundingClientRect();
     indicator.style.top = `${start.top - origin}px`;
     indicator.style.height = `${end.bottom - start.top}px`;
-  }, [viewportSpan, repos]);
+  }
+
+  useLayoutEffect(placeIndicator, [viewportSpan, repos]);
+
+  // The rows shift whenever anything above them changes height (the agent
+  // status, the title's description, the reviewed counter), which no prop of
+  // the span or the files reflects, so re-place the indicator on any resize
+  // of the sidebar's sections. Re-subscribes each render because the
+  // sections come and go.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(placeIndicator);
+    for (const child of Array.from(nav.children)) observer.observe(child);
+    return () => observer.disconnect();
+  });
 
   return (
     <nav className="sidebar" ref={navRef}>

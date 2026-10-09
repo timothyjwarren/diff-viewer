@@ -1,14 +1,24 @@
 import express from "express";
+import { randomBytes } from "node:crypto";
+import path from "node:path";
 import { ViewerTracker } from "./viewerTracker.js";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted, markUncommittedLines } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
 import { readWorkingTreeFile, readFileAtRef, readWorkingTreeFileOrEmpty, readFileAtRefOrEmpty, linesToContent } from "../git/fileContent.js";
+import { annotateHtml } from "../git/htmlAnnotate.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
   const repo = store.snapshot.repos.find(r => r.path === repoPath);
   if (!repo) throw new Error(`Unknown repo: ${repoPath}`);
   return repo;
+}
+
+/** The ref to read for one side of the active range, mirroring computeRangeDiff's resolution. */
+function renderedRef(baseRef: string, side: "old" | "new", from?: string, to?: string): string {
+  if (side === "new") return to === "uncommitted" ? "working" : to || "HEAD";
+  if (!from) return baseRef;
+  return from === "uncommitted" ? "HEAD" : `${from}^`;
 }
 
 const lastKnownState = new Map<string, { headSha: string; dirty: boolean }>();
@@ -135,6 +145,27 @@ export function createApp(
       ? await readWorkingTreeFile(repoPath, relPath)
       : await readFileAtRef(repoPath, ref, relPath);
     res.json({ lines });
+  });
+
+  app.get("/api/rendered", async (req, res) => {
+    const { repoPath, path: relPath, side, from, to, scripts } = req.query as Record<string, string | undefined>;
+    if (!relPath || path.isAbsolute(relPath) || relPath.split(/[\\/]/).includes("..")) {
+      return res.status(400).json({ error: "path must be repo-relative" });
+    }
+    if (side !== "old" && side !== "new") return res.status(400).json({ error: "side must be old or new" });
+    try {
+      const repo = findRepo(store, repoPath!);
+      const ref = renderedRef(repo.baseRef, side, from, to);
+      const lines = ref === "working"
+        ? await readWorkingTreeFile(repo.path, relPath)
+        : await readFileAtRef(repo.path, ref, relPath);
+      const html = annotateHtml(lines.join("\n"), {
+        scripts: scripts === "1", nonce: randomBytes(16).toString("base64url"),
+      });
+      res.json({ html });
+    } catch {
+      res.status(404).end();
+    }
   });
 
   app.get("/api/threads", (_req, res) => res.json(store.snapshot.threads));
@@ -300,7 +331,11 @@ export function createApp(
       openWaits -= 1;
       lastWaitEndedAt = Date.now();
     });
-    const since = Number(req.query.since ?? store.notificationCount);
+    // A cursor past the end of this server's history was saved against an
+    // earlier run of the session, so none of these notifications have been
+    // seen: replay from the start rather than wait for the count to catch up.
+    const requested = Number(req.query.since ?? store.notificationCount);
+    const since = requested > store.notificationCount ? 0 : requested;
     const already = store.notificationsSince(since);
     if (already.length > 0) {
       res.json({ notifications: already, cursor: since + already.length });
@@ -309,7 +344,7 @@ export function createApp(
     const onClosed = () => {
       clearTimeout(timeout);
       store.emitter.off("notification", onUpdate);
-      res.json({ notifications: [], cursor: since, ended: "viewer_closed" });
+      res.json({ notifications: [], cursor: requested, ended: "viewer_closed" });
     };
     const onUpdate = () => {
       clearTimeout(timeout);

@@ -260,6 +260,55 @@ describe("api app", () => {
     expect(res.body.lines).toEqual(["one", "two", ""]);
   });
 
+  async function commitHtml(content: string, message: string) {
+    await fs.writeFile(path.join(repoPath, "doc.html"), content);
+    await git(repoPath, ["add", "doc.html"]);
+    await git(repoPath, ["commit", "-m", message]);
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoPath });
+    return stdout.trim();
+  }
+
+  it("GET /api/rendered annotates the working-tree file when to=uncommitted", async () => {
+    await fs.writeFile(path.join(repoPath, "doc.html"), "<p>hi</p>\n");
+    const app = createApp(await buildStore());
+    const res = await request(app).get("/api/rendered")
+      .query({ repoPath, path: "doc.html", side: "new", to: "uncommitted", scripts: "0" });
+    expect(res.status).toBe(200);
+    expect(res.body.html).toContain('data-dv-line="1"');
+    expect(res.body.html).toContain("Content-Security-Policy");
+    expect(res.body.html).toContain("script-src 'nonce-");
+  });
+
+  it("GET /api/rendered resolves the old side to the parent of from and the new side to to", async () => {
+    await commitHtml("<p>one</p>\n", "v1");
+    const second = await commitHtml("<p>two</p>\n", "v2");
+    const app = createApp(await buildStore());
+    const oldRes = await request(app).get("/api/rendered")
+      .query({ repoPath, path: "doc.html", side: "old", from: second, to: second, scripts: "0" });
+    const newRes = await request(app).get("/api/rendered")
+      .query({ repoPath, path: "doc.html", side: "new", from: second, to: second, scripts: "0" });
+    expect(oldRes.body.html).toContain("one");
+    expect(newRes.body.html).toContain("two");
+  });
+
+  it("GET /api/rendered with scripts=1 uses the script-permitting policy", async () => {
+    await fs.writeFile(path.join(repoPath, "doc.html"), "<p>hi</p>\n");
+    const app = createApp(await buildStore());
+    const res = await request(app).get("/api/rendered")
+      .query({ repoPath, path: "doc.html", side: "new", to: "uncommitted", scripts: "1" });
+    expect(res.body.html).toContain("script-src 'unsafe-inline' https:");
+  });
+
+  it("GET /api/rendered rejects bad input and unknown files", async () => {
+    const app = createApp(await buildStore());
+    const base = { repoPath, side: "new", to: "uncommitted" };
+    expect((await request(app).get("/api/rendered").query({ ...base, path: "../etc/passwd" })).status).toBe(400);
+    expect((await request(app).get("/api/rendered").query({ ...base, path: "/etc/passwd" })).status).toBe(400);
+    expect((await request(app).get("/api/rendered").query({ ...base, path: "a.txt", side: "sideways" })).status).toBe(400);
+    expect((await request(app).get("/api/rendered").query({ ...base, path: "missing.html" })).status).toBe(404);
+    expect((await request(app).get("/api/rendered").query({ ...base, repoPath: "/not/a/repo", path: "a.txt" })).status).toBe(404);
+  });
+
   it("GET /view-file serves the SPA shell when a webDistDir is configured", async () => {
     const webDistDir = await fs.mkdtemp(path.join(os.tmpdir(), "dv-api-dist-"));
     await fs.writeFile(path.join(webDistDir, "index.html"), "<html>shell</html>");
@@ -377,6 +426,18 @@ describe("api app", () => {
     const res = await request(app).get("/api/wait").query({ since: 0 });
     expect(res.status).toBe(200);
     expect(res.body.notifications[0].type).toBe("comment");
+  });
+
+  it("/api/wait treats a cursor beyond the server's notification count as unseen history and replays from the start", async () => {
+    const app = createApp(await buildStore());
+    await request(app).post("/api/threads").send({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "after a restart", pending: false, toRef: "HEAD",
+    });
+    const res = await request(app).get("/api/wait").query({ since: 5 });
+    expect(res.status).toBe(200);
+    expect(res.body.notifications).toHaveLength(1);
+    expect(res.body.cursor).toBe(1);
   });
 
   it("a pending comment only shows up after a verdict is submitted, with correct intent", async () => {

@@ -407,6 +407,7 @@ export function App() {
               repoPath={repo.repoPath}
               repoName={`${repo.repo}:${repo.branch}`}
               gitRef={rangeByRepo[repo.repoPath]?.to ?? "working"}
+              rangeFrom={rangeByRepo[repo.repoPath]?.from}
               showUncommittedBanner={
                 rangeByRepo[repo.repoPath]?.to === "uncommitted"
                 && Boolean(dirtyFilesByRepo[repo.repoPath]?.includes(fileName(file)))

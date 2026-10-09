@@ -10,6 +10,9 @@ import type { NavAvailability } from "../lib/commentNav";
 import { fetchFile } from "../api/client";
 import { CommentThread } from "./CommentThread";
 import { ExpandStrip } from "./ExpandStrip";
+import { Composer } from "./Composer";
+import { RenderedHtmlView } from "./RenderedHtmlView";
+import { isHtmlPath } from "../lib/renderedView";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
 import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
@@ -116,51 +119,6 @@ export interface CommentHandlers {
   /** Per thread id: whether its previous/next buttons have somewhere to go. */
   navAvailability: NavAvailability;
   onNavigate: (threadId: string, direction: "next" | "previous") => void;
-}
-
-function formatQuote(text: string): string {
-  return text.split("\n").map(line => `> ${line}`).join("\n") + "\n\n";
-}
-
-function Composer({ onSubmit, onCancel, quotedText }: {
-  onSubmit: (body: string, pending: boolean) => void | boolean | Promise<void | boolean>;
-  onCancel: () => void;
-  quotedText: string | null;
-}) {
-  const [draft, setDraft] = useState(() => (quotedText ? formatQuote(quotedText) : ""));
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  function reset() {
-    setDraft("");
-    if (textareaRef.current) textareaRef.current.style.height = "";
-  }
-
-  // A handler that returns (or resolves to) `false` reports the save failed;
-  // the draft stays so it can be retried.
-  function submit(pending: boolean) {
-    const result = onSubmit(draft, pending);
-    if (result instanceof Promise) void result.then(saved => { if (saved !== false) reset(); });
-    else if (result !== false) reset();
-  }
-
-  return (
-    <div className="comment-composer">
-      <textarea
-        ref={textareaRef}
-        placeholder="Leave a comment..." value={draft} autoFocus
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === "Escape" && draft.trim() === "") onCancel();
-          else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(false); }
-        }}
-      />
-      <div className="comment-reply-actions">
-        <button className="btn btn-primary" title="⌘↵" onClick={() => submit(false)}>Add single comment</button>
-        <button className="btn" onClick={() => submit(true)}>Add to review</button>
-        <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  );
 }
 
 function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLineCount }: {
@@ -281,10 +239,12 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
 }
 
 export function DiffView({
-  file, repoPath, repoName, gitRef, showUncommittedBanner, comments,
+  file, repoPath, repoName, gitRef, rangeFrom, showUncommittedBanner, comments,
   collapsed, reviewed, onToggleCollapsed, onToggleReviewed,
 }: {
   file: DiffFile; repoPath: string; repoName: string; gitRef: string;
+  /** Start of the active commit range, if any; locates the old side of rendered HTML previews. */
+  rangeFrom?: string;
   collapsed: boolean;
   reviewed: boolean;
   onToggleCollapsed: () => void;
@@ -297,6 +257,7 @@ export function DiffView({
   const [fullFileLines, setFullFileLines] = useState<string[] | null>(null);
   const [paneSplit, setPaneSplit] = useState(50);
   const [dragging, setDragging] = useState(false);
+  const [rendered, setRendered] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; split: number } | null>(null);
@@ -310,6 +271,7 @@ export function DiffView({
   const dir = slash >= 0 ? fileId.slice(0, slash) : "";
   const base = fileId.slice(slash + 1);
   const stat = diffStat(file);
+  const canRender = isHtmlPath(fileId);
   const openThreads = comments.threads.filter(t => !t.resolved).length;
   useAlignedAnnotations(bodyRef);
 
@@ -434,6 +396,12 @@ export function DiffView({
             {stat.added > 0 && <span className="diffstat-added">+{stat.added}</span>}
             {stat.deleted > 0 && <span className="diffstat-deleted">−{stat.deleted}</span>}
           </span>
+          {canRender && (
+            <span className="diff-view-mode" role="group" aria-label="View mode">
+              <button className={`btn${rendered ? "" : " btn-primary"}`} aria-pressed={!rendered} onClick={() => setRendered(false)}>Source</button>
+              <button className={`btn${rendered ? " btn-primary" : ""}`} aria-pressed={rendered} onClick={() => setRendered(true)}>Rendered</button>
+            </span>
+          )}
           {openThreads > 0 && (
             <span className="diff-view-threads" aria-label={`${openThreads} open thread${openThreads === 1 ? "" : "s"}`}>
               <CommentIcon />{openThreads}
@@ -451,7 +419,13 @@ export function DiffView({
       {showUncommittedBanner && (
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
-      {!collapsed && (
+      {!collapsed && rendered && canRender && (
+        <RenderedHtmlView
+          file={file} repoPath={repoPath} hunks={hunks} comments={comments}
+          fromRef={rangeFrom || undefined} toRef={gitRef === "working" ? undefined : gitRef}
+        />
+      )}
+      {!collapsed && !(rendered && canRender) && (
         <div
           className={`diff-view-body${isNewFile ? " diff-view-body-single" : ""}`}
           ref={bodyRef}

@@ -37,4 +37,10 @@ describe("fileContent", () => {
   it("reads file contents at a specific ref", async () => {
     expect(await readFileAtRef(repoPath, "HEAD", "a.txt")).toEqual(["committed line"]);
   });
+
+  it("readFileAtRef refuses a ref that git would parse as an option", async () => {
+    const target = path.join(repoPath, "pwned");
+    await expect(readFileAtRef(repoPath, `--output=${target}`, "a.txt")).rejects.toThrow();
+    await expect(fs.access(target)).rejects.toThrow();
+  });
 });

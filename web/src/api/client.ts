@@ -53,6 +53,16 @@ export async function fetchFile(repoPath: string, filePath: string, ref: string)
   return data.lines;
 }
 
+export async function fetchRendered(
+  p: { repoPath: string; path: string; side: "old" | "new"; from?: string; to?: string; scripts: boolean },
+): Promise<string> {
+  const params = new URLSearchParams({ repoPath: p.repoPath, path: p.path, side: p.side, scripts: p.scripts ? "1" : "0" });
+  if (p.from) params.set("from", p.from);
+  if (p.to) params.set("to", p.to);
+  const data = await json<{ html: string }>(await fetch(`/api/rendered?${params}`));
+  return data.html;
+}
+
 export async function fetchThreads(): Promise<CommentThread[]> {
   return json(await fetch("/api/threads"));
 }
