@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { CommitInfo, CommitRange } from "../types";
 import { computeRangeClick, isShaInRange, rangeCommitCount } from "../lib/commitRange";
+import { commitDateLabel, commitDateTitle, dayHeading, dayKey } from "../lib/commitDate";
 
 /** The chooser's "everything" mode: baseRef through the working tree, committed history plus any local edits. */
 const EVERYTHING_RANGE: CommitRange = { from: "", to: "uncommitted" };
 
-export function CommitChooser({ commits, range, onChange, onOpen }: {
+export function CommitChooser({ commits, range, onChange, onOpen, now }: {
   commits: CommitInfo[];
   range: CommitRange | null;
   onChange: (range: CommitRange | null) => void;
   /** Called each time the popover opens, so the caller can refresh `commits` with new HEAD commits. */
   onOpen?: () => void;
+  /** The moment dates are measured against; defaults to the current time. */
+  now?: Date;
 }) {
   const [open, setOpen] = useState(false);
   // Set on mousedown over a row, cleared on mouseup: while set, a range is
@@ -59,6 +62,8 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
   }
 
   const realCommitCount = commits.filter(c => c.sha !== "uncommitted").length;
+  const latestSha = commits.findLast(c => c.sha !== "uncommitted")?.sha;
+  const clock = now ?? new Date();
   const hasUncommittedRow = realCommitCount !== commits.length;
   const isEverythingMode = range?.from === EVERYTHING_RANGE.from && range?.to === EVERYTHING_RANGE.to;
 
@@ -133,10 +138,13 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
               </button>
             </li>
           )}
-          {commits.map(c => {
+          {commits.map((c, i) => {
             const selected = isSelected(c.sha);
+            const startsDay = c.date !== "" && dayKey(c.date) !== dayKey(commits[i - 1]?.date ?? "");
             return (
-              <li key={c.sha}>
+              <Fragment key={c.sha}>
+              {startsDay && <li role="presentation" className="commit-chooser-day">{dayHeading(c.date, clock)}</li>}
+              <li>
                 {/*
                  * A plain div, not a button: browsers implicitly capture the
                  * mouse to a pressed form control, which silently suppresses
@@ -162,9 +170,16 @@ export function CommitChooser({ commits, range, onChange, onOpen }: {
                 >
                   <span className="commit-chooser-sha">{c.shortSha}</span>
                   <span className="commit-chooser-subject">{c.subject}</span>
-                  <span className="commit-chooser-author">{c.author}</span>
+                  {c.sha !== "uncommitted" && (
+                    <span className="commit-chooser-meta">
+                      <span className="commit-chooser-date" title={commitDateTitle(c.date)}>{commitDateLabel(c.date, clock)}</span>
+                      <span className="commit-chooser-author">{c.author}</span>
+                      {c.sha === latestSha && <span className="commit-chooser-latest">latest</span>}
+                    </span>
+                  )}
                 </div>
               </li>
+              </Fragment>
             );
           })}
         </ul>

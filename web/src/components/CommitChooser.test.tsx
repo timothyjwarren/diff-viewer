@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { CommitChooser } from "./CommitChooser";
 import type { CommitInfo } from "../types";
 
@@ -138,5 +138,49 @@ describe("CommitChooser", () => {
   it("shows no exclusion badge when the range already covers every commit", () => {
     render(<CommitChooser commits={commits} range={null} onChange={vi.fn()} />);
     expect(screen.queryByLabelText(/commits not shown/)).not.toBeInTheDocument();
+  });
+
+  describe("dates", () => {
+    const at = (day: number, hour: number) => new Date(2026, 9, day, hour).toISOString();
+    const now = new Date(2026, 9, 13, 15);
+    const dated: CommitInfo[] = [
+      { sha: "aaa111", shortSha: "aaa111", subject: "first", author: "tj", date: at(9, 10) },
+      { sha: "bbb222", shortSha: "bbb222", subject: "second", author: "tj", date: at(12, 9) },
+      { sha: "ccc333", shortSha: "ccc333", subject: "third", author: "tj", date: at(12, 17) },
+      { sha: "ddd444", shortSha: "ddd444", subject: "fourth", author: "tj", date: at(13, 12) },
+    ];
+    const uncommitted: CommitInfo = {
+      sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "",
+    };
+    function open(list: CommitInfo[]) {
+      render(<CommitChooser commits={list} range={null} onChange={vi.fn()} now={now} />);
+      fireEvent.click(screen.getByRole("button", { name: /commit range/i }));
+    }
+
+    it("shows each commit's age, with the full date and time as a tooltip", () => {
+      open(dated);
+      const row = screen.getByText("fourth").closest("[role=option]") as HTMLElement;
+      expect(within(row).getByText("3h ago")).toHaveAttribute("title", expect.stringMatching(/October 13, 2026/));
+      expect(screen.getByText("4d ago")).toBeInTheDocument();
+    });
+
+    it("heads each new day once, naming today and yesterday", () => {
+      open(dated);
+      expect(screen.getAllByRole("presentation").map(h => h.textContent)).toEqual(["Fri, Oct 9", "Yesterday", "Today"]);
+    });
+
+    it("gives the uncommitted row no date and no day heading", () => {
+      open([...dated, uncommitted]);
+      const row = screen.getByText("Uncommitted changes").closest("[role=option]") as HTMLElement;
+      expect(row.querySelector(".commit-chooser-date")).toBeNull();
+      expect(screen.getAllByRole("presentation")).toHaveLength(3);
+    });
+
+    it("tags only the newest real commit as latest", () => {
+      open([...dated, uncommitted]);
+      const tags = screen.getAllByText("latest");
+      expect(tags).toHaveLength(1);
+      expect(tags[0].closest("[role=option]")).toHaveTextContent("fourth");
+    });
   });
 });

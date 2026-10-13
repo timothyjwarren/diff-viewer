@@ -24,19 +24,46 @@ export function alignAnnotationSlots(root: HTMLElement) {
 }
 
 /**
- * Keeps annotation slots under `rootRef` aligned across panes, re-running
- * after every render (slots come and go with threads and the composer) and
- * whenever a slot's content resizes on its own (a reply box opening, a
- * composer textarea growing).
+ * With soft wrapping, the same row can wrap to different heights in the two
+ * panes. Every `.diff-line` carries its row's key; this sizes all lines
+ * sharing a key to the tallest one's natural height. Heights from a previous
+ * pass are cleared first so lines can shrink again when a pane widens, and
+ * stay cleared when `wrap` is off.
  */
-export function useAlignedAnnotations(rootRef: RefObject<HTMLElement | null>) {
+export function alignRowHeights(root: HTMLElement, wrap: boolean) {
+  const lines = root.querySelectorAll<HTMLElement>(".diff-line[data-row-key]");
+  for (const line of lines) line.style.minHeight = "";
+  if (!wrap) return;
+  const tallest = new Map<string, number>();
+  for (const line of lines) {
+    const key = line.dataset.rowKey ?? "";
+    tallest.set(key, Math.max(tallest.get(key) ?? 0, line.getBoundingClientRect().height));
+  }
+  for (const line of lines) {
+    line.style.minHeight = `${tallest.get(line.dataset.rowKey ?? "") ?? 0}px`;
+  }
+}
+
+/**
+ * Keeps annotation slots (and, when `wrap` is on, wrapped lines) under
+ * `rootRef` aligned across panes, re-running after every render (slots come
+ * and go with threads and the composer) and whenever a slot's content or a
+ * pane's width changes on its own (a reply box opening, a composer textarea
+ * growing, the divider being dragged).
+ */
+export function useAlignedAnnotations(rootRef: RefObject<HTMLElement | null>, wrap = false) {
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    alignAnnotationSlots(root);
+    const align = () => {
+      alignRowHeights(root, wrap);
+      alignAnnotationSlots(root);
+    };
+    align();
     if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => alignAnnotationSlots(root));
+    const observer = new ResizeObserver(align);
     root.querySelectorAll(".diff-row-annotations-inner").forEach(el => observer.observe(el));
+    if (wrap) root.querySelectorAll(".diff-pane").forEach(el => observer.observe(el));
     return () => observer.disconnect();
   });
 }

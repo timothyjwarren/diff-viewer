@@ -57,3 +57,13 @@ export function WarningIcon() {
 export function CheckIcon() {
   return <Svg><path d="m3.5 8.5 3 3 6-7" /></Svg>;
 }
+
+export function WrapIcon() {
+  return (
+    <Svg>
+      <path d="M2.5 4h11M2.5 12h4" />
+      <path d="M2.5 8h8.5a2 2 0 0 1 0 4H9.5" />
+      <path d="m11 10.5-1.5 1.5 1.5 1.5" />
+    </Svg>
+  );
+}

@@ -816,6 +816,46 @@ main::-webkit-scrollbar-thumb:hover {
   white-space: nowrap;
 }
 
+.commit-chooser-day {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.commit-chooser-row {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+/* Date, author and the latest tag sit on a second line, under the subject. */
+.commit-chooser-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 100%;
+  padding-left: 58px;
+  font-size: 11px;
+}
+
+.commit-chooser-latest {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.commit-chooser-date {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .commit-chooser-author {
   flex: 0 0 auto;
   color: var(--text-faint);
@@ -1146,6 +1186,47 @@ main {
   flex: 1 1 auto;
   padding-right: 12px;
   color: var(--text);
+}
+
+/*
+ * Soft wrapping (per file, toggled from the header). The pane fits its
+ * column instead of scrolling sideways, code wraps inside its flex item, and
+ * a wrapped row's gutter stays level with the first visual line. Paired rows
+ * in the two panes are kept the same height by alignRowHeights.
+ */
+.diff-view-wrap .diff-pane {
+  overflow-x: hidden;
+}
+
+.diff-view-wrap .diff-pane-content {
+  display: block;
+}
+
+.diff-view-wrap .diff-line {
+  min-height: 20px;
+  height: auto;
+}
+
+.diff-view-wrap .diff-line-gutter {
+  align-items: flex-start;
+  height: auto;
+}
+
+.diff-view-wrap .diff-line-gutter > span {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.diff-view-wrap .diff-line-code {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.btn-icon-active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .diff-line:hover {

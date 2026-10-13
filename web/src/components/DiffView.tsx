@@ -16,7 +16,7 @@ import { isHtmlPath } from "../lib/renderedView";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
 import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
-import { ChevronIcon, CommentIcon, ExternalFileIcon } from "./Icons";
+import { ChevronIcon, CommentIcon, ExternalFileIcon, WrapIcon } from "./Icons";
 import { useAlignedAnnotations } from "../lib/alignAnnotations";
 
 const LINE_SPAN_RE = /<code[^>]*>([\s\S]*)<\/code>/;
@@ -42,8 +42,10 @@ const MARKERS: Record<DiffLine["type"], string> = { add: "+", del: "-", context:
 
 const NO_CHANGES: Range[] = [];
 
-function Line({ line, counterpart, lang, repoName, side, selected, onGutterMouseDown, onGutterMouseEnter }: {
+function Line({ line, rowKey, counterpart, lang, repoName, side, selected, onGutterMouseDown, onGutterMouseEnter }: {
   line: DiffLine;
+  /** Identifies the row across both panes, so wrapped lines can be kept level. */
+  rowKey: string;
   /** The other side's line in a changed pair, whose differences get highlighted. */
   counterpart: DiffLine | null;
   lang: string; repoName: string; side: "old" | "new";
@@ -73,6 +75,7 @@ function Line({ line, counterpart, lang, repoName, side, selected, onGutterMouse
     <div
       className={`diff-line diff-line-${line.type}${selected ? " diff-line-selected" : ""}${line.uncommitted ? " diff-line-uncommitted" : ""}`}
       data-line-number={lineNumber}
+      data-row-key={rowKey}
     >
       {/*
        * Selecting/commenting is driven entirely from the gutter, never the code
@@ -96,8 +99,8 @@ function Line({ line, counterpart, lang, repoName, side, selected, onGutterMouse
   );
 }
 
-function EmptyLine() {
-  return <div className="diff-line diff-line-empty" />;
+function EmptyLine({ rowKey }: { rowKey: string }) {
+  return <div className="diff-line diff-line-empty" data-row-key={rowKey} />;
 }
 
 export interface CommentHandlers {
@@ -198,7 +201,7 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
                   )
                   : null;
                 if (!l) {
-                  return slot ? <div key={ri}><EmptyLine />{slot}</div> : <EmptyLine key={ri} />;
+                  return slot ? <div key={ri}><EmptyLine rowKey={`${hi}:${ri}`} />{slot}</div> : <EmptyLine key={ri} rowKey={`${hi}:${ri}`} />;
                 }
 
                 const lineNumber = own.lineNumber;
@@ -209,7 +212,7 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
                 return (
                   <div key={ri}>
                     <Line
-                      line={l} counterpart={l.type === "context" ? null : row[otherSide]} lang={lang} repoName={repoName} side={side} selected={selected}
+                      line={l} rowKey={`${hi}:${ri}`} counterpart={l.type === "context" ? null : row[otherSide]} lang={lang} repoName={repoName} side={side} selected={selected}
                       onGutterMouseDown={(line) => comments.onGutterMouseDown(side, line)}
                       onGutterMouseEnter={(line) => comments.onGutterMouseEnter(side, line)}
                     />
@@ -258,6 +261,7 @@ export function DiffView({
   const [paneSplit, setPaneSplit] = useState(50);
   const [dragging, setDragging] = useState(false);
   const [rendered, setRendered] = useState(false);
+  const [wrap, setWrap] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; split: number } | null>(null);
@@ -273,7 +277,7 @@ export function DiffView({
   const stat = diffStat(file);
   const canRender = isHtmlPath(fileId);
   const openThreads = comments.threads.filter(t => !t.resolved).length;
-  useAlignedAnnotations(bodyRef);
+  useAlignedAnnotations(bodyRef, wrap);
 
   function noteHeaderTopBeforeCollapse() {
     beforeCollapseTopRef.current = headerRef.current?.getBoundingClientRect().top ?? null;
@@ -402,6 +406,15 @@ export function DiffView({
               <button className={`btn${rendered ? " btn-primary" : ""}`} aria-pressed={rendered} onClick={() => setRendered(true)}>Rendered</button>
             </span>
           )}
+          {!(rendered && canRender) && (
+            <button
+              className={`btn-icon${wrap ? " btn-icon-active" : ""}`}
+              aria-label="Wrap lines" aria-pressed={wrap} title="Wrap long lines"
+              onClick={() => setWrap(w => !w)}
+            >
+              <WrapIcon />
+            </button>
+          )}
           {openThreads > 0 && (
             <span className="diff-view-threads" aria-label={`${openThreads} open thread${openThreads === 1 ? "" : "s"}`}>
               <CommentIcon />{openThreads}
@@ -427,7 +440,7 @@ export function DiffView({
       )}
       {!collapsed && !(rendered && canRender) && (
         <div
-          className={`diff-view-body${isNewFile ? " diff-view-body-single" : ""}`}
+          className={`diff-view-body${isNewFile ? " diff-view-body-single" : ""}${wrap ? " diff-view-wrap" : ""}`}
           ref={bodyRef}
           style={isNewFile ? undefined : { gridTemplateColumns: `${paneSplit}% 4px ${100 - paneSplit}%` }}
         >

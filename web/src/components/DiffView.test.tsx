@@ -347,6 +347,48 @@ describe("DiffView", () => {
     expect(panes[0].getAttribute("data-side")).toBe("new");
   });
 
+  it("toggles soft wrapping per file from the header, in both modified and new-file views", () => {
+    const toggle = () => screen.getByRole("button", { name: "Wrap lines" });
+    const { container, rerender } = render(
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const body = () => container.querySelector(".diff-view-body")!;
+    expect(body()).not.toHaveClass("diff-view-wrap");
+    expect(toggle()).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle());
+    expect(body()).toHaveClass("diff-view-wrap");
+    expect(toggle()).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toggle());
+    expect(body()).not.toHaveClass("diff-view-wrap");
+
+    rerender(
+      <TestDiffView file={{ ...file, status: "added" }} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    fireEvent.click(toggle());
+    expect(body()).toHaveClass("diff-view-wrap");
+  });
+
+  it("wraps each file independently", () => {
+    render(
+      <>
+        <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+        <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />
+      </>,
+    );
+    const [first, second] = screen.getAllByRole("button", { name: "Wrap lines" });
+    fireEvent.click(first);
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(second).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("gives paired lines in both panes the same row key so wrapping can keep them level", () => {
+    const { container } = render(
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+    );
+    const keys = [...container.querySelectorAll(".diff-line")].map(l => (l as HTMLElement).dataset.rowKey);
+    expect(keys).toEqual(["0:0", "0:0"]);
+  });
+
   it("still renders two panes for a modified file", () => {
     const { container } = render(
       <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
