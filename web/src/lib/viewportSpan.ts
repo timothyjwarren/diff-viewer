@@ -20,3 +20,20 @@ export function computeViewportSpan(files: FileRect[], viewportHeight: number): 
   if (visible.length === 0) return null;
   return { startId: visible[0].id, endId: visible[visible.length - 1].id };
 }
+
+/** Breathing room kept between the revealed rows and the sidebar's edge, so a neighbouring row stays in sight. */
+export const REVEAL_MARGIN = 32;
+
+/**
+ * Where to scroll the sidebar so the rows from `top` to `bottom` (in its
+ * content coordinates) are on screen, moving it as little as possible; or
+ * null when they already are. Rows taller than the sidebar show their top.
+ */
+export function scrollTopToReveal(
+  top: number, bottom: number, scrollTop: number, viewHeight: number, margin = REVEAL_MARGIN,
+): number | null {
+  if (top >= scrollTop && bottom <= scrollTop + viewHeight) return null;
+  const tooTall = bottom - top + 2 * margin > viewHeight;
+  const target = top < scrollTop || tooTall ? top - margin : bottom - viewHeight + margin;
+  return Math.max(0, target);
+}

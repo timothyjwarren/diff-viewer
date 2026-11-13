@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeViewportSpan } from "./viewportSpan";
+import { computeViewportSpan, scrollTopToReveal } from "./viewportSpan";
 
 // Rects are relative to the scroll viewport's top edge; viewport is 500px tall.
 const H = 500;
@@ -42,5 +42,28 @@ describe("computeViewportSpan", () => {
 
   it("returns null when no file is on screen", () => {
     expect(computeViewportSpan([{ id: "a", top: 600, bottom: 900 }], H)).toBeNull();
+  });
+});
+
+describe("scrollTopToReveal", () => {
+  // Sidebar is 400px tall, scrolled to 1000; margin 32.
+  it("leaves the sidebar alone when the rows are already on screen", () => {
+    expect(scrollTopToReveal(1100, 1200, 1000, 400)).toBeNull();
+  });
+
+  it("scrolls up just enough to show rows above the view", () => {
+    expect(scrollTopToReveal(900, 950, 1000, 400)).toBe(868);
+  });
+
+  it("scrolls down just enough to show rows below the view", () => {
+    expect(scrollTopToReveal(1500, 1550, 1000, 400)).toBe(1182);
+  });
+
+  it("shows the top of rows taller than the view", () => {
+    expect(scrollTopToReveal(1300, 2000, 1000, 400)).toBe(1268);
+  });
+
+  it("never scrolls above the top", () => {
+    expect(scrollTopToReveal(10, 40, 1000, 400)).toBe(0);
   });
 });

@@ -4,7 +4,7 @@ import { CommitChooser } from "./CommitChooser";
 import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
 import { buildBrowseUrl } from "../lib/route";
-import type { ViewportSpan } from "../lib/viewportSpan";
+import { scrollTopToReveal, type ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
 import { CheckIcon, ChevronIcon, CommentIcon, WarningIcon } from "./Icons";
 import { CommentMarkdown } from "./CommentMarkdown";
@@ -126,6 +126,24 @@ function OtherFiles({ repo, threads, headSha }: {
   );
 }
 
+// Position the viewport indicator over the rows of the files on screen,
+// from the top of the first one's row to the bottom of the last one's.
+// Returns those rows' extent in the sidebar's content coordinates.
+function placeIndicator(
+  nav: HTMLElement | null, indicator: HTMLElement | null, viewportSpan: ViewportSpan | null,
+): { top: number; bottom: number } | null {
+  if (!nav || !indicator || !viewportSpan) return null;
+  const startRow = nav.querySelector<HTMLElement>(`[data-file-id="${viewportSpan.startId}"]`);
+  const endRow = nav.querySelector<HTMLElement>(`[data-file-id="${viewportSpan.endId}"]`);
+  if (!startRow || !endRow) return null;
+  const origin = nav.getBoundingClientRect().top - nav.scrollTop;
+  const top = startRow.getBoundingClientRect().top - origin;
+  const bottom = endRow.getBoundingClientRect().bottom - origin;
+  indicator.style.top = `${top}px`;
+  indicator.style.height = `${bottom - top}px`;
+  return { top, bottom };
+}
+
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
   title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
@@ -162,23 +180,20 @@ export function Sidebar({
   const navRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
 
-  // Position the viewport indicator over the rows of the files on screen,
-  // from the top of the first one's row to the bottom of the last one's.
-  function placeIndicator() {
+  // When the files on screen change — the main pane scrolled or jumped —
+  // also scroll the sidebar so their rows stay in sight. Only on a change of
+  // span, so scrolling the sidebar by hand to look further down the list
+  // isn't undone.
+  const revealedSpanRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
     const nav = navRef.current;
-    const indicator = indicatorRef.current;
-    if (!nav || !indicator || !viewportSpan) return;
-    const startRow = nav.querySelector<HTMLElement>(`[data-file-id="${viewportSpan.startId}"]`);
-    const endRow = nav.querySelector<HTMLElement>(`[data-file-id="${viewportSpan.endId}"]`);
-    if (!startRow || !endRow) return;
-    const origin = nav.getBoundingClientRect().top - nav.scrollTop;
-    const start = startRow.getBoundingClientRect();
-    const end = endRow.getBoundingClientRect();
-    indicator.style.top = `${start.top - origin}px`;
-    indicator.style.height = `${end.bottom - start.top}px`;
-  }
-
-  useLayoutEffect(placeIndicator, [viewportSpan, repos]);
+    const extent = placeIndicator(nav, indicatorRef.current, viewportSpan);
+    const spanKey = viewportSpan && `${viewportSpan.startId}\n${viewportSpan.endId}`;
+    if (!extent || !nav || nav.clientHeight === 0 || spanKey === revealedSpanRef.current) return;
+    revealedSpanRef.current = spanKey;
+    const target = scrollTopToReveal(extent.top, extent.bottom, nav.scrollTop, nav.clientHeight);
+    if (target !== null) nav.scrollTop = target;
+  }, [viewportSpan, repos]);
 
   // The rows shift whenever anything above them changes height (the agent
   // status, the title's description, the reviewed counter), which no prop of
@@ -188,7 +203,7 @@ export function Sidebar({
   useLayoutEffect(() => {
     const nav = navRef.current;
     if (!nav || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(placeIndicator);
+    const observer = new ResizeObserver(() => { placeIndicator(nav, indicatorRef.current, viewportSpan); });
     for (const child of Array.from(nav.children)) observer.observe(child);
     return () => observer.disconnect();
   });

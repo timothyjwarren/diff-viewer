@@ -108,6 +108,35 @@ describe("Sidebar", () => {
     }
   });
 
+  it("scrolls the sidebar to keep the rows of the files on screen in sight", () => {
+    const rowTops: Record<string, number> = { [fileAnchorId(repos[0].files[0])]: 100, [fileAnchorId(repos[1].files[0])]: 900 };
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const nav = this.closest("nav");
+      const id = this.getAttribute("data-file-id");
+      const top = id ? rowTops[id] - (nav?.scrollTop ?? 0) : 0;
+      return { top, bottom: top + 26, height: 26, left: 0, right: 0, width: 0, x: 0, y: top, toJSON() {} } as DOMRect;
+    });
+    const heightSpy = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    try {
+      const a = fileAnchorId(repos[0].files[0]);
+      const b = fileAnchorId(repos[1].files[0]);
+      const { container, rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={{ startId: a, endId: a }} />);
+      const nav = container.querySelector("nav")!;
+      expect(nav.scrollTop).toBe(0);
+
+      rerender(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={{ startId: b, endId: b }} />);
+      expect(nav.scrollTop).toBe(900 + 26 - 400 + 32);
+
+      // Scrolling the sidebar by hand sticks while the same files stay on screen.
+      nav.scrollTop = 0;
+      rerender(<Sidebar repos={repos} onSelectFile={() => {}} viewportSpan={{ startId: b, endId: b }} />);
+      expect(nav.scrollTop).toBe(0);
+    } finally {
+      rectSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+
   it("shows the session title", () => {
     render(<Sidebar repos={repos} onSelectFile={() => {}} title="my review" />);
     expect(screen.getByRole("heading", { name: "my review" })).toBeInTheDocument();
