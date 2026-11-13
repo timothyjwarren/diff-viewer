@@ -260,6 +260,53 @@ describe("api app", () => {
     expect(res.body.lines).toEqual(["one", "two", ""]);
   });
 
+  it("GET /api/file rejects hostile input and unknown repos or files", async () => {
+    const app = createApp(await buildStore());
+    const base = { repoPath, path: "a.txt", ref: "HEAD" };
+    const get = (q: Record<string, string>) => request(app).get("/api/file").query({ ...base, ...q });
+    expect((await get({ path: "../x" })).status).toBe(400);
+    expect((await get({ path: "/etc/passwd" })).status).toBe(400);
+    expect((await get({ path: "" })).status).toBe(400);
+    expect((await get({ ref: "--output=x" })).status).toBe(400);
+    expect((await get({ path: "missing.txt" })).status).toBe(404);
+    expect((await get({ path: "missing.txt", ref: "uncommitted" })).status).toBe(404);
+    expect((await get({ repoPath: "/not/a/repo" })).status).toBe(404);
+  });
+
+  it("GET /api/file serves uncommitted lines and flags binary files", async () => {
+    await fs.writeFile(path.join(repoPath, "bin.dat"), Buffer.from([65, 0, 66]));
+    const app = createApp(await buildStore());
+    const q = { repoPath, path: "a.txt", ref: "uncommitted" };
+    expect((await request(app).get("/api/file").query(q)).body.lines).toEqual(["one", "two"]);
+    const bin = await request(app).get("/api/file").query({ ...q, path: "bin.dat" });
+    expect(bin.body).toEqual({ lines: [], skipped: "binary" });
+  });
+
+  it("GET /api/tree lists entries with changed markers from the default diff", async () => {
+    await fs.mkdir(path.join(repoPath, "sub"));
+    await fs.writeFile(path.join(repoPath, "sub/u.ts"), "u\n");
+    await git(repoPath, ["add", "."]);
+    await commitAll("add sub");
+    const app = createApp(await buildStore());
+    const root = await request(app).get("/api/tree").query({ repoPath, ref: "HEAD", path: "" });
+    expect(root.status).toBe(200);
+    expect(root.body.repoName).toBe("repo:feature");
+    expect(root.body.entries.map((e: { name: string }) => e.name)).toEqual(["sub", "a.txt"]);
+    const sub = await request(app).get("/api/tree").query({ repoPath, ref: "HEAD", path: "sub" });
+    expect(sub.body.entries).toEqual([{ name: "u.ts", type: "file", changed: expect.any(Boolean) }]);
+  });
+
+  it("GET /api/tree rejects hostile input and missing paths", async () => {
+    const app = createApp(await buildStore());
+    const get = (q: Record<string, string>) =>
+      request(app).get("/api/tree").query({ repoPath, ref: "HEAD", path: "", ...q });
+    expect((await get({ path: "../.." })).status).toBe(400);
+    expect((await get({ ref: "--output=x" })).status).toBe(400);
+    expect((await get({ path: "a.txt" })).status).toBe(404);
+    expect((await get({ path: "nope" })).status).toBe(404);
+    expect((await get({ repoPath: "/not/a/repo" })).status).toBe(404);
+  });
+
   async function commitHtml(content: string, message: string) {
     await fs.writeFile(path.join(repoPath, "doc.html"), content);
     await git(repoPath, ["add", "doc.html"]);

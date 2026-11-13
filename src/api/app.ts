@@ -5,7 +5,11 @@ import { ViewerTracker } from "./viewerTracker.js";
 import { SessionStore, type NewThreadInput } from "../session/sessionStore.js";
 import { computeDiff, computeRangeDiff, computeDiffIncludingUncommitted, markUncommittedLines } from "../git/diff.js";
 import { listCommits, resolveHeadSha, isDirty, listDirtyFiles } from "../git/gitRepo.js";
-import { readWorkingTreeFile, readFileAtRef, readWorkingTreeFileOrEmpty, readFileAtRefOrEmpty, linesToContent } from "../git/fileContent.js";
+import {
+  readWorkingTreeFile, readFileAtRef, readWorkingTreeFileOrEmpty, readFileAtRefOrEmpty, linesToContent,
+  readFileForView, isSafeRef, isRepoRelativePath,
+} from "../git/fileContent.js";
+import { listTree } from "../git/tree.js";
 import { annotateHtml } from "../git/htmlAnnotate.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
@@ -139,12 +143,49 @@ export function createApp(
     }
   });
 
+  /** Validates the repo/ref/path query shared by /api/file and /api/tree; sends the error response itself. */
+  function parseBrowseQuery(req: express.Request, res: express.Response, allowEmptyPath: boolean) {
+    const { repoPath, path: relPath = "", ref } = req.query as Record<string, string | undefined>;
+    if (typeof repoPath !== "string" || typeof ref !== "string" || typeof relPath !== "string") {
+      res.status(400).json({ error: "repoPath, ref and path are required" });
+      return null;
+    }
+    if (!isSafeRef(ref) || !isRepoRelativePath(relPath) || (!allowEmptyPath && relPath === "")) {
+      res.status(400).json({ error: "invalid ref or path" });
+      return null;
+    }
+    const repo = store.snapshot.repos.find(r => r.path === repoPath);
+    if (!repo) {
+      res.status(404).json({ error: "unknown repo" });
+      return null;
+    }
+    return { repo, ref, relPath };
+  }
+
   app.get("/api/file", async (req, res) => {
-    const { repoPath, path: relPath, ref } = req.query as Record<string, string>;
-    const lines = ref === "working"
-      ? await readWorkingTreeFile(repoPath, relPath)
-      : await readFileAtRef(repoPath, ref, relPath);
-    res.json({ lines });
+    const q = parseBrowseQuery(req, res, false);
+    if (!q) return;
+    try {
+      // "working" keeps the raw-disk shape the diff view's expansion relies on.
+      if (q.ref === "working") return res.json({ lines: await readWorkingTreeFile(q.repo.path, q.relPath) });
+      const result = await readFileForView(q.repo.path, q.ref, q.relPath);
+      res.json("lines" in result ? result : { lines: [], skipped: result.skipped });
+    } catch {
+      res.status(404).end();
+    }
+  });
+
+  app.get("/api/tree", async (req, res) => {
+    const q = parseBrowseQuery(req, res, true);
+    if (!q) return;
+    try {
+      const files = await computeDiff(q.repo.path, q.repo.baseRef);
+      const changed = new Set(files.map(f => f.newPath || f.oldPath));
+      const entries = await listTree(q.repo.path, q.ref, q.relPath, changed);
+      res.json({ repoName: `${q.repo.name}:${q.repo.branch}`, entries });
+    } catch {
+      res.status(404).end();
+    }
   });
 
   app.get("/api/rendered", async (req, res) => {

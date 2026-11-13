@@ -1,4 +1,4 @@
-import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, SessionMeta, Verdict, VerdictType } from "../types";
+import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, SessionMeta, Verdict, VerdictType, TreeEntry } from "../types";
 
 /** Throws for a non-2xx response, so a failed request surfaces to the caller instead of being read as a success. */
 function ensureOk(res: Response): Response {
@@ -51,6 +51,20 @@ export async function fetchFile(repoPath: string, filePath: string, ref: string)
   const params = new URLSearchParams({ repoPath, path: filePath, ref });
   const data = await json<{ lines: string[] }>(await fetch(`/api/file?${params}`));
   return data.lines;
+}
+
+export async function fetchFileForView(
+  repoPath: string, filePath: string, ref: string,
+): Promise<{ lines: string[]; skipped?: "binary" | "too-large" }> {
+  const params = new URLSearchParams({ repoPath, path: filePath, ref });
+  return json(await fetch(`/api/file?${params}`));
+}
+
+export async function fetchTree(
+  repoPath: string, ref: string, path: string,
+): Promise<{ repoName: string; entries: TreeEntry[] }> {
+  const params = new URLSearchParams({ repoPath, ref, path });
+  return json(await fetch(`/api/tree?${params}`));
 }
 
 export async function fetchRendered(

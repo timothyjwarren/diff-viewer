@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { Sidebar } from "./Sidebar";
 import { fileAnchorId } from "../lib/fileAnchor";
-import type { RepoDiff } from "../types";
+import type { CommentThread, RepoDiff } from "../types";
 
 const repos: RepoDiff[] = [
   {
@@ -14,6 +14,48 @@ const repos: RepoDiff[] = [
     files: [{ repoPath: "/r/b", oldPath: "y.ts", newPath: "y.ts", status: "added", hunks: [] }],
   },
 ];
+
+function otherThread(over: Partial<CommentThread>): CommentThread {
+  return {
+    id: "t", repoPath: "/r/a", file: "lib/util.ts", lineStart: 12, lineEnd: 12, side: "new",
+    resolved: false, pinnedRef: "abc", outdated: false, comments: [], ...over,
+  };
+}
+
+describe("Sidebar other files", () => {
+  const props = { headShaByRepo: { "/r/a": "head999" } };
+
+  it("lists an open thread on a file outside the diff, linking to the browser at HEAD and its line", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}} threads={[otherThread({})]} {...props} />);
+    expect(screen.getByText("Other files")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /lib\/util\.ts:12/ });
+    const params = new URL(link.getAttribute("href")!, "http://x").searchParams;
+    expect(params.get("repoPath")).toBe("/r/a");
+    expect(params.get("path")).toBe("lib/util.ts");
+    expect(params.get("line")).toBe("12");
+    expect(params.get("ref")).toBe("head999");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("links at uncommitted for an uncommitted-pinned thread and at HEAD for a sha-pinned one", () => {
+    render(<Sidebar repos={repos} onSelectFile={() => {}}
+      threads={[otherThread({ id: "u", pinnedRef: "uncommitted", lineStart: 5 }), otherThread({ id: "s", lineStart: 9 })]}
+      {...props} />);
+    const ref = (re: RegExp) =>
+      new URL(screen.getByRole("link", { name: re }).getAttribute("href")!, "http://x").searchParams.get("ref");
+    expect(ref(/lib\/util\.ts:5/)).toBe("uncommitted");
+    expect(ref(/lib\/util\.ts:9/)).toBe("head999");
+  });
+
+  it("omits the section for threads on diff files, resolved threads, and when empty", () => {
+    const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} threads={[otherThread({ file: "x.ts" })]} {...props} />);
+    expect(screen.queryByText("Other files")).toBeNull();
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} threads={[otherThread({ resolved: true })]} {...props} />);
+    expect(screen.queryByText("Other files")).toBeNull();
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} {...props} />);
+    expect(screen.queryByText("Other files")).toBeNull();
+  });
+});
 
 describe("Sidebar", () => {
   it("lists each repo and its changed files", () => {

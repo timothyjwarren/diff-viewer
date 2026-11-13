@@ -3,6 +3,7 @@ import type { CommentThread, CommitInfo, CommitRange, DiffFile, RepoDiff } from 
 import { CommitChooser } from "./CommitChooser";
 import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
+import { buildBrowseUrl } from "../lib/route";
 import type { ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
 import { CheckIcon, ChevronIcon, CommentIcon, WarningIcon } from "./Icons";
@@ -99,12 +100,41 @@ function SessionTitle({ title, description, sessionId }: {
   );
 }
 
+/** Open threads on files the diff doesn't touch, each linking to the browser at the file's current state. */
+function OtherFiles({ repo, threads, headSha }: {
+  repo: RepoDiff; threads: CommentThread[]; headSha: string | undefined;
+}) {
+  const inDiff = new Set(repo.files.map(f => f.newPath || f.oldPath));
+  const others = threads
+    .filter(t => t.repoPath === repo.repoPath && !t.resolved && !t.outdated && !inDiff.has(t.file))
+    .sort((a, b) => a.file.localeCompare(b.file) || a.lineStart - b.lineStart);
+  if (others.length === 0) return null;
+  return (
+    <div className="sidebar-other-files">
+      <div className="sidebar-other-files-title">Other files</div>
+      {others.map(t => {
+        // The thread's lines follow its basis: the working tree for an uncommitted pin, HEAD otherwise.
+        const ref = t.pinnedRef === "uncommitted" ? "uncommitted" : headSha ?? "uncommitted";
+        return (
+          <a
+            key={t.id} target="_blank" rel="noreferrer" title={`${t.file}:${t.lineStart}`}
+            href={buildBrowseUrl({ repoPath: repo.repoPath, ref, path: t.file, line: t.lineStart })}
+          >{t.file}:{t.lineStart}</a>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Sidebar({
   repos, onSelectFile, commitsByRepo = {}, rangeByRepo = {}, onRangeChange = () => {}, onOpenCommits = () => {},
   title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
   isReviewed = () => false, reviewedCount = 0,
   anyReviewedCollapsed = false, onToggleAllReviewed = () => {}, agentListening = null,
+  headShaByRepo = {},
 }: {
+  /** Current HEAD sha per repo path, used to link "Other files" entries. */
+  headShaByRepo?: Record<string, string>;
   repos: RepoDiff[];
   onSelectFile: (file: DiffFile) => void;
   commitsByRepo?: Record<string, CommitInfo[]>;
@@ -246,6 +276,10 @@ export function Sidebar({
               );
             })}
           </ul>
+          <OtherFiles
+            repo={repo} threads={threads}
+            headSha={headShaByRepo[repo.repoPath]}
+          />
         </div>
       ))}
     </nav>

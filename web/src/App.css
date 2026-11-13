@@ -1849,6 +1849,163 @@ main {
   color: var(--text);
 }
 
+.diff-view-dir-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.diff-view-dir-link:hover {
+  text-decoration: underline;
+}
+
+.sidebar-other-files {
+  padding: 6px 12px 8px;
+  font-size: 12px;
+}
+
+.sidebar-other-files-title {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.sidebar-other-files a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-other-files a:hover {
+  text-decoration: underline;
+}
+
+.file-view-line-clickable {
+  cursor: pointer;
+}
+
+.file-view-line-clickable:hover {
+  color: var(--text);
+}
+
+.file-view-line-selected {
+  background: var(--active);
+}
+
+.file-view-line-target {
+  background: var(--active);
+  box-shadow: inset 3px 0 0 var(--text-muted);
+}
+
+.file-view-annotations {
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  padding: 6px 12px 6px 68px;
+  font-family: var(--font-sans, inherit);
+  line-height: 1.4;
+}
+
+.file-view-annotations .comment-thread,
+.file-view-annotations .comment-composer {
+  width: auto;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* ---------- File browser ---------- */
+
+.browser-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-size: 14px;
+}
+
+.browser-page .file-view-header {
+  position: static;
+  flex: none;
+}
+
+.browser-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.browser-sidebar {
+  flex: 0 0 280px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 6px 0;
+}
+
+.browser-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.file-tree {
+  font-size: 13px;
+}
+
+.file-tree-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  padding-right: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-tree-row:hover {
+  background: var(--line-hover);
+}
+
+.file-tree-selected {
+  background: var(--active);
+}
+
+.file-tree-caret {
+  flex: none;
+  width: 10px;
+  color: var(--text-faint);
+}
+
+.file-tree-badge {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--active);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.file-tree-empty,
+.file-pane-state {
+  padding: 24px 16px;
+  color: var(--text-muted);
+}
+
+.file-pane-banner {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 16px;
+  background: var(--active);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
 .diff-view-mode {
   flex: none;
   display: inline-flex;

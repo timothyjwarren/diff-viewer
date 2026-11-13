@@ -116,4 +116,20 @@ describe("gitRepo", () => {
     await git(repoPath, ["add", "b.txt"]);
     expect(await listDirtyFiles(repoPath)).toEqual(["a.txt", "b.txt"]);
   });
+
+  it("listDirtyFiles returns unquoted paths containing spaces and non-ASCII characters", async () => {
+    await fs.mkdir(path.join(repoPath, "odd dir"));
+    await fs.writeFile(path.join(repoPath, "odd dir/a b.txt"), "x\n");
+    await fs.writeFile(path.join(repoPath, "é.txt"), "y\n");
+    await git(repoPath, ["add", "."]);
+    await git(repoPath, ["commit", "-m", "odd"]);
+    await fs.writeFile(path.join(repoPath, "odd dir/a b.txt"), "x2\n");
+    await fs.writeFile(path.join(repoPath, "é.txt"), "y2\n");
+    expect((await listDirtyFiles(repoPath)).sort()).toEqual(["odd dir/a b.txt", "é.txt"]);
+  });
+
+  it("listDirtyFiles reports a rename's new path", async () => {
+    await git(repoPath, ["mv", "a.txt", "renamed file.txt"]);
+    expect(await listDirtyFiles(repoPath)).toEqual(["renamed file.txt"]);
+  });
 });

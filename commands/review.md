@@ -28,6 +28,14 @@ branch, which is empty. Instead pass the *parent* of the range you want as
 an explicit SHA, e.g. `/repo:abc1234` to review everything after commit
 `abc1234`; this also populates the in-app commit picker with that range.
 
+**Linking to code.** When the user asks you to link them to a file, a
+definition or a directory ("link me to where `Foo` is defined"), find it,
+then run `diff-viewer link <sessionId> <path>[:line]` (`dir/` for a
+directory; add `--repo <repoPath>` only if the session has several repos)
+and give them the `url` it prints. It opens the file browser at the repo's
+current HEAD, where the user can read the file and comment on its lines;
+those comments reach you through `review` like any other.
+
 **Format every comment and reply as Markdown.** The viewer renders
 `reply` and `comment` text as Markdown, so write it the way you'd write a
 GitHub PR comment rather than as plain prose:

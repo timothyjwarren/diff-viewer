@@ -189,6 +189,53 @@ export async function commentCommand(
   return res.json();
 }
 
+/**
+ * Builds a viewer URL for a file (optionally `:line`) or directory (`dir/`, or
+ * `.` for the repo root) as of the repo's current HEAD. Throws if the path
+ * isn't at HEAD, so a handed-out link is never dead.
+ */
+export async function linkCommand(sessionId: string, target: string, repoPath?: string): Promise<{ url: string }> {
+  const url = await baseUrl(sessionId);
+  const session = await (await fetch(`${url}/api/session`)).json() as SessionData;
+  const repos = session.repos.map(r => r.path);
+  let repo = repoPath;
+  if (repo === undefined) {
+    if (repos.length !== 1) throw new Error(`Session has ${repos.length} repos; pass --repo <repoPath> with one of:\n${repos.join("\n")}`);
+    repo = repos[0];
+  } else if (!repos.includes(repo)) {
+    throw new Error(`Unknown repo ${repo}; session repos:\n${repos.join("\n")}`);
+  }
+
+  let rel = target;
+  let line: string | undefined;
+  const lineMatch = /^(.*):(\d+)$/.exec(rel);
+  if (lineMatch) {
+    rel = lineMatch[1];
+    line = lineMatch[2];
+  }
+  const isDirTarget = rel === "." || rel.endsWith("/");
+  rel = rel === "." ? "" : rel.replace(/\/+$/, "");
+
+  const stateRes = await fetch(`${url}/api/repo-state?${new URLSearchParams({ repoPath: repo })}`);
+  if (!stateRes.ok) throw new Error(`Could not read repo state for ${repo}`);
+  const { headSha } = await stateRes.json() as { headSha: string };
+
+  if (rel !== "") {
+    const slash = rel.lastIndexOf("/");
+    const parent = slash === -1 ? "" : rel.slice(0, slash);
+    const name = rel.slice(slash + 1);
+    const treeRes = await fetch(`${url}/api/tree?${new URLSearchParams({ repoPath: repo, ref: headSha, path: parent })}`);
+    const entries = treeRes.ok ? (await treeRes.json() as { entries: { name: string; type: string }[] }).entries : [];
+    const entry = entries.find(e => e.name === name);
+    if (!entry || (isDirTarget && entry.type !== "dir")) throw new Error(`${rel} does not exist at ${headSha}`);
+    if (entry.type === "dir") line = undefined;
+  }
+
+  const params = new URLSearchParams({ repoPath: repo, ref: headSha, path: rel });
+  if (line !== undefined && !isDirTarget) params.set("line", line);
+  return { url: `${url}/view-file?${params}` };
+}
+
 export async function describeCommand(sessionId: string, description: string): Promise<void> {
   const url = await baseUrl(sessionId);
   const res = await fetch(`${url}/api/session/description`, {

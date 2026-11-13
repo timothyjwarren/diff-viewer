@@ -11,7 +11,7 @@ import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand,
 } from "./commands.js";
 
 const execFileAsync = promisify(execFile);
@@ -300,5 +300,91 @@ describe("cli commands", () => {
     await stopCommand("to-stop");
     await new Promise(resolve => setTimeout(resolve, 100));
     expect(() => process.kill(child.pid!, 0)).toThrow();
+  });
+});
+
+describe("linkCommand", () => {
+  let home: string;
+  let server: Server;
+  let repoA: string;
+  let repoB: string;
+  let headSha: string;
+  const sid = "link1";
+
+  async function makeRepo(prefix: string): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
+    const run = (args: string[]) => execFileAsync("git", args, { cwd: dir });
+    await run(["init", "-b", "main"]);
+    await run(["config", "user.email", "test@example.com"]);
+    await run(["config", "user.name", "Test"]);
+    await fs.mkdir(path.join(dir, "src/odd dir"), { recursive: true });
+    await fs.writeFile(path.join(dir, "src/util.ts"), "export const x = 1;\n");
+    await fs.writeFile(path.join(dir, "src/odd dir/a#b&c é.ts"), "y\n");
+    await run(["add", "."]);
+    await run(["commit", "-m", "base"]);
+    return dir;
+  }
+
+  async function start(repos: string[]): Promise<void> {
+    const configs = repos.map((p, i) => ({ path: p, name: `r${i}`, branch: "main", baseRef: "HEAD" }));
+    const store = SessionStore.create(configs, sid, "t", path.join(home, "data"));
+    server = createApp(store).listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => server.once("listening", resolve));
+    const address = server.address();
+    await writeRegistryEntry(sid, { port: typeof address === "object" && address ? address.port : 0, pid: process.pid });
+  }
+
+  beforeEach(async () => {
+    home = await fs.mkdtemp(path.join(os.tmpdir(), "dv-link-"));
+    process.env.DIFFVIEWER_HOME = home;
+    repoA = await makeRepo("dv-link-a-");
+    repoB = await makeRepo("dv-link-b-");
+    headSha = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoA })).stdout.trim();
+  });
+
+  afterEach(async () => {
+    server?.close();
+    delete process.env.DIFFVIEWER_HOME;
+    await fs.rm(home, { recursive: true, force: true });
+    await fs.rm(repoA, { recursive: true, force: true });
+    await fs.rm(repoB, { recursive: true, force: true });
+  });
+
+  it("builds a file link pinned to HEAD with a line", async () => {
+    await start([repoA]);
+    const { url } = await linkCommand(sid, "src/util.ts:3");
+    const u = new URL(url);
+    expect(u.pathname).toBe("/view-file");
+    expect(u.searchParams.get("repoPath")).toBe(repoA);
+    expect(u.searchParams.get("ref")).toBe(headSha);
+    expect(u.searchParams.get("path")).toBe("src/util.ts");
+    expect(u.searchParams.get("line")).toBe("3");
+  });
+
+  it("builds a directory link without a line for a trailing slash", async () => {
+    await start([repoA]);
+    const u = new URL((await linkCommand(sid, "src/")).url);
+    expect(u.searchParams.get("path")).toBe("src");
+    expect(u.searchParams.has("line")).toBe(false);
+    expect(new URL((await linkCommand(sid, ".")).url).searchParams.get("path")).toBe("");
+  });
+
+  it("round-trips a path with space, #, & and é", async () => {
+    await start([repoA]);
+    const u = new URL((await linkCommand(sid, "src/odd dir/a#b&c é.ts")).url);
+    expect(u.searchParams.get("path")).toBe("src/odd dir/a#b&c é.ts");
+  });
+
+  it("rejects a path that does not exist at HEAD", async () => {
+    await start([repoA]);
+    await expect(linkCommand(sid, "src/nope.ts")).rejects.toThrow(/does not exist/);
+    await expect(linkCommand(sid, "nodir/x.ts")).rejects.toThrow(/does not exist/);
+  });
+
+  it("needs --repo when the session has several repos, and names them", async () => {
+    await start([repoA, repoB]);
+    await expect(linkCommand(sid, "src/util.ts")).rejects.toThrow(new RegExp(`${repoA}[\\s\\S]*${repoB}`));
+    const u = new URL((await linkCommand(sid, "src/util.ts", repoB)).url);
+    expect(u.searchParams.get("repoPath")).toBe(repoB);
   });
 });

@@ -73,14 +73,19 @@ export async function listDirtyFiles(repoPath: string): Promise<string[]> {
   // leading space off the first porcelain line only (a clean " M a.txt"
   // becomes "M a.txt"), throwing off the fixed 3-char status-prefix offset
   // below for exactly that one line.
-  const { stdout } = await execFileAsync("git", ["status", "--porcelain"], { cwd: repoPath });
-  const status = stdout.replace(/\n$/, "");
-  if (!status) return [];
-  return status.split("\n").map(line => {
-    const path = line.slice(3);
-    const arrowIdx = path.indexOf(" -> ");
-    return arrowIdx === -1 ? path : path.slice(arrowIdx + 4);
-  });
+  // -z gives unquoted paths (plain porcelain C-quotes spaces and non-ASCII
+  // bytes). Each record is "XY <path>"; a rename or copy is followed by one
+  // extra record holding the old path, which is skipped.
+  const { stdout } = await execFileAsync("git", ["status", "--porcelain", "-z"], { cwd: repoPath });
+  const records = stdout.split("\0");
+  const files: string[] = [];
+  for (let i = 0; i < records.length; i++) {
+    const rec = records[i];
+    if (rec.length < 4) continue;
+    files.push(rec.slice(3));
+    if (rec[0] === "R" || rec[0] === "C" || rec[1] === "R" || rec[1] === "C") i++;
+  }
+  return files;
 }
 
 export async function isDirty(repoPath: string): Promise<boolean> {

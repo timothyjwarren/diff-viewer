@@ -106,7 +106,34 @@ describe("DiffView", () => {
     expect(parsed.searchParams.get("repoPath")).toBe("/repo");
     expect(parsed.searchParams.get("path")).toBe("a.ts");
     expect(parsed.searchParams.get("ref")).toBe("abc123");
-    expect(parsed.searchParams.get("repoName")).toBe("repo:main");
+  });
+
+  it("opens the file view at uncommitted when the diff shows the working tree", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />);
+    fireEvent.click(screen.getByRole("button", { name: "View File" }));
+    expect(new URL(String(openSpy.mock.calls[0][0]), "http://localhost").searchParams.get("ref")).toBe("uncommitted");
+  });
+
+  describe("header path links", () => {
+    const deep: DiffFile = { ...file, oldPath: "foo/bar/baz/qux.json", newPath: "foo/bar/baz/qux.json" };
+
+    it("links each directory segment to the browser at that directory", () => {
+      render(<TestDiffView file={deep} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />);
+      const links = ["foo", "bar", "baz"].map(name => screen.getByRole("link", { name }));
+      const hrefs = links.map(a => new URL(a.getAttribute("href")!, "http://x").searchParams);
+      expect(hrefs.map(p => p.get("path"))).toEqual(["foo", "foo/bar", "foo/bar/baz"]);
+      expect(hrefs.every(p => p.get("ref") === "uncommitted" && p.get("repoPath") === "/repo")).toBe(true);
+      expect(links.every(a => a.getAttribute("target") === "_blank")).toBe(true);
+      expect(links[2]).toHaveAttribute("title", "Browse foo/bar/baz");
+      expect(screen.queryByRole("link", { name: "qux.json" })).toBeNull();
+    });
+
+    it("uses the diff's commit sha as the ref when one is given", () => {
+      render(<TestDiffView file={deep} repoPath="/repo" repoName="repo:main" gitRef="abc123" comments={comments} />);
+      const href = screen.getByRole("link", { name: "foo" }).getAttribute("href")!;
+      expect(new URL(href, "http://x").searchParams.get("ref")).toBe("abc123");
+    });
   });
 
   it("keeps showing the diff panes after clicking View File, since it no longer toggles in place", () => {

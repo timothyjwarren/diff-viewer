@@ -69,6 +69,7 @@ export function App() {
   const [commitsByRepo, setCommitsByRepo] = useState<Record<string, CommitInfo[]>>({});
   const [rangeByRepo, setRangeByRepo] = useState<Record<string, CommitRange | null>>({});
   const [dirtyFilesByRepo, setDirtyFilesByRepo] = useState<Record<string, string[]>>({});
+  const [headShaByRepo, setHeadShaByRepo] = useState<Record<string, string>>({});
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [offscreenNewComments, setOffscreenNewComments] = useState<string[]>([]);
   const [lineSelection, dispatchLineSelection] = useReducer(selectionReducer, null);
@@ -147,7 +148,10 @@ export function App() {
   useEffect(() => {
     function pollRepoStates() {
       repos.forEach(r => fetchRepoState(r.repoPath)
-        .then(state => setDirtyFilesByRepo(prev => ({ ...prev, [r.repoPath]: state.dirtyFiles })))
+        .then(state => {
+          setDirtyFilesByRepo(prev => ({ ...prev, [r.repoPath]: state.dirtyFiles }));
+          setHeadShaByRepo(prev => (prev[r.repoPath] === state.headSha ? prev : { ...prev, [r.repoPath]: state.headSha }));
+        })
         .catch(() => {}));
     }
     refreshThreads();
@@ -384,6 +388,7 @@ export function App() {
           reviewedCount={reviewed.reviewedCount} anyReviewedCollapsed={reviewed.anyReviewedCollapsed}
           onToggleAllReviewed={reviewed.toggleAllReviewed}
           agentListening={serverReachable ? agentListening : null}
+          headShaByRepo={headShaByRepo}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}

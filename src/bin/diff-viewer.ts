@@ -2,7 +2,7 @@
 import { startCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, type CommentOverrides,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand, type CommentOverrides,
 } from "../cli/commands.js";
 import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
 
@@ -63,6 +63,11 @@ async function main(): Promise<void> {
       console.log(JSON.stringify(await commentCommand(
         sessionId, repoPath, file, Number(lineStart), Number(lineEnd), side as "old" | "new", text, overrides,
       )));
+      break;
+    }
+    case "link": {
+      const { value: repoPath, rest: linkRest } = extractFlag(rest, "--repo");
+      console.log(JSON.stringify(await linkCommand(linkRest[0], linkRest[1], repoPath)));
       break;
     }
     case "ack": {

@@ -13,6 +13,8 @@ export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 export interface DiffFile { repoPath: string; oldPath: string; newPath: string; status: FileStatus; hunks: DiffHunk[]; }
 export interface RepoDiff { repo: string; branch: string; repoPath: string; files: DiffFile[]; }
 
+export interface TreeEntry { name: string; type: "file" | "dir"; changed: boolean; }
+
 export interface CommitInfo {
   sha: string; shortSha: string; subject: string; author: string; date: string;
 }

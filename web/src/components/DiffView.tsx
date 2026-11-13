@@ -15,6 +15,7 @@ import { RenderedHtmlView } from "./RenderedHtmlView";
 import { isHtmlPath } from "../lib/renderedView";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
+import { buildBrowseUrl, toBrowseRef, dirLinkSegments } from "../lib/route";
 import { STATUS_LETTER, diffStat } from "../lib/fileSummary";
 import { ChevronIcon, CommentIcon, ExternalFileIcon, WrapIcon } from "./Icons";
 import { useAlignedAnnotations } from "../lib/alignAnnotations";
@@ -373,8 +374,7 @@ export function DiffView({
   }
 
   function openFileView() {
-    const params = new URLSearchParams({ repoPath, path: fileId, ref: gitRef, repoName });
-    window.open(`/view-file?${params}`, "_blank");
+    window.open(buildBrowseUrl({ repoPath, ref: toBrowseRef(gitRef), path: fileId }), "_blank");
   }
 
   return (
@@ -393,7 +393,18 @@ export function DiffView({
           </span>
           <span className="diff-view-title" title={`${repoName} › ${fileId}`}>
             <span className="diff-view-repo">{repoName}</span>
-            {dir && <span className="diff-view-dir">{dir}/</span>}
+            {dir && (
+              <span className="diff-view-dir">
+                {dirLinkSegments(fileId).map(seg => (
+                  <span key={seg.dirPath}>
+                    <a
+                      className="diff-view-dir-link" target="_blank" rel="noreferrer" title={`Browse ${seg.dirPath}`}
+                      href={buildBrowseUrl({ repoPath, ref: toBrowseRef(gitRef), path: seg.dirPath })}
+                    >{seg.name}</a>/
+                  </span>
+                ))}
+              </span>
+            )}
             <span className="diff-view-base">{base}</span>
           </span>
           <span className="diffstat">
