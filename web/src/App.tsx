@@ -13,11 +13,15 @@ import { computeViewportSpan, type ViewportSpan } from "./lib/viewportSpan";
 import { useSessionMeta } from "./lib/useSessionMeta";
 import { useReviewedFiles } from "./lib/useReviewedFiles";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
+import { compareScopeState } from "./lib/scopeStaleness";
 import {
   findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability,
   type CommentPosition, type NavAvailability,
 } from "./lib/commentNav";
-import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange } from "./types";
+import type { DiffFile, RepoDiff, CommentThread, VerdictType, CommitInfo, CommitRange, ScopeState } from "./types";
+
+/** A scoped repo opens on "all commits + uncommitted changes", so committing a scoped file changes nothing on screen. */
+const SCOPED_DEFAULT_RANGE: CommitRange = { from: "", to: "uncommitted" };
 
 function fileName(file: DiffFile): string {
   return file.newPath || file.oldPath;
@@ -77,7 +81,16 @@ export function App() {
   const [quotedText, setQuotedText] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [viewportSpan, setViewportSpan] = useState<ViewportSpan | null>(null);
-  const { sessionId, title, description, commentsReplacedBy, commentsReplacedAt, dismissCommentsReplaced, serverReachable, agentListening } = useSessionMeta();
+  const { sessionId, title, description, commentsReplacedBy, commentsReplacedAt, dismissCommentsReplaced, serverReachable, agentListening, scope } = useSessionMeta();
+  // Per tab and never saved: a reload starts with the scope applied.
+  const [showAll, setShowAll] = useState(false);
+  const showAllRef = useRef(false);
+  const rangeByRepoRef = useRef<Record<string, CommitRange | null>>({});
+  useEffect(() => { rangeByRepoRef.current = rangeByRepo; }, [rangeByRepo]);
+  // The scope fingerprints each scoped repo's shown files were loaded with.
+  const loadedScopeRef = useRef<Record<string, ScopeState>>({});
+  const [staleFilesByRepo, setStaleFilesByRepo] = useState<Record<string, Set<string>>>({});
+  const [staleRepos, setStaleRepos] = useState<Set<string>>(new Set());
   const reviewed = useReviewedFiles(sessionId, commentsReplacedAt, repos.flatMap(r => r.files));
   const mainRef = useRef<HTMLElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -123,36 +136,128 @@ export function App() {
     return "down";
   }
 
-  useEffect(() => {
-    fetchDiffs().then(async loadedRepos => {
-      setRepos(loadedRepos);
-      setLoaded(true);
-      const entries = await Promise.all(
-        loadedRepos.map(r => fetchCommits(r.repoPath).then(commits => [r.repoPath, commits] as const)),
-      );
-      setCommitsByRepo(Object.fromEntries(entries));
+  function clearStale(repoPath: string) {
+    setStaleFilesByRepo(prev => {
+      if (!prev[repoPath]) return prev;
+      const next = { ...prev };
+      delete next[repoPath];
+      return next;
     });
+    setStaleRepos(prev => {
+      if (!prev.has(repoPath)) return prev;
+      const next = new Set(prev);
+      next.delete(repoPath);
+      return next;
+    });
+  }
+
+  /**
+   * Fetches a scoped repo's fingerprints for `range`, to compare later polls
+   * against. Called before the files are fetched, so a change landing between
+   * the two shows up as stale rather than going unnoticed.
+   */
+  async function fingerprintsFor(repoPath: string, range: CommitRange | null): Promise<ScopeState | undefined> {
+    try {
+      return (await fetchRepoState(repoPath, range?.to ?? "HEAD")).scope;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function recordFingerprints(repoPath: string, state: ScopeState | undefined) {
+    if (state) loadedScopeRef.current[repoPath] = state;
+    else delete loadedScopeRef.current[repoPath];
+  }
+
+  /**
+   * Loads every repo's files and commits, ignoring the scope when `all` is
+   * set. `rangeFor` picks each repo's range; by default a scoped repo gets the
+   * scoped default and an unscoped one the committed-only view.
+   */
+  async function loadAll(
+    all: boolean,
+    rangeFor: (repo: RepoDiff, commits: CommitInfo[]) => CommitRange | null = repo => (repo.scoped ? SCOPED_DEFAULT_RANGE : null),
+  ) {
+    const fresh = await fetchDiffs(all);
+    const commitEntries = await Promise.all(
+      fresh.map(r => fetchCommits(r.repoPath, all).then(commits => [r.repoPath, commits] as const)),
+    );
+    const commits = Object.fromEntries(commitEntries);
+    const ranges = Object.fromEntries(fresh.map(r => [r.repoPath, rangeFor(r, commits[r.repoPath] ?? [])]));
+    // An unscoped repo on its default view keeps /api/diffs' files. A scoped
+    // repo is refetched after its fingerprints, so no change slips in unseen.
+    const withFiles = await Promise.all(fresh.map(async r => {
+      const range = ranges[r.repoPath];
+      const state = r.scoped ? await fingerprintsFor(r.repoPath, range) : undefined;
+      const files = !r.scoped && range === null ? r.files : await fetchRepoDiff(r.repoPath, range ?? undefined, all);
+      recordFingerprints(r.repoPath, state);
+      return { ...r, files };
+    }));
+    setRangeByRepo(ranges);
+    setCommitsByRepo(commits);
+    setRepos(withFiles);
+    setStaleFilesByRepo({});
+    setStaleRepos(new Set());
+    setLoaded(true);
+  }
+
+  useEffect(() => {
+    // Mount-only: later loads come from the toggle and scope changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadAll(false);
   }, []);
 
   async function handleOpenCommits(repoPath: string) {
-    const commits = await fetchCommits(repoPath);
+    const commits = await fetchCommits(repoPath, showAllRef.current);
     setCommitsByRepo(prev => ({ ...prev, [repoPath]: commits }));
   }
 
   async function handleRangeChange(repoPath: string, range: CommitRange | null) {
     setRangeByRepo(prev => ({ ...prev, [repoPath]: range }));
-    const files = await fetchRepoDiff(repoPath, range ?? undefined);
+    const scoped = repos.find(r => r.repoPath === repoPath)?.scoped;
+    const state = scoped ? await fingerprintsFor(repoPath, range) : undefined;
+    const files = await fetchRepoDiff(repoPath, range ?? undefined, showAllRef.current);
+    recordFingerprints(repoPath, state);
+    clearStale(repoPath);
     setRepos(prev => prev.map(r => (r.repoPath === repoPath ? { ...r, files } : r)));
+  }
+
+  /** Refetches one repo's files and commits for its current range, clearing its stale notices. */
+  async function reloadRepo(repoPath: string) {
+    await handleRangeChange(repoPath, rangeByRepoRef.current[repoPath] ?? null);
+    await handleOpenCommits(repoPath);
+  }
+
+  function toggleShowAll() {
+    const next = !showAll;
+    showAllRef.current = next;
+    setShowAll(next);
+    void loadAll(next);
   }
 
   useEffect(() => {
     function pollRepoStates() {
-      repos.forEach(r => fetchRepoState(r.repoPath)
+      repos.forEach(r => {
+        const loadedState = r.scoped ? loadedScopeRef.current[r.repoPath] : undefined;
+        const to = loadedState ? rangeByRepoRef.current[r.repoPath]?.to ?? "HEAD" : undefined;
+        fetchRepoState(r.repoPath, to)
         .then(state => {
           setDirtyFilesByRepo(prev => ({ ...prev, [r.repoPath]: state.dirtyFiles }));
           setHeadShaByRepo(prev => (prev[r.repoPath] === state.headSha ? prev : { ...prev, [r.repoPath]: state.headSha }));
+          // Compare only against the state this view was loaded with; a reload in flight replaces it.
+          if (!state.scope || loadedScopeRef.current[r.repoPath] !== loadedState || !loadedState) return;
+          const { staleFiles, repoStale } = compareScopeState(loadedState, state.scope);
+          if (staleFiles.size > 0) {
+            setStaleFilesByRepo(prev => {
+              const known = prev[r.repoPath] ?? new Set<string>();
+              if ([...staleFiles].every(f => known.has(f))) return prev;
+              return { ...prev, [r.repoPath]: new Set([...known, ...staleFiles]) };
+            });
+          }
+          if (repoStale) setStaleRepos(prev => (prev.has(r.repoPath) ? prev : new Set([...prev, r.repoPath])));
         })
-        .catch(() => {}));
+        .catch(() => {});
+      });
     }
     refreshThreads();
     pollRepoStates();
@@ -389,6 +494,8 @@ export function App() {
           onToggleAllReviewed={reviewed.toggleAllReviewed}
           agentListening={serverReachable ? agentListening : null}
           headShaByRepo={headShaByRepo}
+          scope={scope ?? null} showAll={showAll} onToggleShowAll={toggleShowAll}
+          staleRepos={staleRepos} onReloadRepo={repoPath => void reloadRepo(repoPath)}
         />
         <ReviewBar
           onSubmit={handleSubmitVerdict}
@@ -422,6 +529,7 @@ export function App() {
               reviewed={reviewed.isReviewed(file)}
               onToggleCollapsed={() => reviewed.toggleCollapsed(file)}
               onToggleReviewed={() => reviewed.toggleReviewed(file)}
+              stale={staleFilesByRepo[repo.repoPath]?.has(fileName(file)) ? { onReload: () => void reloadRepo(repo.repoPath) } : undefined}
             />
           </div>
         )))}
