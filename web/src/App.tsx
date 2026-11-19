@@ -14,6 +14,7 @@ import { useSessionMeta } from "./lib/useSessionMeta";
 import { useReviewedFiles } from "./lib/useReviewedFiles";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import { compareScopeState } from "./lib/scopeStaleness";
+import { rangeAfterReload, onScopeChange } from "./lib/scopeChange";
 import {
   findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability,
   type CommentPosition, type NavAvailability,
@@ -222,11 +223,42 @@ export function App() {
     setRepos(prev => prev.map(r => (r.repoPath === repoPath ? { ...r, files } : r)));
   }
 
+  /** Reloads every repo after a scope change, keeping each range whose commits are still listed. */
+  function reloadForScope() {
+    pendingScopeReloadRef.current = false;
+    return loadAll(showAllRef.current, (repo, commits) =>
+      rangeAfterReload(rangeByRepoRef.current[repo.repoPath] ?? null, commits, Boolean(repo.scoped)));
+  }
+
   /** Refetches one repo's files and commits for its current range, clearing its stale notices. */
   async function reloadRepo(repoPath: string) {
+    // A scope change deferred while a comment was being written reloads everything.
+    if (pendingScopeReloadRef.current) return reloadForScope();
     await handleRangeChange(repoPath, rangeByRepoRef.current[repoPath] ?? null);
     await handleOpenCommits(repoPath);
   }
+
+  // The agent can change the scope mid-session (`diff-viewer scope`).
+  const knownScopeRef = useRef<string | undefined>(undefined);
+  const pendingScopeReloadRef = useRef(false);
+  const composerArmedRef = useRef(composerArmed);
+  useEffect(() => { composerArmedRef.current = composerArmed; }, [composerArmed]);
+  useEffect(() => {
+    if (scope === undefined) return;
+    const key = JSON.stringify(scope);
+    const known = knownScopeRef.current;
+    knownScopeRef.current = key;
+    // The first value is what the page loaded with.
+    if (known === undefined || known === key) return;
+    if (onScopeChange(composerArmedRef.current) === "defer") {
+      pendingScopeReloadRef.current = true;
+      setStaleRepos(new Set(repos.map(r => r.repoPath)));
+      return;
+    }
+    void reloadForScope();
+    // Runs only when the scope changes; the rest is read through refs or is current enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   function toggleShowAll() {
     const next = !showAll;
