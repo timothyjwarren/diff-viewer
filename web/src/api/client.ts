@@ -1,4 +1,4 @@
-import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, SessionMeta, Verdict, VerdictType, TreeEntry } from "../types";
+import type { CommitInfo, CommitRange, RepoDiff, DiffFile, CommentThread, SessionInfo, SessionMeta, Verdict, VerdictType, TreeEntry, ScopeState } from "../types";
 
 /** Throws for a non-2xx response, so a failed request surfaces to the caller instead of being read as a success. */
 function ensureOk(res: Response): Response {
@@ -10,8 +10,9 @@ async function json<T>(res: Response): Promise<T> {
   return ensureOk(res).json() as Promise<T>;
 }
 
-export async function fetchDiffs(): Promise<RepoDiff[]> {
-  return json(await fetch("/api/diffs"));
+/** `all` shows every changed file, ignoring the session's scope. */
+export async function fetchDiffs(all = false): Promise<RepoDiff[]> {
+  return json(await fetch(all ? "/api/diffs?all=1" : "/api/diffs"));
 }
 
 /** Identifies this page to the server, which stops itself once no viewer is left. */
@@ -30,13 +31,15 @@ export function sendViewerBye(): void {
   navigator.sendBeacon(`/api/session/bye?viewer=${viewerId}`);
 }
 
-export async function fetchCommits(repoPath: string): Promise<CommitInfo[]> {
+export async function fetchCommits(repoPath: string, all = false): Promise<CommitInfo[]> {
   const params = new URLSearchParams({ repoPath });
+  if (all) params.set("all", "1");
   return json(await fetch(`/api/commits?${params}`));
 }
 
-export async function fetchRepoDiff(repoPath: string, range?: CommitRange): Promise<DiffFile[]> {
+export async function fetchRepoDiff(repoPath: string, range?: CommitRange, all = false): Promise<DiffFile[]> {
   const params = new URLSearchParams({ repoPath });
+  if (all) params.set("all", "1");
   if (range) {
     // range.from is "" for the "everything, including uncommitted edits"
     // mode — the server treats to=uncommitted with no from specially, so
@@ -134,8 +137,13 @@ export async function markCommentRead(threadId: string, commentId: string): Prom
   ensureOk(await fetch(`/api/threads/${threadId}/comments/${commentId}/read`, { method: "POST" }));
 }
 
-export async function fetchRepoState(repoPath: string): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[] }> {
-  return json(await fetch(`/api/repo-state?repoPath=${encodeURIComponent(repoPath)}`));
+/** `to`, sent only for a scoped repo, is the current range's end; the response then includes scope fingerprints. */
+export async function fetchRepoState(
+  repoPath: string, to?: string,
+): Promise<{ headSha: string; dirty: boolean; dirtyFiles: string[]; scope?: ScopeState }> {
+  const params = new URLSearchParams({ repoPath });
+  if (to) params.set("to", to);
+  return json(await fetch(`/api/repo-state?${params}`));
 }
 
 export async function fetchVerdicts(): Promise<Verdict[]> {

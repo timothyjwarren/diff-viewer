@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSession, fetchSessionMeta, sendViewerBye } from "../api/client";
-import type { CommentsReplaced } from "../types";
+import type { CommentsReplaced, ScopeEntry } from "../types";
 
 export const SESSION_META_POLL_MS = 3000;
 
@@ -16,7 +16,9 @@ export const UNREACHABLE_AFTER_FAILURES = 2;
  * stopped or crashed) and true again as soon as a poll succeeds.
  * `agentListening` is whether an agent is waiting on the session.
  * `commentsReplacedAt` is when the comments were last replaced (null if never,
- * undefined until the session loads).
+ * undefined until the session loads). `scope` is the session's file scope
+ * (null when unscoped, undefined until the session loads); it keeps its
+ * identity across polls until the scope actually changes.
  */
 export function useSessionMeta() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -26,18 +28,27 @@ export function useSessionMeta() {
   const [serverReachable, setServerReachable] = useState(true);
   const [agentListening, setAgentListening] = useState(false);
   const failures = useRef(0);
+  const [scope, setScopeState] = useState<ScopeEntry[] | null | undefined>(undefined);
+  const scopeKey = useRef<string | undefined>(undefined);
   const [commentsReplacedAt, setCommentsReplacedAt] = useState<string | null | undefined>(undefined);
   // undefined until the session loads; null once loaded if its comments have never been replaced.
   const knownReplacedAt = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
+    const setScope = (next: ScopeEntry[] | null | undefined) => {
+      const key = JSON.stringify(next ?? null);
+      if (key === scopeKey.current) return;
+      scopeKey.current = key;
+      setScopeState(next ?? null);
+    };
     fetchSession().then(session => {
       if (cancelled) return;
       document.title = session.title;
       setSessionId(session.id);
       setTitle(session.title);
       setDescription(session.description ?? null);
+      setScope(session.scope);
       knownReplacedAt.current = session.commentsReplaced?.at ?? null;
       setCommentsReplacedAt(knownReplacedAt.current);
     }).catch(() => {});
@@ -52,6 +63,7 @@ export function useSessionMeta() {
           document.title = meta.title;
           setTitle(meta.title);
           setDescription(meta.description ?? null);
+          if (scopeKey.current !== undefined) setScope(meta.scope);
           if (knownReplacedAt.current === undefined) return;
           const replaced = meta.commentsReplaced;
           if (replaced && replaced.at !== knownReplacedAt.current) {
@@ -83,7 +95,7 @@ export function useSessionMeta() {
   }, []);
 
   return {
-    sessionId, title, description, commentsReplacedBy, commentsReplacedAt, serverReachable, agentListening,
+    sessionId, title, description, commentsReplacedBy, commentsReplacedAt, serverReachable, agentListening, scope,
     dismissCommentsReplaced: () => setCommentsReplacedBy(null),
   };
 }

@@ -1,7 +1,7 @@
 import type { DiffFile, FileStatus } from "../types";
 
 export const STATUS_LETTER: Record<FileStatus, string> = {
-  added: "A", modified: "M", deleted: "D", renamed: "R",
+  added: "A", modified: "M", deleted: "D", renamed: "R", unchanged: "U",
 };
 
 export interface DiffStat { added: number; deleted: number; }

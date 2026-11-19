@@ -288,6 +288,13 @@ textarea:focus {
 .file-status-modified { color: var(--warning); background: var(--warning-soft); }
 .file-status-deleted { color: var(--danger); background: var(--danger-soft); }
 .file-status-renamed { color: var(--accent); background: var(--accent-soft); }
+.file-status-unchanged { color: var(--text-muted); background: var(--hover); }
+
+.file-unchanged-badge {
+  flex: none;
+  font: 500 12px var(--font-mono);
+  color: var(--text-muted);
+}
 
 .diffstat {
   flex: none;
@@ -456,6 +463,27 @@ textarea:focus {
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.sidebar-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sidebar-scope-heading {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sidebar-scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .sidebar-reviewed-toggle {
@@ -1002,6 +1030,25 @@ main {
   color: var(--warning);
   background: var(--warning-soft);
   border-bottom: 1px solid var(--border);
+}
+
+/* A scoped file, or a repo's file list, that changed on disk after it was loaded. */
+.stale-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-repo .stale-notice {
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .diff-view-body {

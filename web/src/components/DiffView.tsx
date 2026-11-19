@@ -12,6 +12,7 @@ import { CommentThread } from "./CommentThread";
 import { ExpandStrip } from "./ExpandStrip";
 import { Composer } from "./Composer";
 import { RenderedHtmlView } from "./RenderedHtmlView";
+import { StaleNotice } from "./StaleNotice";
 import { isHtmlPath } from "../lib/renderedView";
 import { shiftForUncommitted } from "../lib/uncommittedShift";
 import { SHIKI_THEMES } from "../lib/highlight";
@@ -244,8 +245,10 @@ function Pane({ hunks, side, lang, repoName, fileId, comments, onExpand, fileLin
 
 export function DiffView({
   file, repoPath, repoName, gitRef, rangeFrom, showUncommittedBanner, comments,
-  collapsed, reviewed, onToggleCollapsed, onToggleReviewed,
+  collapsed, reviewed, onToggleCollapsed, onToggleReviewed, stale,
 }: {
+  /** Set when the file changed on disk after it was loaded. */
+  stale?: { onReload: () => void };
   file: DiffFile; repoPath: string; repoName: string; gitRef: string;
   /** Start of the active commit range, if any; locates the old side of rendered HTML previews. */
   rangeFrom?: string;
@@ -271,7 +274,8 @@ export function DiffView({
   const autoExpandedThreadIdsRef = useRef<Set<string>>(new Set());
   const lang = detectLanguage(file.newPath || file.oldPath);
   const fileId = file.newPath || file.oldPath;
-  const isNewFile = file.status === "added";
+  // A new or unchanged file has one meaningful side, shown full width as "new".
+  const isNewFile = file.status === "added" || file.status === "unchanged";
   const slash = fileId.lastIndexOf("/");
   const dir = slash >= 0 ? fileId.slice(0, slash) : "";
   const base = fileId.slice(slash + 1);
@@ -407,10 +411,14 @@ export function DiffView({
             )}
             <span className="diff-view-base">{base}</span>
           </span>
-          <span className="diffstat">
-            {stat.added > 0 && <span className="diffstat-added">+{stat.added}</span>}
-            {stat.deleted > 0 && <span className="diffstat-deleted">−{stat.deleted}</span>}
-          </span>
+          {file.status === "unchanged" ? (
+            <span className="file-unchanged-badge" title="No changes in this range; showing the whole file">unchanged</span>
+          ) : (
+            <span className="diffstat">
+              {stat.added > 0 && <span className="diffstat-added">+{stat.added}</span>}
+              {stat.deleted > 0 && <span className="diffstat-deleted">−{stat.deleted}</span>}
+            </span>
+          )}
           {canRender && (
             <span className="diff-view-mode" role="group" aria-label="View mode">
               <button className={`btn${rendered ? "" : " btn-primary"}`} aria-pressed={!rendered} onClick={() => setRendered(false)}>Source</button>
@@ -440,16 +448,20 @@ export function DiffView({
           </button>
         </div>
       </div>
+      {stale && <StaleNotice onReload={stale.onReload} />}
       {showUncommittedBanner && (
         <div className="uncommitted-banner">Viewing uncommitted changes</div>
       )}
-      {!collapsed && rendered && canRender && (
+      {!collapsed && !file.skipped && rendered && canRender && (
         <RenderedHtmlView
           file={file} repoPath={repoPath} hunks={hunks} comments={comments}
           fromRef={rangeFrom || undefined} toRef={gitRef === "working" ? undefined : gitRef}
         />
       )}
-      {!collapsed && !(rendered && canRender) && (
+      {!collapsed && file.skipped && (
+        <div className="file-pane-state">{file.skipped === "binary" ? "Binary file" : "File too large to display"}</div>
+      )}
+      {!collapsed && !file.skipped && !(rendered && canRender) && (
         <div
           className={`diff-view-body${isNewFile ? " diff-view-body-single" : ""}${wrap ? " diff-view-wrap" : ""}`}
           ref={bodyRef}

@@ -374,6 +374,57 @@ describe("DiffView", () => {
     expect(panes[0].getAttribute("data-side")).toBe("new");
   });
 
+  describe("unchanged scoped file", () => {
+    const unchanged: DiffFile = {
+      repoPath: "/repo", oldPath: "lib.sh", newPath: "lib.sh", status: "unchanged",
+      hunks: [{
+        oldStart: 1, oldLines: 2, newStart: 1, newLines: 2,
+        lines: [
+          { type: "context", oldLineNumber: 1, newLineNumber: 1, content: "echo one" },
+          { type: "context", oldLineNumber: 2, newLineNumber: 2, content: "echo two" },
+        ],
+      }],
+    };
+
+    it("shows an unchanged badge instead of a diffstat, and its lines in one new-side pane", () => {
+      const { container } = render(
+        <TestDiffView file={unchanged} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      );
+      expect(container.querySelector(".file-unchanged-badge")).toHaveTextContent("unchanged");
+      expect(container.querySelector(".diffstat")).toBeNull();
+      const panes = container.querySelectorAll(".diff-pane");
+      expect(panes).toHaveLength(1);
+      expect(panes[0].getAttribute("data-side")).toBe("new");
+      expect(screen.getByText("echo two")).toBeInTheDocument();
+    });
+
+    it("starts a new-side comment from a gutter click", () => {
+      const onGutterMouseDown = vi.fn();
+      const { container } = render(
+        <TestDiffView file={unchanged} repoPath="/repo" repoName="repo:main" gitRef="working" comments={{ ...comments, onGutterMouseDown }} />,
+      );
+      fireEvent.mouseDown(container.querySelector('[data-line-number="2"] .diff-line-gutter')!);
+      expect(onGutterMouseDown).toHaveBeenCalledWith("new", 2);
+    });
+
+    it("shows a placeholder for a skipped binary file", () => {
+      render(
+        <TestDiffView file={{ ...unchanged, hunks: [], skipped: "binary" }} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} />,
+      );
+      expect(screen.getByText("Binary file")).toBeInTheDocument();
+    });
+  });
+
+  it("shows a stale notice whose Reload button calls onReload", () => {
+    const onReload = vi.fn();
+    render(
+      <TestDiffView file={file} repoPath="/repo" repoName="repo:main" gitRef="working" comments={comments} stale={{ onReload }} />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Changed since you loaded it");
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(onReload).toHaveBeenCalled();
+  });
+
   it("toggles soft wrapping per file from the header, in both modified and new-file views", () => {
     const toggle = () => screen.getByRole("button", { name: "Wrap lines" });
     const { container, rerender } = render(

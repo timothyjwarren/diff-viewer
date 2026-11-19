@@ -50,6 +50,27 @@ describe("useSessionMeta", () => {
     expect(result.current.description).toBe("second");
   });
 
+  it("loads the scope and picks up a changed scope on the next poll", async () => {
+    const scope = [{ repoPath: "/r", path: "a.sh", kind: "file" as const }];
+    meta = { ...meta, scope: null };
+    const { result } = renderHook(() => useSessionMeta());
+    await act(async () => {});
+    expect(result.current.scope).toBeNull();
+    meta = { ...meta, scope };
+    await poll();
+    expect(result.current.scope).toEqual(scope);
+  });
+
+  it("keeps the same scope object when a poll returns an equal scope", async () => {
+    meta = { ...meta, scope: [{ repoPath: "/r", path: "a.sh", kind: "file" }] };
+    vi.mocked(client.fetchSessionMeta).mockImplementation(async () => structuredClone(meta));
+    const { result } = renderHook(() => useSessionMeta());
+    await act(async () => {});
+    const first = result.current.scope;
+    await poll();
+    expect(result.current.scope).toBe(first);
+  });
+
   it("reports a reset or restore that happens while the page is open, until dismissed", async () => {
     const { result } = renderHook(() => useSessionMeta());
     await act(async () => {});

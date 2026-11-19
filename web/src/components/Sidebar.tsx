@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState } from "react";
-import type { CommentThread, CommitInfo, CommitRange, DiffFile, RepoDiff } from "../types";
+import type { CommentThread, CommitInfo, CommitRange, DiffFile, RepoDiff, ScopeEntry } from "../types";
 import { CommitChooser } from "./CommitChooser";
 import { fileAnchorId } from "../lib/fileAnchor";
 import { elideDir } from "../lib/elidePath";
@@ -8,6 +8,7 @@ import { scrollTopToReveal, type ViewportSpan } from "../lib/viewportSpan";
 import { STATUS_LETTER, totalDiffStat } from "../lib/fileSummary";
 import { CheckIcon, ChevronIcon, CommentIcon, WarningIcon } from "./Icons";
 import { CommentMarkdown } from "./CommentMarkdown";
+import { StaleNotice } from "./StaleNotice";
 
 let measureCanvas: HTMLCanvasElement | null = null;
 function textWidth(text: string, font: string): number {
@@ -126,6 +127,24 @@ function OtherFiles({ repo, threads, headSha }: {
   );
 }
 
+/** The session's file scope, and the toggle that turns it off for this tab. */
+function ScopeControls({ scope, showAll, onToggleShowAll }: {
+  scope: ScopeEntry[]; showAll: boolean; onToggleShowAll: () => void;
+}) {
+  const paths = scope.map(e => (e.kind === "dir" && e.path !== "." ? `${e.path}/` : e.path));
+  return (
+    <div className="sidebar-scope">
+      <span className="sidebar-scope-heading" title={paths.join("\n")}>
+        Scoped to {scope.length} path{scope.length === 1 ? "" : "s"}
+      </span>
+      <label className="sidebar-scope-toggle">
+        <input type="checkbox" checked={showAll} onChange={onToggleShowAll} />
+        Show all changed files
+      </label>
+    </div>
+  );
+}
+
 // Position the viewport indicator over the rows of the files on screen,
 // from the top of the first one's row to the bottom of the last one's.
 // Returns those rows' extent in the sidebar's content coordinates.
@@ -149,8 +168,17 @@ export function Sidebar({
   title = null, description = null, sessionId = null, viewportSpan = null, threads = [],
   isReviewed = () => false, reviewedCount = 0,
   anyReviewedCollapsed = false, onToggleAllReviewed = () => {}, agentListening = null,
-  headShaByRepo = {},
+  headShaByRepo = {}, scope = null, showAll = false, onToggleShowAll = () => {},
+  staleRepos = new Set<string>(), onReloadRepo = () => {},
 }: {
+  /** The session's file scope; null when unscoped. */
+  scope?: ScopeEntry[] | null;
+  /** Whether this tab shows every changed file despite the scope. */
+  showAll?: boolean;
+  onToggleShowAll?: () => void;
+  /** Repos whose files changed on disk since they were loaded. */
+  staleRepos?: Set<string>;
+  onReloadRepo?: (repoPath: string) => void;
   /** Current HEAD sha per repo path, used to link "Other files" entries. */
   headShaByRepo?: Record<string, string>;
   repos: RepoDiff[];
@@ -247,6 +275,7 @@ export function Sidebar({
           Agent listening
         </p>
       )}
+      {scope && <ScopeControls scope={scope} showAll={showAll} onToggleShowAll={onToggleShowAll} />}
       {viewportSpan && <div ref={indicatorRef} className="sidebar-viewport-indicator" data-testid="viewport-indicator" />}
       {repos.map(repo => (
         <div
@@ -264,6 +293,7 @@ export function Sidebar({
               onOpen={() => onOpenCommits(repo.repoPath)}
             />
           </div>
+          {staleRepos.has(repo.repoPath) && <StaleNotice onReload={() => onReloadRepo(repo.repoPath)} />}
           <ul>
             {repo.files.map(file => {
               const name = file.newPath || file.oldPath;

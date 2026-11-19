@@ -258,3 +258,39 @@ describe("Sidebar", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
+
+describe("Sidebar scope", () => {
+  const scope = [
+    { repoPath: "/r/a", path: "x.ts", kind: "file" as const },
+    { repoPath: "/r/a", path: "lib", kind: "dir" as const },
+  ];
+
+  it("shows the scope heading and the show-all toggle only for a scoped session", () => {
+    const onToggleShowAll = vi.fn();
+    const { rerender } = render(<Sidebar repos={repos} onSelectFile={() => {}} scope={scope} showAll={false} onToggleShowAll={onToggleShowAll} />);
+    expect(screen.getByText("Scoped to 2 paths")).toHaveAttribute("title", "x.ts\nlib/");
+    const toggle = screen.getByRole("checkbox", { name: "Show all changed files" });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(onToggleShowAll).toHaveBeenCalled();
+
+    rerender(<Sidebar repos={repos} onSelectFile={() => {}} scope={null} />);
+    expect(screen.queryByText(/Scoped to/)).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: "Show all changed files" })).toBeNull();
+  });
+
+  it("shows the scope controls even when no scoped file is listed", () => {
+    render(<Sidebar repos={[{ ...repos[0], files: [] }]} onSelectFile={() => {}} scope={[scope[0]]} showAll={false} onToggleShowAll={() => {}} />);
+    expect(screen.getByText("Scoped to 1 path")).toBeInTheDocument();
+  });
+
+  it("shows a stale notice at the top of a stale repo's file list, reloading that repo", () => {
+    const onReloadRepo = vi.fn();
+    render(<Sidebar repos={repos} onSelectFile={() => {}} scope={scope} showAll={false} onToggleShowAll={() => {}}
+      staleRepos={new Set(["/r/b"])} onReloadRepo={onReloadRepo} />);
+    const notices = screen.getAllByRole("status").filter(n => n.textContent?.includes("Changed since you loaded it"));
+    expect(notices).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(onReloadRepo).toHaveBeenCalledWith("/r/b");
+  });
+});
