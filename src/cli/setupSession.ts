@@ -31,14 +31,15 @@ export interface SessionSetup {
  * a user-facing message on any invalid argument.
  */
 export async function setupSession(argv: string[], cwd: string): Promise<SessionSetup> {
-  const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
+  // --files first: its list ends at the next flag, so the other flags must still be in place.
+  const { values: files, rest: withoutFiles } = extractListFlag(argv, "--files");
+  const { value: sessionId, rest: afterSessionId } = extractFlag(withoutFiles, "--session-id");
   const { value: titleArg, rest: afterTitle } = extractFlag(afterSessionId, "--title");
   const { value: descriptionArg, rest: afterDescription } = extractFlag(afterTitle, "--description");
   const { value: portArg, rest: afterPort } = extractFlag(afterDescription, "--port");
   const { value: firstConnectArg, rest: afterFirstConnect } = extractFlag(afterPort, "--first-connect-timeout");
   const { value: idleArg, rest: afterIdle } = extractFlag(afterFirstConnect, "--idle-timeout");
-  const { value: importSessionId, rest: afterImport } = extractFlag(afterIdle, "--import-session");
-  const { values: files, rest: repoArgv } = extractListFlag(afterImport, "--files");
+  const { value: importSessionId, rest: repoArgv } = extractFlag(afterIdle, "--import-session");
 
   const port = validatePort(portArg);
   if (files !== undefined && files.length === 0) throw new Error("--files needs at least one path");

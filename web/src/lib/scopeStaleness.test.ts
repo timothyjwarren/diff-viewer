@@ -33,4 +33,10 @@ describe("compareScopeState", () => {
     const current = { ...loaded, files: { ...loaded.files, "c.sh": "h5" } };
     expect(compareScopeState(before, current)).toEqual({ staleFiles: new Set(["c.sh"]), repoStale: true });
   });
+
+  it("marks the repo stale when a changed file isn't among the shown files, since it has no header for a notice", () => {
+    const current = { ...loaded, files: { ...loaded.files, "b.sh": "h3" } };
+    expect(compareScopeState(loaded, current, new Set(["a.sh"]))).toEqual({ staleFiles: new Set(["b.sh"]), repoStale: true });
+    expect(compareScopeState(loaded, current, new Set(["a.sh", "b.sh"])).repoStale).toBe(false);
+  });
 });

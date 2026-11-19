@@ -657,6 +657,15 @@ describe("api app", () => {
       expect(res.body[0].files[0].hunks[0].lines[0]).toMatchObject({ type: "add", content: "#!/bin/sh", uncommitted: true });
     });
 
+    it("lists a modified scoped file with a space or non-ASCII name once, as modified", async () => {
+      for (const n of ["my script.sh", "café.sh"]) await fs.writeFile(path.join(repoPath, n), "x\n");
+      await git(repoPath, ["add", "my script.sh", "café.sh"]);
+      const app = createApp(await scopedStore(["my script.sh", "café.sh"]));
+      for (const n of ["my script.sh", "café.sh"]) await fs.writeFile(path.join(repoPath, n), "x\ny\n");
+      const res = await request(app).get("/api/diffs");
+      expect(names(res.body[0].files)).toEqual(["café.sh:modified", "my script.sh:modified"]);
+    });
+
     it("GET /api/repo-diff applies the scope to a commit range and lists unchanged files at that commit", async () => {
       const store = await scopedStore(["a.txt", "b.txt"]);
       await fs.writeFile(path.join(repoPath, "c.txt"), "see\n");

@@ -45,6 +45,12 @@ describe("setupSession", () => {
     expect(store.snapshot.scope?.map(e => e.path)).toEqual(["a.txt", "b.txt"]);
   });
 
+  it("ends the --files list at a following flag, so repo args after that flag stay repo args", async () => {
+    const { store } = await setupSession(["--session-id", "s1", "--files", "a.txt", "--title", "T", repoPath], repoPath);
+    expect(store.snapshot.scope).toEqual([{ repoPath, path: "a.txt", kind: "file" }]);
+    expect(store.snapshot.title).toBe("T");
+  });
+
   it("starts unscoped without --files", async () => {
     const { store } = await setupSession(["--session-id", "s1", repoPath], "/");
     expect(store.snapshot.scope).toBeNull();

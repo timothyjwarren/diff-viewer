@@ -15,6 +15,7 @@ import { useReviewedFiles } from "./lib/useReviewedFiles";
 import { ScrollbarMarkers } from "./components/ScrollbarMarkers";
 import { compareScopeState } from "./lib/scopeStaleness";
 import { rangeAfterReload, onScopeChange } from "./lib/scopeChange";
+import { LoadGenerations } from "./lib/loadGenerations";
 import {
   findAdjacentComment, findCommentBeside, isEditableTarget, threadNavAvailability,
   type CommentPosition, type NavAvailability,
@@ -90,6 +91,7 @@ export function App() {
   useEffect(() => { rangeByRepoRef.current = rangeByRepo; }, [rangeByRepo]);
   // The scope fingerprints each scoped repo's shown files were loaded with.
   const loadedScopeRef = useRef<Record<string, ScopeState>>({});
+  const generations = useRef(new LoadGenerations()).current;
   const [staleFilesByRepo, setStaleFilesByRepo] = useState<Record<string, Set<string>>>({});
   const [staleRepos, setStaleRepos] = useState<Set<string>>(new Set());
   const reviewed = useReviewedFiles(sessionId, commentsReplacedAt, repos.flatMap(r => r.files));
@@ -179,33 +181,39 @@ export function App() {
     all: boolean,
     rangeFor: (repo: RepoDiff, commits: CommitInfo[]) => CommitRange | null = repo => (repo.scoped ? SCOPED_DEFAULT_RANGE : null),
   ) {
+    const isCurrent = generations.beginAll();
     const fresh = await fetchDiffs(all);
+    // A failed commit list leaves the picker empty rather than blocking the diff.
     const commitEntries = await Promise.all(
-      fresh.map(r => fetchCommits(r.repoPath, all).then(commits => [r.repoPath, commits] as const)),
+      fresh.map(r => fetchCommits(r.repoPath, all).catch(() => []).then(commits => [r.repoPath, commits] as const)),
     );
     const commits = Object.fromEntries(commitEntries);
     const ranges = Object.fromEntries(fresh.map(r => [r.repoPath, rangeFor(r, commits[r.repoPath] ?? [])]));
     // An unscoped repo on its default view keeps /api/diffs' files. A scoped
     // repo is refetched after its fingerprints, so no change slips in unseen.
-    const withFiles = await Promise.all(fresh.map(async r => {
+    const loadedRepos = await Promise.all(fresh.map(async r => {
       const range = ranges[r.repoPath];
       const state = r.scoped ? await fingerprintsFor(r.repoPath, range) : undefined;
       const files = !r.scoped && range === null ? r.files : await fetchRepoDiff(r.repoPath, range ?? undefined, all);
-      recordFingerprints(r.repoPath, state);
-      return { ...r, files };
+      return { repo: { ...r, files }, state };
     }));
+    if (!isCurrent()) return;
+    // The poll reads ranges through the ref, so it changes together with the fingerprints.
+    rangeByRepoRef.current = ranges;
+    for (const { repo, state } of loadedRepos) recordFingerprints(repo.repoPath, state);
     setRangeByRepo(ranges);
     setCommitsByRepo(commits);
-    setRepos(withFiles);
+    setRepos(loadedRepos.map(l => l.repo));
     setStaleFilesByRepo({});
-    setStaleRepos(new Set());
+    // A scoped repo whose fingerprints couldn't be read can't detect changes, so it asks for a reload.
+    setStaleRepos(new Set(loadedRepos.filter(l => l.repo.scoped && !l.state).map(l => l.repo.repoPath)));
     setLoaded(true);
   }
 
   useEffect(() => {
     // Mount-only: later loads come from the toggle and scope changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     void loadAll(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleOpenCommits(repoPath: string) {
@@ -214,12 +222,16 @@ export function App() {
   }
 
   async function handleRangeChange(repoPath: string, range: CommitRange | null) {
+    const isCurrent = generations.beginRepo(repoPath);
     setRangeByRepo(prev => ({ ...prev, [repoPath]: range }));
     const scoped = repos.find(r => r.repoPath === repoPath)?.scoped;
     const state = scoped ? await fingerprintsFor(repoPath, range) : undefined;
     const files = await fetchRepoDiff(repoPath, range ?? undefined, showAllRef.current);
+    if (!isCurrent()) return;
+    rangeByRepoRef.current = { ...rangeByRepoRef.current, [repoPath]: range };
     recordFingerprints(repoPath, state);
     clearStale(repoPath);
+    if (scoped && !state) setStaleRepos(prev => new Set([...prev, repoPath]));
     setRepos(prev => prev.map(r => (r.repoPath === repoPath ? { ...r, files } : r)));
   }
 
@@ -235,8 +247,15 @@ export function App() {
 
   /** Refetches one repo's files and commits for its current range, clearing its stale notices. */
   async function reloadRepo(repoPath: string) {
-    // A scope change deferred while a comment was being written reloads everything.
-    if (pendingScopeReloadRef.current) return reloadForScope();
+    // A scope change deferred while a comment was being written reloads
+    // everything, once the comment is posted or cancelled.
+    if (pendingScopeReloadRef.current) {
+      if (onScopeChange(composerArmedRef.current) === "defer") {
+        setFailure("Post or cancel your comment first, then reload.");
+        return;
+      }
+      return reloadForScope();
+    }
     await handleRangeChange(repoPath, rangeByRepoRef.current[repoPath] ?? null);
     await handleOpenCommits(repoPath);
   }
@@ -282,7 +301,8 @@ export function App() {
           setHeadShaByRepo(prev => (prev[r.repoPath] === state.headSha ? prev : { ...prev, [r.repoPath]: state.headSha }));
           // Compare only against the state this view was loaded with; a reload in flight replaces it.
           if (!state.scope || loadedScopeRef.current[r.repoPath] !== loadedState || !loadedState) return;
-          const { staleFiles, repoStale } = compareScopeState(loadedState, state.scope);
+          const shown = new Set(r.files.map(fileName));
+          const { staleFiles, repoStale } = compareScopeState(loadedState, state.scope, shown);
           if (staleFiles.size > 0) {
             setStaleFilesByRepo(prev => {
               const known = prev[r.repoPath] ?? new Set<string>();

@@ -14,6 +14,34 @@ function pathFromGitHeader(header: string): string {
   return rest === `a/${path} b/${path}` ? path : "";
 }
 
+const C_ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, "\\": 92 };
+
+/**
+ * A path as git prints it in a diff header line: C-quoted (with octal-escaped
+ * UTF-8 bytes) when it has unusual characters, and followed by a tab on
+ * `---`/`+++` lines when it contains a space.
+ */
+function headerLinePath(raw: string): string {
+  if (!raw.startsWith('"')) return raw.replace(/\t$/, "");
+  const bytes: number[] = [];
+  for (let i = 1; i < raw.length && raw[i] !== '"'; i++) {
+    const ch = raw[i];
+    if (ch !== "\\") {
+      bytes.push(...Buffer.from(ch, "utf-8"));
+      continue;
+    }
+    const next = raw[++i];
+    const octal = /^[0-7]{3}/.exec(raw.slice(i));
+    if (octal) {
+      bytes.push(parseInt(octal[0], 8));
+      i += 2;
+    } else {
+      bytes.push(C_ESCAPES[next] ?? next.charCodeAt(0));
+    }
+  }
+  return Buffer.from(bytes).toString("utf-8");
+}
+
 export function parseUnifiedDiff(diffText: string, repoPath: string): DiffFile[] {
   if (!diffText.trim()) return [];
   const lines = diffText.split("\n");
@@ -39,14 +67,14 @@ export function parseUnifiedDiff(diffText: string, repoPath: string): DiffFile[]
       else if (line.startsWith("deleted file mode")) status = "deleted";
       else if (line.startsWith("rename from")) {
         status = "renamed";
-        oldPath = line.slice("rename from ".length);
+        oldPath = headerLinePath(line.slice("rename from ".length));
       } else if (line.startsWith("rename to")) {
-        newPath = line.slice("rename to ".length);
+        newPath = headerLinePath(line.slice("rename to ".length));
       } else if (line.startsWith("--- ")) {
-        const p = line.slice(4);
+        const p = headerLinePath(line.slice(4));
         oldPath = p === "/dev/null" ? "" : p.replace(/^a\//, "");
       } else if (line.startsWith("+++ ")) {
-        const p = line.slice(4);
+        const p = headerLinePath(line.slice(4));
         newPath = p === "/dev/null" ? "" : p.replace(/^b\//, "");
       }
       i++;

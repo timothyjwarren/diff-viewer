@@ -105,3 +105,44 @@ index 0000000..e69de29
     expect(parseUnifiedDiff("", "/repo")).toEqual([]);
   });
 });
+
+describe("parseUnifiedDiff path quoting", () => {
+  it("drops the tab git appends to a ---/+++ path containing a space", () => {
+    const diff = [
+      "diff --git a/my script.sh b/my script.sh",
+      "index 1..2 100644",
+      "--- a/my script.sh\t",
+      "+++ b/my script.sh\t",
+      "@@ -1 +1 @@",
+      "-a",
+      "+b",
+    ].join("\n");
+    const [f] = parseUnifiedDiff(diff, "/r");
+    expect([f.oldPath, f.newPath]).toEqual(["my script.sh", "my script.sh"]);
+  });
+
+  it("unquotes C-quoted paths, decoding octal UTF-8 bytes and escapes", () => {
+    const diff = [
+      'diff --git "a/caf\\303\\251.sh" "b/caf\\303\\251.sh"',
+      "new file mode 100644",
+      "--- /dev/null",
+      '+++ "b/caf\\303\\251 \\"q\\".sh"',
+      "@@ -0,0 +1 @@",
+      "+x",
+    ].join("\n");
+    const [f] = parseUnifiedDiff(diff, "/r");
+    expect(f.newPath).toBe('café "q".sh');
+    expect(f.status).toBe("added");
+  });
+
+  it("unquotes quoted rename paths", () => {
+    const diff = [
+      "diff --git a/old b/new",
+      "similarity index 100%",
+      'rename from "caf\\303\\251"',
+      "rename to new name",
+    ].join("\n");
+    const [f] = parseUnifiedDiff(diff, "/r");
+    expect([f.oldPath, f.newPath]).toEqual(["café", "new name"]);
+  });
+});
