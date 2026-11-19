@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractFlag, extractBooleanFlag, validatePort } from "./flags.js";
+import { extractFlag, extractBooleanFlag, extractListFlag, validatePort } from "./flags.js";
 
 describe("extractFlag", () => {
   it("returns the value after the flag and removes both from rest", () => {
@@ -36,5 +36,25 @@ describe("validatePort", () => {
 
   it.each(["0", "65536", "not-a-number", "8080.5"])("rejects an invalid value: %s", value => {
     expect(() => validatePort(value)).toThrow(/Invalid --port value/);
+  });
+});
+
+describe("extractListFlag", () => {
+  it("takes values up to a literal -- and drops the --", () => {
+    expect(extractListFlag(["--title", "t", "--files", "a", "b", "--", "/r"], "--files")).toEqual({
+      values: ["a", "b"], rest: ["--title", "t", "/r"],
+    });
+  });
+
+  it("takes values up to the next --flag", () => {
+    expect(extractListFlag(["--files", "a", "--port", "1"], "--files")).toEqual({ values: ["a"], rest: ["--port", "1"] });
+  });
+
+  it("returns undefined values when the flag is absent", () => {
+    expect(extractListFlag(["a"], "--files")).toEqual({ values: undefined, rest: ["a"] });
+  });
+
+  it("keeps a value that starts with a single dash", () => {
+    expect(extractListFlag(["--files", "-odd.sh"], "--files")).toEqual({ values: ["-odd.sh"], rest: [] });
   });
 });

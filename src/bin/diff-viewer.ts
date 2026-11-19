@@ -2,7 +2,7 @@
 import { startCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand, type CommentOverrides,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand, scopeCommand, type CommentOverrides,
 } from "../cli/commands.js";
 import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
 
@@ -83,6 +83,12 @@ async function main(): Promise<void> {
     case "describe": {
       await describeCommand(rest[0], rest[1]);
       console.log(JSON.stringify({ described: rest[0] }));
+      break;
+    }
+    case "scope": {
+      const { present: clear, rest: scopeRest } = extractBooleanFlag(rest, "--clear");
+      const [sessionId, ...paths] = scopeRest;
+      console.log(JSON.stringify(await scopeCommand(sessionId, paths, clear)));
       break;
     }
     case "reset": {

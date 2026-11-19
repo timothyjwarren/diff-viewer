@@ -3,7 +3,8 @@ import path from "node:path";
 import { getRegistryDir, getDataDir } from "../paths.js";
 import { readRegistryEntry, removeRegistryEntry } from "../registry.js";
 import { readCursor, writeCursor } from "./cursor.js";
-import { verdictIntent, type SessionData, type RepoConfig, type CommentThread, type CommentAuthor, type CommentArchiveSummary } from "../types.js";
+import { verdictIntent, type SessionData, type RepoConfig, type CommentThread, type CommentAuthor, type CommentArchiveSummary, type ScopeEntry } from "../types.js";
+import { resolveScopePaths } from "../scope/scope.js";
 
 async function baseUrl(sessionId: string): Promise<string> {
   const { port } = await readRegistryEntry(sessionId);
@@ -246,6 +247,26 @@ export async function describeCommand(sessionId: string, description: string): P
   if (!res.ok) throw new Error(`diff-viewer describe: unexpected status ${res.status}`);
 }
 
+/**
+ * Replaces a running session's file scope with `paths` (absolute, or relative
+ * to `cwd`), or removes it with `clear`.
+ */
+export async function scopeCommand(
+  sessionId: string, paths: string[], clear: boolean, cwd: string = process.cwd(),
+): Promise<{ scope: ScopeEntry[] | null }> {
+  if ((paths.length > 0) === clear) throw new Error("diff-viewer scope: pass either paths or --clear");
+  const url = await baseUrl(sessionId);
+  const session = await (await fetch(`${url}/api/session`)).json() as SessionData;
+  const scope = clear ? null : await resolveScopePaths(paths, session.repos, cwd);
+  const res = await fetch(`${url}/api/session/scope`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope }),
+  });
+  if (!res.ok) throw new Error(`diff-viewer scope: unexpected status ${res.status}`);
+  return await res.json() as { scope: ScopeEntry[] | null };
+}
+
 export async function resetCommand(sessionId: string): Promise<void> {
   const url = await baseUrl(sessionId);
   const res = await fetch(`${url}/api/session/reset`, { method: "POST" });
@@ -270,7 +291,9 @@ export async function stopCommand(sessionId: string): Promise<void> {
   await removeRegistryEntry(sessionId);
 }
 
-export async function sessionsCommand(repoFilter?: string): Promise<Array<{ sessionId: string; repos: RepoConfig[] }>> {
+export async function sessionsCommand(
+  repoFilter?: string,
+): Promise<Array<{ sessionId: string; repos: RepoConfig[]; scope: ScopeEntry[] | null }>> {
   let entries: string[];
   try {
     entries = await fs.readdir(getRegistryDir());
@@ -283,14 +306,14 @@ export async function sessionsCommand(repoFilter?: string): Promise<Array<{ sess
   // covers this exact repo.
   const resolvedFilter = repoFilter ? path.resolve(repoFilter) : undefined;
   const sessionIds = entries.filter(f => f.endsWith(".json")).map(f => f.replace(/\.json$/, ""));
-  const results: Array<{ sessionId: string; repos: RepoConfig[] }> = [];
+  const results: Array<{ sessionId: string; repos: RepoConfig[]; scope: ScopeEntry[] | null }> = [];
   for (const id of sessionIds) {
     try {
       const raw = await fs.readFile(path.join(getDataDir(), `${id}.json`), "utf-8");
       const data = JSON.parse(raw) as SessionData;
       if (data.status !== "active") continue;
       if (!resolvedFilter || data.repos.some(r => r.path === resolvedFilter)) {
-        results.push({ sessionId: id, repos: data.repos });
+        results.push({ sessionId: id, repos: data.repos, scope: data.scope ?? null });
       }
     } catch {
       continue;

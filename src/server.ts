@@ -3,86 +3,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./api/app.js";
 import { ViewerTracker, DEFAULT_VIEWER_TIMEOUTS } from "./api/viewerTracker.js";
-import { SessionStore } from "./session/sessionStore.js";
-import { resolveBaseRef, getCurrentBranch, assertValidRepoPath } from "./git/gitRepo.js";
 import { writeRegistryEntry, removeRegistryEntry } from "./registry.js";
-import { parseRepoArgs } from "./parseRepoArgs.js";
-import { extractFlag, validatePort } from "./cli/flags.js";
-import { getDataDir } from "./paths.js";
+import { setupSession } from "./cli/setupSession.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function defaultTitle(repos: Array<{ name: string; branch: string }>): string {
-  if (repos.length === 1) return `${repos[0].name}:${repos[0].branch}`;
-  const [first, ...rest] = repos;
-  return rest.length === 0 ? first.name : `${first.name} (+${rest.length} more)`;
-}
-
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  const { value: sessionId, rest: afterSessionId } = extractFlag(argv, "--session-id");
-  const { value: titleArg, rest: afterTitle } = extractFlag(afterSessionId, "--title");
-  const { value: descriptionArg, rest: afterDescription } = extractFlag(afterTitle, "--description");
-  const { value: portArg, rest: afterPort } = extractFlag(afterDescription, "--port");
-  const { value: firstConnectArg, rest: afterFirstConnect } = extractFlag(afterPort, "--first-connect-timeout");
-  const { value: idleArg, rest: afterIdle } = extractFlag(afterFirstConnect, "--idle-timeout");
-  const { value: importSessionId, rest: repoArgv } = extractFlag(afterIdle, "--import-session");
-  const repoArgs = parseRepoArgs(repoArgv);
-
-  let port: number;
+  let setup;
   try {
-    port = validatePort(portArg);
+    setup = await setupSession(process.argv.slice(2), process.cwd());
   } catch (err) {
     console.error(`diff-viewer: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
-
-  if (repoArgs.length === 0) {
-    console.error("diff-viewer: no repo paths given (pass one or more <path[:baseRef]> arguments)");
-    process.exit(1);
-  }
-
-  const validationErrors: string[] = [];
-  for (const { path: repoPath } of repoArgs) {
-    try {
-      await assertValidRepoPath(path.resolve(repoPath));
-    } catch (err) {
-      validationErrors.push(err instanceof Error ? err.message : String(err));
-    }
-  }
-  if (validationErrors.length > 0) {
-    console.error(`diff-viewer: invalid repo path${validationErrors.length > 1 ? "s" : ""}:`);
-    for (const msg of validationErrors) console.error(`  - ${msg}`);
-    process.exit(1);
-  }
-
-  const repos = await Promise.all(repoArgs.map(async ({ path: repoPath, baseRef }) => {
-    const resolvedPath = path.resolve(repoPath);
-    return {
-      path: resolvedPath,
-      name: path.basename(resolvedPath),
-      branch: await getCurrentBranch(repoPath),
-      baseRef: await resolveBaseRef(repoPath, baseRef),
-    };
-  }));
-
-  if (!sessionId) throw new Error("Missing required --session-id argument");
-
-  let store: SessionStore;
-  if (importSessionId) {
-    const sourcePath = path.join(getDataDir(), `${importSessionId}.json`);
-    try {
-      store = await SessionStore.importFrom(sourcePath, sessionId, repos, titleArg);
-    } catch (err) {
-      console.error(`diff-viewer: failed to import session ${importSessionId}: ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-  } else {
-    const title = titleArg ?? defaultTitle(repos);
-    store = SessionStore.create(repos, sessionId, title);
-  }
-  if (descriptionArg !== undefined) store.setDescription(descriptionArg);
-  await store.persist();
+  const { store, sessionId, port, portArg, firstConnectArg, idleArg, warnings } = setup;
+  for (const w of warnings) console.error(`diff-viewer: ${w}`);
 
   const webDistDir = path.join(__dirname, "../web/dist");
   const viewers = new ViewerTracker({

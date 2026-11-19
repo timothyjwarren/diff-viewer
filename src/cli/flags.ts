@@ -13,6 +13,20 @@ export function extractBooleanFlag(argv: string[], flag: string): { present: boo
 }
 
 /**
+ * Pulls a `--flag v1 v2 ...` list out of argv. The values run up to the next
+ * token starting with `--`; a literal `--` ending the list is removed too.
+ */
+export function extractListFlag(argv: string[], flag: string): { values: string[] | undefined; rest: string[] } {
+  const idx = argv.indexOf(flag);
+  if (idx === -1) return { values: undefined, rest: argv };
+  let end = idx + 1;
+  while (end < argv.length && !argv[end].startsWith("--")) end++;
+  const values = argv.slice(idx + 1, end);
+  const after = argv[end] === "--" ? end + 1 : end;
+  return { values, rest: [...argv.slice(0, idx), ...argv.slice(after)] };
+}
+
+/**
  * Validates a `--port` value: an unset value maps to 0 (let the OS pick an
  * ephemeral port, the existing default), anything else must be an integer in
  * the valid TCP port range.

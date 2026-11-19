@@ -123,7 +123,8 @@ Monitor.
 
 | Command | Purpose |
 |---|---|
-| `diff-viewer start [--title <text>] [--description <markdown>] [--port <n>] [--import-session <sessionId>] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. `--description` sets the session description (see `describe`). `--port` and `--import-session` are described below. |
+| `diff-viewer start [--title <text>] [--description <markdown>] [--port <n>] [--import-session <sessionId>] [--files <path>... --] <path[:baseRef]>...` | Start a session; prints `{sessionId, port, url}`. `--title` sets the browser tab title (defaults to `repo:branch`, or a summary for multiple repos) -- pick something that distinguishes this session among other concurrent diff-viewer tabs. `--description` sets the session description (see `describe`). `--files` scopes the session to those paths, and the repo paths may then be left out. `--port`, `--import-session` and `--files` are described below. |
+| `diff-viewer scope <sessionId> <path>...` / `scope <sessionId> --clear` | Replace a running session's file scope, or remove it. Prints `{"scope": [...]}` or `{"scope": null}`. An open viewer picks up the change within a few seconds. |
 | `diff-viewer describe <sessionId> <markdown>` | Set the session description: a brief Markdown overview of what is under review and what the review is for. The title in the sidebar expands to show it, and an open viewer picks up changes within a few seconds. |
 | `diff-viewer watch <sessionId>` | Loops indefinitely, printing one JSON line per comment/verdict notification; built for `Monitor`. |
 | `diff-viewer wait <sessionId>` | Long-polls until the next single comment or verdict, then exits. |
@@ -135,7 +136,7 @@ Monitor.
 | `diff-viewer reset <sessionId>` | Clear every comment thread (including the user's pending, unsubmitted ones) and verdict in the session, keeping its title and description. The cleared comments are archived in the session file. An open viewer clears its comments and shows a notice. |
 | `diff-viewer archives <sessionId>` | List the session's archives as JSON: `id`, `archivedAt`, and thread/comment/verdict counts. |
 | `diff-viewer restore <sessionId> <archiveId>` | Bring an archive's comments and verdicts back. The comments it replaces are archived first, so a restore can itself be undone. |
-| `diff-viewer sessions [--repo <path>]` | List active sessions, optionally filtered to ones covering a given repo. |
+| `diff-viewer sessions [--repo <path>]` | List active sessions with their repos and file scope, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
 
 ### Shutting down when no viewer is open
@@ -172,6 +173,34 @@ never written, so this is safe even if the source session is still running.
 Reach for it when handing a review off to a new process (e.g. after a
 crash) and you want the prior discussion to carry over rather than start
 silent.
+
+### Scoping a review to specific files: `--files` and `scope`
+
+`start --files <path>...` limits the session to those paths, whatever their
+git state. The paths are absolute or relative to the current directory, and
+run up to the next `--` flag (a bare `--` ends the list, so repo paths can
+follow it). Without repo paths, the session covers the repos that contain
+the files. Each path must exist in the working tree, at HEAD or at the diff
+base; a directory scopes every changed file under it.
+
+While a session is scoped:
+
+- A scoped file with changes shows its diff, and one with no changes shows
+  its full contents, marked "unchanged", with lines you can comment on. A
+  new untracked file shows as added.
+- The default range is "all commits + uncommitted changes", so committing a
+  scoped file mid-review changes nothing on screen.
+- The commit picker lists only commits that touch a scoped path.
+- "Show all changed files" in the sidebar turns the scope off for that
+  browser tab.
+- When a scoped file changes on disk after the page loaded, its header says
+  "Changed since you loaded it", with a Reload button.
+
+`diff-viewer scope <sessionId> <path>...` replaces the scope of a running
+session, and `--clear` removes it. The scope is saved with the session and
+carries over with `--import-session`: an entry whose repo isn't in the new
+session moves to the repo with the same directory name, or is dropped with a
+warning.
 
 ### `--author` / `--created-at` / `--pending`
 

@@ -11,7 +11,7 @@ import { SessionStore } from "../session/sessionStore.js";
 import { writeRegistryEntry, removeRegistryEntry } from "../registry.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
-  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand,
+  stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand, scopeCommand,
 } from "./commands.js";
 
 const execFileAsync = promisify(execFile);
@@ -143,6 +143,35 @@ describe("cli commands", () => {
     expect(store.snapshot.description).toBe("Reviewing the auth refactor.");
   });
 
+  it("scopeCommand resolves paths against cwd and sets the scope, and --clear removes it", async () => {
+    const repoPath = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "dv-cli-scope-")));
+    await execFileAsync("git", ["init", "-b", "main"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: repoPath });
+    await execFileAsync("git", ["config", "user.name", "Test"], { cwd: repoPath });
+    await fs.mkdir(path.join(repoPath, "sub"));
+    await fs.writeFile(path.join(repoPath, "sub", "x.sh"), "x\n");
+    await execFileAsync("git", ["add", "."], { cwd: repoPath });
+    await execFileAsync("git", ["commit", "-m", "base"], { cwd: repoPath });
+    const repoStore = SessionStore.create([{ path: repoPath, name: "r", branch: "main", baseRef: "HEAD" }], sessionId, "t", path.join(home, "data"));
+    const repoServer = createApp(repoStore).listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => repoServer.once("listening", resolve));
+    const address = repoServer.address();
+    await writeRegistryEntry(sessionId, { port: typeof address === "object" && address ? address.port : 0, pid: process.pid });
+    try {
+      const scope = [{ repoPath, path: "sub/x.sh", kind: "file" }];
+      expect(await scopeCommand(sessionId, ["./x.sh"], false, path.join(repoPath, "sub"))).toEqual({ scope });
+      expect(repoStore.snapshot.scope).toEqual(scope);
+      expect(await scopeCommand(sessionId, [], true)).toEqual({ scope: null });
+      expect(repoStore.snapshot.scope).toBeNull();
+      await expect(scopeCommand(sessionId, ["nope.sh"], false, repoPath)).rejects.toThrow(/No such file/);
+      await expect(scopeCommand(sessionId, [], false)).rejects.toThrow(/paths or --clear/);
+      await expect(scopeCommand(sessionId, ["x"], true)).rejects.toThrow(/paths or --clear/);
+    } finally {
+      repoServer.close();
+      await fs.rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it("resetCommand clears the session's comments and verdicts", async () => {
     store.addThread({
       repoPath: "/repo", file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
@@ -220,7 +249,7 @@ describe("cli commands", () => {
   it("sessionsCommand finds an active session for a given repo path", async () => {
     await store.persist();
     const found = await sessionsCommand("/repo");
-    expect(found).toEqual([{ sessionId: "s1", repos: [{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }] }]);
+    expect(found).toEqual([{ sessionId: "s1", repos: [{ path: "/repo", name: "repo", branch: "main", baseRef: "abc" }], scope: null }]);
     expect(await sessionsCommand("/nonexistent")).toEqual([]);
   });
 

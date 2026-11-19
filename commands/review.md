@@ -36,6 +36,25 @@ and give them the `url` it prints. It opens the file browser at the repo's
 current HEAD, where the user can read the file and comment on its lines;
 those comments reach you through `review` like any other.
 
+**Reviewing specific files.** When the user asks to look at specific files,
+or you want them to vet code before it runs (a script you'll ask them to run
+with elevated permissions, say), start a scoped session with `--files`
+instead of handing out one `link` per file:
+```bash
+diff-viewer start --title "<title>" --description "<description>" --files ./deploy.sh ./lib/perm.sh
+```
+The viewer then shows exactly those files: a file with changes as its diff
+(committed or not, including a new untracked file), and an untouched file as
+its full contents marked "unchanged". Committing a scoped file mid-review
+changes nothing the user sees. `--files` takes paths (absolute or relative
+to the current directory) up to the next `--` flag; a directory scopes every
+changed file under it. Repo paths can follow a `--`; without them, the repos
+are the ones containing the files. When the review narrows or widens, replace
+the scope with `diff-viewer scope <sessionId> <path>...` (or remove it with
+`diff-viewer scope <sessionId> --clear`); an open viewer picks it up within a
+few seconds. `link` stays the way to point at one file or line in a running
+session.
+
 **Format every comment and reply as Markdown.** The viewer renders
 `reply` and `comment` text as Markdown, so write it the way you'd write a
 GitHub PR comment rather than as plain prose:
