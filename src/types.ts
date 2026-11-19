@@ -22,7 +22,8 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
-export type FileStatus = "added" | "modified" | "deleted" | "renamed";
+/** "unchanged" is a scoped file with no changes in the range, shown as its full contents. */
+export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "unchanged";
 
 export interface DiffFile {
   repoPath: string;
@@ -30,6 +31,23 @@ export interface DiffFile {
   newPath: string;
   status: FileStatus;
   hunks: DiffHunk[];
+  /** Set on an unchanged scoped file whose contents aren't shown. */
+  skipped?: "binary" | "too-large";
+}
+
+/** One path of a session's file scope. `path` is repo-relative; "." is the repo root. */
+export interface ScopeEntry {
+  repoPath: string;
+  path: string;
+  kind: "file" | "dir";
+}
+
+/** Content fingerprints of a repo's scoped files at one ref, for spotting stale views. */
+export interface ScopeState {
+  /** Fingerprint per path: a blob hash, or null when the file is missing. */
+  files: Record<string, string | null>;
+  /** Sorted paths under the scope that differ from the diff base. */
+  changed: string[];
 }
 
 export interface CommitInfo {
@@ -132,6 +150,8 @@ export interface SessionData {
   /** Comments set aside by `reset` or `restore`, oldest first. */
   archives?: CommentArchive[];
   repos: RepoConfig[];
+  /** Paths the viewer is limited to; null shows every changed file. Never empty. */
+  scope?: ScopeEntry[] | null;
   createdAt: string;
   status: "active" | "stopped";
   threads: CommentThread[];
