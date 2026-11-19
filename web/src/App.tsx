@@ -223,11 +223,14 @@ export function App() {
     setRepos(prev => prev.map(r => (r.repoPath === repoPath ? { ...r, files } : r)));
   }
 
-  /** Reloads every repo after a scope change, keeping each range whose commits are still listed. */
+  /** Each repo's current range when its commits are still listed, else the default for its scoping. */
+  const keepRange = (repo: RepoDiff, commits: CommitInfo[]) =>
+    rangeAfterReload(rangeByRepoRef.current[repo.repoPath] ?? null, commits, Boolean(repo.scoped));
+
+  /** Reloads every repo after a scope change. */
   function reloadForScope() {
     pendingScopeReloadRef.current = false;
-    return loadAll(showAllRef.current, (repo, commits) =>
-      rangeAfterReload(rangeByRepoRef.current[repo.repoPath] ?? null, commits, Boolean(repo.scoped)));
+    return loadAll(showAllRef.current, keepRange);
   }
 
   /** Refetches one repo's files and commits for its current range, clearing its stale notices. */
@@ -264,7 +267,8 @@ export function App() {
     const next = !showAll;
     showAllRef.current = next;
     setShowAll(next);
-    void loadAll(next);
+    // The toggle only lifts the filter: the range the user is looking at stays.
+    void loadAll(next, keepRange);
   }
 
   useEffect(() => {
