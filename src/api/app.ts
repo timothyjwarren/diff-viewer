@@ -13,6 +13,7 @@ import { listTree } from "../git/tree.js";
 import { annotateHtml } from "../git/htmlAnnotate.js";
 import { entriesFor, pathspecArgs, matchesScope } from "../scope/scope.js";
 import { unchangedFiles, untrackedFiles } from "../scope/unchanged.js";
+import { scopeFingerprints } from "../scope/fingerprint.js";
 import type { DiffFile, RepoConfig, ScopeEntry } from "../types.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
@@ -386,15 +387,15 @@ export function createApp(
   });
 
   app.get("/api/repo-state", async (req, res) => {
-    const { repoPath } = req.query as Record<string, string>;
+    const { repoPath, to } = req.query as Record<string, string | undefined>;
     try {
-      const repo = findRepo(store, repoPath);
+      const repo = findRepo(store, repoPath!);
       const [headSha, dirtyFiles] = await Promise.all([resolveHeadSha(repo.path), listDirtyFiles(repo.path)]);
       const dirty = dirtyFiles.length > 0;
-      const prev = lastKnownState.get(repoPath);
+      const prev = lastKnownState.get(repo.path);
       if (!prev || prev.headSha !== headSha || prev.dirty !== dirty) {
         await store.recomputeThreadPositions(
-          repoPath, headSha, dirty,
+          repo.path, headSha, dirty,
           (pinnedRef, file) => pinnedRef === "uncommitted"
             ? readWorkingTreeFileOrEmpty(repo.path, file).then(linesToContent)
             : readFileAtRefOrEmpty(repo.path, pinnedRef, file).then(linesToContent),
@@ -414,9 +415,14 @@ export function createApp(
           },
         );
         await store.persist();
-        lastKnownState.set(repoPath, { headSha, dirty });
+        lastKnownState.set(repo.path, { headSha, dirty });
       }
-      res.json({ headSha, dirty, dirtyFiles });
+      const { scope } = store.snapshot;
+      // Only for a scoped session, and only with the viewer's current "to" ref.
+      const scopeState = scope && to && (to === "uncommitted" || isSafeRef(to))
+        ? await scopeFingerprints(repo.path, repo.baseRef, entriesFor(scope, repo.path), to)
+        : undefined;
+      res.json({ headSha, dirty, dirtyFiles, ...(scopeState ? { scope: scopeState } : {}) });
     } catch {
       res.status(404).end();
     }

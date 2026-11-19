@@ -12,6 +12,23 @@ async function lsFiles(repoPath: string, args: string[]): Promise<string[]> {
 }
 
 /**
+ * Sorted untracked working-tree paths in the scope: ignored files are skipped
+ * under a directory entry, but a file entry is listed even if ignored.
+ */
+export async function listUntracked(repoPath: string, entries: ScopeEntry[]): Promise<string[]> {
+  const fileEntries = entries.filter(e => e.kind === "file");
+  const dirEntries = entries.filter(e => e.kind === "dir");
+  const paths = new Set<string>();
+  if (dirEntries.length > 0) {
+    for (const p of await lsFiles(repoPath, ["--others", "--exclude-standard", ...pathspecArgs(dirEntries)])) paths.add(p);
+  }
+  if (fileEntries.length > 0) {
+    for (const p of await lsFiles(repoPath, ["--others", ...pathspecArgs(fileEntries)])) paths.add(p);
+  }
+  return [...paths].sort();
+}
+
+/**
  * Full-contents entries for scoped files with no changes in the range: each
  * file entry of `entries` that isn't in `changed` and exists at `toRef` (a
  * sha, or "uncommitted"/"working" for the working tree).
@@ -47,22 +64,11 @@ export async function unchangedFiles(repoPath: string, entries: ScopeEntry[], ch
 /**
  * Untracked working-tree files in the scope, as "added" entries. `git diff`
  * leaves untracked files out, but a scoped file the agent just created is
- * exactly what the reviewer needs to see. Under a directory entry, ignored
- * files are skipped; a file entry is shown even if ignored.
+ * exactly what the reviewer needs to see.
  */
 export async function untrackedFiles(repoPath: string, entries: ScopeEntry[]): Promise<DiffFile[]> {
-  if (entries.length === 0) return [];
-  const fileEntries = entries.filter(e => e.kind === "file");
-  const dirEntries = entries.filter(e => e.kind === "dir");
-  const paths = new Set<string>();
-  if (dirEntries.length > 0) {
-    for (const p of await lsFiles(repoPath, ["--others", "--exclude-standard", ...pathspecArgs(dirEntries)])) paths.add(p);
-  }
-  if (fileEntries.length > 0) {
-    for (const p of await lsFiles(repoPath, ["--others", ...pathspecArgs(fileEntries)])) paths.add(p);
-  }
   const out: DiffFile[] = [];
-  for (const p of [...paths].sort()) {
+  for (const p of await listUntracked(repoPath, entries)) {
     let view;
     try {
       view = await readFileForView(repoPath, "working", p);

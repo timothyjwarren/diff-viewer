@@ -703,5 +703,14 @@ describe("api app", () => {
       expect(cleared.body).toEqual({ scope: null });
       expect((await request(app).get("/api/session/meta")).body.scope).toBeNull();
     });
+    it("GET /api/repo-state reports scope fingerprints for a scoped session given a ref, and omits them otherwise", async () => {
+      const store = await scopedStore(["a.txt"]);
+      const app = createApp(store);
+      const scoped = await request(app).get("/api/repo-state").query({ repoPath, to: "uncommitted" });
+      expect(scoped.body.scope).toEqual({ files: { "a.txt": expect.stringMatching(/^[0-9a-f]{40}$/) }, changed: ["a.txt"] });
+      expect((await request(app).get("/api/repo-state").query({ repoPath })).body.scope).toBeUndefined();
+      store.setScope(null);
+      expect((await request(app).get("/api/repo-state").query({ repoPath, to: "uncommitted" })).body.scope).toBeUndefined();
+    });
   });
 });
