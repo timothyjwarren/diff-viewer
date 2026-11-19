@@ -51,7 +51,7 @@ describe("api app", () => {
     const store = await buildStore();
     const app = createApp(store);
     const res = await request(app).get("/api/session/meta");
-    expect(res.body).toEqual({ title: "test session", agentListening: false });
+    expect(res.body).toEqual({ title: "test session", agentListening: false, scope: null });
   });
 
   it("reports an agent as listening while a wait request is open, then for the grace period after", async () => {
@@ -118,7 +118,7 @@ describe("api app", () => {
     const app = createApp(store);
     const res = await request(app).put("/api/session/description").send({ description: "Reviewing X." });
     expect(res.status).toBe(204);
-    expect((await request(app).get("/api/session/meta")).body).toEqual({ title: "test session", description: "Reviewing X.", agentListening: false });
+    expect((await request(app).get("/api/session/meta")).body).toEqual({ title: "test session", description: "Reviewing X.", agentListening: false, scope: null });
     const saved = JSON.parse(await fs.readFile(path.join(dataDir, "s1.json"), "utf-8"));
     expect(saved.description).toBe("Reviewing X.");
   });
@@ -591,5 +591,117 @@ describe("api app", () => {
     await request(app).post("/api/mark-seen");
     threads = await request(app).get("/api/threads");
     expect(threads.body[0].comments[0].agentStatus).toBe("acked");
+  });
+  describe("file scope", () => {
+    type F = { newPath: string; oldPath: string; status: string; hunks: { lines: { type: string; content: string; uncommitted?: boolean }[] }[] };
+    const names = (files: F[]) => files.map(f => `${f.newPath || f.oldPath}:${f.status}`);
+
+    // a.txt: edited, uncommitted. b.txt: committed at base, untouched. c.txt: changed, out of scope.
+    async function scopedStore(paths: string[]) {
+      await fs.writeFile(path.join(repoPath, "b.txt"), "bee\n");
+      await fs.writeFile(path.join(repoPath, "c.txt"), "see\n");
+      await git(repoPath, ["add", "b.txt", "c.txt"]);
+      await git(repoPath, ["commit", "-m", "more base"]);
+      const store = await buildStore();
+      await fs.writeFile(path.join(repoPath, "c.txt"), "see\nmore\n");
+      store.setScope(paths.map(p => ({ repoPath, path: p, kind: "file" as const })));
+      return store;
+    }
+
+    it("GET /api/diffs shows scoped changed files, then unchanged scoped files, including uncommitted edits", async () => {
+      const app = createApp(await scopedStore(["a.txt", "b.txt"]));
+      const res = await request(app).get("/api/diffs");
+      expect(res.body[0].scoped).toBe(true);
+      expect(names(res.body[0].files)).toEqual(["a.txt:modified", "b.txt:unchanged"]);
+      const added = res.body[0].files[0].hunks[0].lines.filter((l: { type: string }) => l.type === "add");
+      expect(added).toEqual([expect.objectContaining({ content: "two", uncommitted: true })]);
+    });
+
+    it("GET /api/diffs?all=1 ignores the scope", async () => {
+      const app = createApp(await scopedStore(["a.txt", "b.txt"]));
+      await commitAll("commit a and c");
+      const res = await request(app).get("/api/diffs").query({ all: "1" });
+      expect(res.body[0].scoped).toBe(false);
+      expect(names(res.body[0].files)).toEqual(["a.txt:modified", "c.txt:modified"]);
+    });
+
+    it("an unscoped session's /api/diffs is committed-only and not scoped", async () => {
+      const app = createApp(await buildStore());
+      const res = await request(app).get("/api/diffs");
+      expect(res.body[0].scoped).toBe(false);
+      expect(res.body[0].files).toEqual([]);
+    });
+
+    it("keeps showing a scoped file the same way after it is committed", async () => {
+      const app = createApp(await scopedStore(["a.txt"]));
+      const before = (await request(app).get("/api/diffs")).body[0].files;
+      await git(repoPath, ["commit", "-qm", "commit a", "a.txt"]);
+      const after = (await request(app).get("/api/diffs")).body[0].files;
+      expect(names(after)).toEqual(["a.txt:modified"]);
+      const content = (fs: F[]) => fs[0].hunks.flatMap(h => h.lines.map(l => `${l.type}:${l.content}`));
+      expect(content(after)).toEqual(content(before));
+    });
+
+    it("shows a scoped file deleted from the working tree as a deletion", async () => {
+      const app = createApp(await scopedStore(["b.txt"]));
+      await fs.rm(path.join(repoPath, "b.txt"));
+      const res = await request(app).get("/api/diffs");
+      expect(names(res.body[0].files)).toEqual(["b.txt:deleted"]);
+    });
+
+    it("shows a new untracked scoped file as added", async () => {
+      await fs.writeFile(path.join(repoPath, "my file.sh"), "#!/bin/sh\n");
+      const app = createApp(await scopedStore(["my file.sh"]));
+      const res = await request(app).get("/api/diffs");
+      expect(names(res.body[0].files)).toEqual(["my file.sh:added"]);
+      expect(res.body[0].files[0].hunks[0].lines[0]).toMatchObject({ type: "add", content: "#!/bin/sh", uncommitted: true });
+    });
+
+    it("GET /api/repo-diff applies the scope to a commit range and lists unchanged files at that commit", async () => {
+      const store = await scopedStore(["a.txt", "b.txt"]);
+      await fs.writeFile(path.join(repoPath, "c.txt"), "see\n");
+      const sha = await commitAll("commit a");
+      const app = createApp(store);
+      const res = await request(app).get("/api/repo-diff").query({ repoPath, from: sha, to: sha });
+      expect(names(res.body)).toEqual(["a.txt:modified", "b.txt:unchanged"]);
+      const all = await request(app).get("/api/repo-diff").query({ repoPath, from: sha, to: sha, all: "1" });
+      expect(names(all.body)).toEqual(["a.txt:modified"]);
+    });
+
+    it("GET /api/commits lists only commits touching a scoped path, and uncommitted only when a scoped path is dirty", async () => {
+      const store = await scopedStore(["b.txt"]);
+      const app = createApp(store);
+      await commitAll("touches a and c");
+      expect((await request(app).get("/api/commits").query({ repoPath })).body).toEqual([]);
+      await fs.writeFile(path.join(repoPath, "c.txt"), "dirty\n");
+      expect((await request(app).get("/api/commits").query({ repoPath })).body).toEqual([]);
+      await fs.writeFile(path.join(repoPath, "b.txt"), "dirty\n");
+      expect((await request(app).get("/api/commits").query({ repoPath })).body.map((c: { sha: string }) => c.sha)).toEqual(["uncommitted"]);
+      await git(repoPath, ["commit", "-qm", "touches b", "b.txt"]);
+      const subjects = (await request(app).get("/api/commits").query({ repoPath })).body.map((c: { subject: string }) => c.subject);
+      expect(subjects).toEqual(["touches b"]);
+      const all = (await request(app).get("/api/commits").query({ repoPath, all: "1" })).body.map((c: { subject: string }) => c.subject);
+      expect(all).toEqual(["touches a and c", "touches b", "Uncommitted changes"]);
+    });
+
+    it("PUT /api/session/scope validates entries, stores the scope, and meta reports it", async () => {
+      const app = createApp(await buildStore());
+      const put = (scope: unknown) => request(app).put("/api/session/scope").send({ scope });
+      expect((await put([])).status).toBe(400);
+      expect((await put([{ repoPath: "/nope", path: "a.txt", kind: "file" }])).status).toBe(400);
+      expect((await put([{ repoPath, path: "../x", kind: "file" }])).status).toBe(400);
+      expect((await put([{ repoPath, path: "a.txt", kind: "glob" }])).status).toBe(400);
+      expect((await put("a.txt")).status).toBe(400);
+
+      const scope = [{ repoPath, path: "a.txt", kind: "file" }, { repoPath, path: ".", kind: "dir" }];
+      const ok = await put(scope);
+      expect(ok.status).toBe(200);
+      expect(ok.body).toEqual({ scope });
+      expect((await request(app).get("/api/session/meta")).body.scope).toEqual(scope);
+
+      const cleared = await put(null);
+      expect(cleared.body).toEqual({ scope: null });
+      expect((await request(app).get("/api/session/meta")).body.scope).toBeNull();
+    });
   });
 });

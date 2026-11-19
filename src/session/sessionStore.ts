@@ -6,8 +6,9 @@ import { getDataDir } from "../paths.js";
 import type {
   SessionData, RepoConfig, CommentThread, Comment, CommentAuthor,
   Verdict, VerdictType, NotificationEvent, VerdictIntent,
-  CommentArchive, CommentArchiveSummary, CommentsReplaced,
+  CommentArchive, CommentArchiveSummary, CommentsReplaced, ScopeEntry,
 } from "../types.js";
+import { remapScope } from "../scope/scope.js";
 import { verdictIntent } from "../types.js";
 import { trackThreadDrift } from "./driftTracking.js";
 
@@ -29,6 +30,7 @@ export class SessionStore {
   readonly emitter = new EventEmitter();
   private data: SessionData;
   private filePath: string;
+  private dropped: ScopeEntry[] = [];
 
   private constructor(data: SessionData, filePath: string) {
     this.data = data;
@@ -38,7 +40,7 @@ export class SessionStore {
 
   static create(repos: RepoConfig[], id: string, title: string, dataDir: string = getDataDir()): SessionStore {
     const data: SessionData = {
-      id, title, repos, createdAt: new Date().toISOString(), status: "active",
+      id, title, repos, scope: null, createdAt: new Date().toISOString(), status: "active",
       threads: [], verdicts: [], notifications: [], contentSnapshots: {},
     };
     return new SessionStore(data, path.join(dataDir, `${id}.json`));
@@ -46,29 +48,42 @@ export class SessionStore {
 
   static async load(filePath: string): Promise<SessionStore> {
     const raw = await fs.readFile(filePath, "utf-8");
-    return new SessionStore(JSON.parse(raw) as SessionData, filePath);
+    const data = JSON.parse(raw) as SessionData;
+    return new SessionStore({ ...data, scope: data.scope ?? null }, filePath);
   }
 
   /**
    * Seeds a brand-new session (new id, fresh `repos`/live repo state) with
    * another session's comment history — the source file is only read, never
    * written, so the two sessions never contend for the same file.
+   *
+   * An explicit `scope` replaces the source's. Otherwise the source scope is
+   * remapped onto `repos` (see `remapScope`), and the entries that found no
+   * repo are reported by `lastImportDropped`.
    */
   static async importFrom(
     sourceFilePath: string, newId: string, repos: RepoConfig[], title?: string, dataDir: string = getDataDir(),
+    scope?: ScopeEntry[] | null,
   ): Promise<SessionStore> {
     const raw = await fs.readFile(sourceFilePath, "utf-8");
     const source = JSON.parse(raw) as SessionData;
+    const remapped = scope === undefined ? remapScope(source.scope ?? [], repos) : { scope, dropped: [] };
     const data: SessionData = {
       ...source,
       id: newId,
       title: title ?? source.title,
       repos,
+      scope: remapped.scope,
       createdAt: new Date().toISOString(),
       status: "active",
     };
-    return new SessionStore(data, path.join(dataDir, `${newId}.json`));
+    const store = new SessionStore(data, path.join(dataDir, `${newId}.json`));
+    store.dropped = remapped.dropped;
+    return store;
   }
+
+  /** Scope entries `importFrom` dropped because no session repo matched them. */
+  get lastImportDropped(): ScopeEntry[] { return this.dropped; }
 
   get id(): string { return this.data.id; }
   get snapshot(): SessionData { return structuredClone(this.data); }
@@ -81,6 +96,10 @@ export class SessionStore {
 
   setDescription(description: string): void {
     this.data.description = description;
+  }
+
+  setScope(scope: ScopeEntry[] | null): void {
+    this.data.scope = scope && scope.length > 0 ? scope : null;
   }
 
   /**

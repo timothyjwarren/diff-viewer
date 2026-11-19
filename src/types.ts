@@ -31,7 +31,7 @@ export interface DiffFile {
   newPath: string;
   status: FileStatus;
   hunks: DiffHunk[];
-  /** Set on an unchanged scoped file whose contents aren't shown. */
+  /** Set on a scoped file shown as full contents (unchanged or untracked) whose contents aren't shown. */
   skipped?: "binary" | "too-large";
 }
 

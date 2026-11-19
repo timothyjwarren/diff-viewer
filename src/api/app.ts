@@ -11,6 +11,9 @@ import {
 } from "../git/fileContent.js";
 import { listTree } from "../git/tree.js";
 import { annotateHtml } from "../git/htmlAnnotate.js";
+import { entriesFor, pathspecArgs, matchesScope } from "../scope/scope.js";
+import { unchangedFiles, untrackedFiles } from "../scope/unchanged.js";
+import type { DiffFile, RepoConfig, ScopeEntry } from "../types.js";
 
 function findRepo(store: SessionStore, repoPath: string) {
   const repo = store.snapshot.repos.find(r => r.path === repoPath);
@@ -23,6 +26,39 @@ function renderedRef(baseRef: string, side: "old" | "new", from?: string, to?: s
   if (side === "new") return to === "uncommitted" ? "working" : to || "HEAD";
   if (!from) return baseRef;
   return from === "uncommitted" ? "HEAD" : `${from}^`;
+}
+
+function isScopeEntry(e: unknown, repoPaths: string[]): e is ScopeEntry {
+  if (!e || typeof e !== "object") return false;
+  const { repoPath, path: p, kind } = e as Record<string, unknown>;
+  return typeof repoPath === "string" && repoPaths.includes(repoPath)
+    && typeof p === "string" && p !== "" && (p === "." || isRepoRelativePath(p))
+    && (kind === "file" || kind === "dir");
+}
+
+/**
+ * The files to show for one repo and range. With `entries` (a scoped view),
+ * git's output is limited to those paths, untracked scoped files are added
+ * when the range ends at the working tree, and scoped files with no changes
+ * follow as "unchanged" full-contents entries.
+ */
+async function repoFiles(repo: RepoConfig, from: string | undefined, to: string | undefined, entries: ScopeEntry[] | null): Promise<DiffFile[]> {
+  const ps = entries ? pathspecArgs(entries) : [];
+  const files = to === "uncommitted" && !from
+    ? await computeDiffIncludingUncommitted(repo.path, repo.baseRef, ps)
+    : from && to ? await computeRangeDiff(repo.path, from, to, ps) : await computeDiff(repo.path, repo.baseRef, ps);
+  if (entries && to === "uncommitted") {
+    const shown = new Set(files.map(f => f.newPath));
+    files.push(...(await untrackedFiles(repo.path, entries)).filter(f => !shown.has(f.newPath)));
+  }
+  if (to === "uncommitted") {
+    await markUncommittedLines(repo.path, await resolveHeadSha(repo.path), files);
+  }
+  if (entries) {
+    const toRef = to === "uncommitted" ? "uncommitted" : to || await resolveHeadSha(repo.path);
+    files.push(...await unchangedFiles(repo.path, entries, files, toRef));
+  }
+  return files;
 }
 
 const lastKnownState = new Map<string, { headSha: string; dirty: boolean }>();
@@ -58,8 +94,8 @@ export function createApp(
   // Polled by the browser, so it returns just these small fields rather than the whole snapshot.
   app.get("/api/session/meta", (req, res) => {
     heartbeat(req);
-    const { title, description, commentsReplaced } = store.snapshot;
-    res.json({ title, description, commentsReplaced, agentListening: agentListening() });
+    const { title, description, commentsReplaced, scope } = store.snapshot;
+    res.json({ title, description, commentsReplaced, agentListening: agentListening(), scope: scope ?? null });
   });
 
   // Sent by a page as it closes, so the server can stop soon after the last viewer leaves.
@@ -99,14 +135,36 @@ export function createApp(
     res.status(204).end();
   });
 
-  app.get("/api/diffs", async (_req, res) => {
+  app.put("/api/session/scope", async (req, res) => {
+    const { scope } = (req.body ?? {}) as { scope?: unknown };
+    const repoPaths = store.snapshot.repos.map(r => r.path);
+    const valid = scope === null
+      || (Array.isArray(scope) && scope.length > 0 && scope.every(e => isScopeEntry(e, repoPaths)));
+    if (!valid) return res.status(400).json({ error: "scope must be null or a non-empty array of { repoPath, path, kind } entries for session repos" });
+    store.setScope(scope === null ? null : (scope as ScopeEntry[]).map(({ repoPath, path: p, kind }) => ({ repoPath, path: p, kind })));
+    await store.persist();
+    res.json({ scope: store.snapshot.scope ?? null });
+  });
+
+  /** The scope entries for a repo, or null when the request shows everything (unscoped session, or `all=1`). */
+  function requestEntries(req: express.Request, repoPath: string): ScopeEntry[] | null {
+    const { scope } = store.snapshot;
+    if (!scope || req.query.all === "1") return null;
+    return entriesFor(scope, repoPath);
+  }
+
+  app.get("/api/diffs", async (req, res) => {
     const session = store.snapshot;
-    const results = await Promise.all(session.repos.map(async repo => ({
-      repo: repo.name,
-      branch: repo.branch,
-      repoPath: repo.path,
-      files: await computeDiff(repo.path, repo.baseRef),
-    })));
+    const results = await Promise.all(session.repos.map(async repo => {
+      const entries = requestEntries(req, repo.path);
+      return {
+        repo: repo.name,
+        branch: repo.branch,
+        repoPath: repo.path,
+        scoped: entries !== null,
+        files: entries ? await repoFiles(repo, undefined, "uncommitted", entries) : await computeDiff(repo.path, repo.baseRef),
+      };
+    }));
     res.json(results);
   });
 
@@ -114,8 +172,12 @@ export function createApp(
     const { repoPath } = req.query as Record<string, string>;
     try {
       const repo = findRepo(store, repoPath);
-      const commits = await listCommits(repo.path, repo.baseRef);
-      if (await isDirty(repo.path)) {
+      const entries = requestEntries(req, repo.path);
+      const commits = await listCommits(repo.path, repo.baseRef, entries ? pathspecArgs(entries) : []);
+      const dirty = entries
+        ? (await listDirtyFiles(repo.path)).some(f => matchesScope(f, entries))
+        : await isDirty(repo.path);
+      if (dirty) {
         commits.push({ sha: "uncommitted", shortSha: "uncommitted", subject: "Uncommitted changes", author: "", date: "" });
       }
       res.json(commits);
@@ -131,13 +193,7 @@ export function createApp(
       // to=uncommitted with no from means "everything, including local
       // edits" (the chooser's "Show all commits + uncommitted changes"),
       // as distinct from a specific from..uncommitted range.
-      const files = to === "uncommitted" && !from
-        ? await computeDiffIncludingUncommitted(repo.path, repo.baseRef)
-        : from && to ? await computeRangeDiff(repo.path, from, to) : await computeDiff(repo.path, repo.baseRef);
-      if (to === "uncommitted") {
-        await markUncommittedLines(repo.path, await resolveHeadSha(repo.path), files);
-      }
-      res.json(files);
+      res.json(await repoFiles(repo, from, to, requestEntries(req, repo.path)));
     } catch {
       res.status(404).end();
     }

@@ -7,14 +7,15 @@ import { readFileAtRef, readWorkingTreeFile, linesToContent } from "./fileConten
 
 const execFileAsync = promisify(execFile);
 
-export async function computeDiff(repoPath: string, baseRef: string): Promise<DiffFile[]> {
-  const { stdout } = await execFileAsync("git", ["diff", "--no-color", baseRef, "HEAD"], { cwd: repoPath });
+/** `pathspec`, when given, is git arguments starting with `--` that limit the diff to some paths. */
+export async function computeDiff(repoPath: string, baseRef: string, pathspec: string[] = []): Promise<DiffFile[]> {
+  const { stdout } = await execFileAsync("git", ["diff", "--no-color", baseRef, "HEAD", ...pathspec], { cwd: repoPath });
   return parseUnifiedDiff(stdout, repoPath);
 }
 
 /** Diffs baseRef against the working tree — every committed change plus any uncommitted edits. */
-export async function computeDiffIncludingUncommitted(repoPath: string, baseRef: string): Promise<DiffFile[]> {
-  const { stdout } = await execFileAsync("git", ["diff", "--no-color", baseRef], { cwd: repoPath });
+export async function computeDiffIncludingUncommitted(repoPath: string, baseRef: string, pathspec: string[] = []): Promise<DiffFile[]> {
+  const { stdout } = await execFileAsync("git", ["diff", "--no-color", baseRef, ...pathspec], { cwd: repoPath });
   return parseUnifiedDiff(stdout, repoPath);
 }
 
@@ -23,10 +24,10 @@ export async function computeDiffIncludingUncommitted(repoPath: string, baseRef:
  * is the `"uncommitted"` sentinel, in which case it diffs against the
  * working tree instead of a commit.
  */
-export async function computeRangeDiff(repoPath: string, from: string, to: string): Promise<DiffFile[]> {
+export async function computeRangeDiff(repoPath: string, from: string, to: string, pathspec: string[] = []): Promise<DiffFile[]> {
   const fromArg = from === "uncommitted" ? "HEAD" : `${from}^`;
   const args = to === "uncommitted" ? ["diff", "--no-color", fromArg] : ["diff", "--no-color", fromArg, to];
-  const { stdout } = await execFileAsync("git", args, { cwd: repoPath });
+  const { stdout } = await execFileAsync("git", [...args, ...pathspec], { cwd: repoPath });
   return parseUnifiedDiff(stdout, repoPath);
 }
 

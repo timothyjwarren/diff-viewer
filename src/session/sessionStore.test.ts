@@ -411,6 +411,32 @@ describe("SessionStore", () => {
       expect(imported.snapshot.description).toBe("Reviewing the auth refactor.");
     });
 
+    it("remaps the source scope to repos with the same basename and reports dropped entries", async () => {
+      const source = SessionStore.create(
+        [{ path: "/old/repo2", name: "repo2", branch: "main", baseRef: "x" }, { path: "/old/gone", name: "gone", branch: "main", baseRef: "x" }],
+        "src5", "source session", dataDir,
+      );
+      source.setScope([
+        { repoPath: "/old/repo2", path: "a.sh", kind: "file" },
+        { repoPath: "/old/gone", path: "b.sh", kind: "file" },
+      ]);
+      await source.persist();
+
+      const imported = await SessionStore.importFrom(path.join(dataDir, "src5.json"), "new-id-5", newRepos, undefined, dataDir);
+      expect(imported.snapshot.scope).toEqual([{ repoPath: "/repo2", path: "a.sh", kind: "file" }]);
+      expect(imported.lastImportDropped).toEqual([{ repoPath: "/old/gone", path: "b.sh", kind: "file" }]);
+    });
+
+    it("uses an explicit scope instead of the source scope", async () => {
+      const source = SessionStore.create(newRepos, "src6", "source session", dataDir);
+      source.setScope([{ repoPath: "/repo2", path: "a.sh", kind: "file" }]);
+      await source.persist();
+      const scope = [{ repoPath: "/repo2", path: "z.sh", kind: "file" as const }];
+      const imported = await SessionStore.importFrom(path.join(dataDir, "src6.json"), "new-id-6", newRepos, undefined, dataDir, scope);
+      expect(imported.snapshot.scope).toEqual(scope);
+      expect(imported.lastImportDropped).toEqual([]);
+    });
+
     it("uses an explicit title override instead of the source title", async () => {
       const source = SessionStore.create(repos, "src3", "source session", dataDir);
       await source.persist();
@@ -420,6 +446,15 @@ describe("SessionStore", () => {
       );
       expect(imported.snapshot.title).toBe("custom title");
     });
+  });
+
+  it("starts unscoped, and loads an old session file without a scope as unscoped", async () => {
+    const store = SessionStore.create(repos, "s-scope", "t", dataDir);
+    expect(store.snapshot.scope).toBeNull();
+    const file = path.join(dataDir, "old.json");
+    const { scope: _omit, ...old } = store.snapshot;
+    await fs.writeFile(file, JSON.stringify(old));
+    expect((await SessionStore.load(file)).snapshot.scope).toBeNull();
   });
 
   it("recomputeThreadPositions does not compound a shift across repeated calls", async () => {
