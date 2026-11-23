@@ -138,6 +138,7 @@ Monitor.
 | `diff-viewer restore <sessionId> <archiveId>` | Bring an archive's comments and verdicts back. The comments it replaces are archived first, so a restore can itself be undone. |
 | `diff-viewer sessions [--repo <path>]` | List active sessions with their repos and file scope, optionally filtered to ones covering a given repo. |
 | `diff-viewer stop <sessionId>` | Shut down a session's server. |
+| `diff-viewer resume <sessionId> [--port <n> \| --any-port]` | Restart a stopped session in place, on the port it last bound; prints `{sessionId, port, url}`. Described below. |
 
 ### Shutting down when no viewer is open
 
@@ -160,19 +161,37 @@ port (e.g. a script or bookmark pointing at a specific address). If that
 port is already in use, `start` fails immediately with `port <n> is
 already in use` instead of silently picking a different one.
 
+### Resuming a stopped session: `resume`
+
+`diff-viewer resume <sessionId>` restarts a session whose server has stopped
+(by `stop`, or after its viewers went idle), under its own id and with its
+comments, verdicts, scope and notification log unchanged. It binds the port
+the session last bound, so a browser tab still open on the session's URL
+reconnects within a few seconds and keeps its place: the current file,
+scroll position, selection and drafts. A `watch` started afterwards picks up
+from the same notification log.
+
+- A session whose file records no port fails with a message naming the two
+  ways forward: `--port <n>` resumes on that port (take it from the open
+  tab's URL), and `--any-port` resumes on a port the OS picks.
+- If the port is already in use, `resume` fails and suggests `--any-port`.
+  `--any-port` gives the session a new URL, so open it in a new tab.
+- A session that is still running fails with `already running` and its URL.
+  A leftover registry entry from a server that crashed is cleared and the
+  session resumes.
+- `--title` and `--description` are not taken; use `describe` once it runs.
+
 ### `--import-session`
 
-The recommended way to continue a review is always a plain `start` --
-sessions are cheap and a fresh one avoids any risk of two servers touching
-the same file. `--import-session <sessionId>` is the deliberate exception:
-it seeds a brand-new session (its own id, port, and URL) with another
+To continue a stopped session, use `resume`. `--import-session <sessionId>`
+is for starting a new session instead: it seeds a brand-new session (its
+own id, port, and URL) with another
 session's comment history -- every thread, comment, and verdict, with
 original authors and timestamps intact -- while resolving `repos` fresh
 against the current working tree. The source session's file is only read,
 never written, so this is safe even if the source session is still running.
-Reach for it when handing a review off to a new process (e.g. after a
-crash) and you want the prior discussion to carry over rather than start
-silent.
+Reach for it when you want a fresh session that carries the prior
+discussion over.
 
 ### Scoping a review to specific files: `--files` and `scope`
 

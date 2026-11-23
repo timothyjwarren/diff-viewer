@@ -34,6 +34,45 @@ describe("setupSession", () => {
     await fs.rm(repoPath, { recursive: true, force: true });
   });
 
+  it("resumes an existing session unchanged", async () => {
+    const { store, sessionId } = await setupSession(["--session-id", "s1", "--files", path.join(repoPath, "a.txt")], "/");
+    const thread = store.addThread({
+      repoPath, file: "a.txt", lineStart: 1, lineEnd: 1, side: "new",
+      author: "user", body: "why?", pending: false, pinnedRef: store.snapshot.repos[0].baseRef,
+    });
+    await store.persist();
+    const before = store.snapshot;
+    expect(before.notifications.length).toBeGreaterThan(0);
+
+    const resumed = await setupSession(["--session-id", sessionId, "--resume"], "/");
+    const after = resumed.store.snapshot;
+    expect(after.id).toBe("s1");
+    expect(after.repos).toEqual(before.repos);
+    expect(after.scope).toEqual(before.scope);
+    expect(after.threads.map(t => t.id)).toEqual([thread.id]);
+    expect(after.threads).toEqual(before.threads);
+    expect(after.notifications).toEqual(before.notifications);
+  });
+
+  it("applies --title and --description when resuming", async () => {
+    await setupSession(["--session-id", "s1", repoPath], "/");
+    const { store } = await setupSession(["--session-id", "s1", "--resume", "--title", "T2", "--description", "D2"], "/");
+    expect(store.snapshot.title).toBe("T2");
+    expect(store.snapshot.description).toBe("D2");
+  });
+
+  it("rejects --resume with repo args, --files or --import-session", async () => {
+    await setupSession(["--session-id", "s1", repoPath], "/");
+    const msg = /--resume takes no repo paths, --files or --import-session/;
+    await expect(setupSession(["--session-id", "s1", "--resume", repoPath], "/")).rejects.toThrow(msg);
+    await expect(setupSession(["--session-id", "s1", "--resume", "--files", "a.txt"], repoPath)).rejects.toThrow(msg);
+    await expect(setupSession(["--session-id", "s1", "--resume", "--import-session", "x"], "/")).rejects.toThrow(msg);
+  });
+
+  it("fails to resume a session with no data file", async () => {
+    await expect(setupSession(["--session-id", "s1", "--resume"], "/")).rejects.toThrow(/no saved session s1/);
+  });
+
   it("infers the repo from --files when no repo args are given, and scopes the session", async () => {
     const { store } = await setupSession(["--session-id", "s1", "--files", path.join(repoPath, "a.txt")], "/");
     expect(store.snapshot.repos.map(r => r.path)).toEqual([repoPath]);

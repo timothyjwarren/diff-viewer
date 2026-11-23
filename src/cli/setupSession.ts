@@ -2,7 +2,7 @@ import path from "node:path";
 import { SessionStore } from "../session/sessionStore.js";
 import { resolveBaseRef, getCurrentBranch, assertValidRepoPath } from "../git/gitRepo.js";
 import { parseRepoArgs } from "../parseRepoArgs.js";
-import { extractFlag, extractListFlag, validatePort } from "./flags.js";
+import { extractFlag, extractBooleanFlag, extractListFlag, validatePort } from "./flags.js";
 import { getDataDir } from "../paths.js";
 import { resolveScopePaths, inferRepoRoots } from "../scope/scope.js";
 import type { ScopeEntry } from "../types.js";
@@ -29,6 +29,9 @@ export interface SessionSetup {
  * and `--files` paths resolve against `cwd`. With `--files` and no repo
  * arguments, the repos are the git repos containing those files. Throws with
  * a user-facing message on any invalid argument.
+ *
+ * With `--resume`, loads the session's existing data file unchanged (same id,
+ * repos, scope and comments) instead of building one.
  */
 export async function setupSession(argv: string[], cwd: string): Promise<SessionSetup> {
   // --files first: its list ends at the next flag, so the other flags must still be in place.
@@ -39,9 +42,27 @@ export async function setupSession(argv: string[], cwd: string): Promise<Session
   const { value: portArg, rest: afterPort } = extractFlag(afterDescription, "--port");
   const { value: firstConnectArg, rest: afterFirstConnect } = extractFlag(afterPort, "--first-connect-timeout");
   const { value: idleArg, rest: afterIdle } = extractFlag(afterFirstConnect, "--idle-timeout");
-  const { value: importSessionId, rest: repoArgv } = extractFlag(afterIdle, "--import-session");
+  const { value: importSessionId, rest: afterImport } = extractFlag(afterIdle, "--import-session");
+  const { present: resume, rest: repoArgv } = extractBooleanFlag(afterImport, "--resume");
 
   const port = validatePort(portArg);
+  if (resume) {
+    if (repoArgv.length > 0 || files !== undefined || importSessionId !== undefined) {
+      throw new Error("--resume takes no repo paths, --files or --import-session");
+    }
+    if (!sessionId) throw new Error("Missing required --session-id argument");
+    let store: SessionStore;
+    try {
+      store = await SessionStore.load(path.join(getDataDir(), `${sessionId}.json`));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new Error(`no saved session ${sessionId}`);
+      throw new Error(`failed to load session ${sessionId}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (titleArg !== undefined) store.setTitle(titleArg);
+    if (descriptionArg !== undefined) store.setDescription(descriptionArg);
+    await store.persist();
+    return { store, sessionId, port, portArg, firstConnectArg, idleArg, warnings: [] };
+  }
   if (files !== undefined && files.length === 0) throw new Error("--files needs at least one path");
 
   const repoArgs = repoArgv.length === 0 && files

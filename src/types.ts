@@ -153,6 +153,8 @@ export interface SessionData {
   /** Paths the viewer is limited to; null shows every changed file. Never empty. */
   scope?: ScopeEntry[] | null;
   createdAt: string;
+  /** Port the server last bound; `resume` reuses it. */
+  port?: number;
   status: "active" | "stopped";
   threads: CommentThread[];
   verdicts: Verdict[];

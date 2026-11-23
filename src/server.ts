@@ -40,9 +40,12 @@ async function main(): Promise<void> {
   server.once("listening", () => {
     const address = server.address();
     const boundPort = typeof address === "object" && address ? address.port : 0;
-    void writeRegistryEntry(sessionId, { port: boundPort, pid: process.pid }).then(() => {
-      console.log(JSON.stringify({ sessionId, port: boundPort, url: `http://127.0.0.1:${boundPort}/session/${sessionId}` }));
-    });
+    store.setPort(boundPort);
+    void store.persist()
+      .then(() => writeRegistryEntry(sessionId, { port: boundPort, pid: process.pid }))
+      .then(() => {
+        console.log(JSON.stringify({ sessionId, port: boundPort, url: `http://127.0.0.1:${boundPort}/session/${sessionId}` }));
+      });
   });
 
   // With no browser viewing the session, nobody can answer an agent: tell the

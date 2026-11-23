@@ -94,6 +94,14 @@ export class SessionStore {
     await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2));
   }
 
+  setTitle(title: string): void {
+    this.data.title = title;
+  }
+
+  setPort(port: number): void {
+    this.data.port = port;
+  }
+
   setDescription(description: string): void {
     this.data.description = description;
   }

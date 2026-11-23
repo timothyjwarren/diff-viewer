@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { startCommand } from "../cli/start.js";
+import { startCommand, resumeCommand } from "../cli/start.js";
 import {
   waitCommand, watchCommand, reviewCommand, replyCommand, commentCommand, ackCommand, unackCommand,
   stopCommand, sessionsCommand, describeCommand, resetCommand, archivesCommand, restoreCommand, linkCommand, scopeCommand, type CommentOverrides,
 } from "../cli/commands.js";
-import { extractFlag, extractBooleanFlag } from "../cli/flags.js";
+import { extractFlag, extractBooleanFlag, validatePort } from "../cli/flags.js";
 
 /**
  * Pulls the optional --author/--created-at/--pending overrides used to
@@ -38,6 +38,14 @@ async function main(): Promise<void> {
   switch (cmd) {
     case "start": {
       console.log(JSON.stringify(await startCommand(rest)));
+      break;
+    }
+    case "resume": {
+      const { value: portArg, rest: afterPort } = extractFlag(rest, "--port");
+      const { present: anyPort, rest: [sessionId, ...extra] } = extractBooleanFlag(afterPort, "--any-port");
+      if (!sessionId || extra.length > 0) throw new Error("usage: diff-viewer resume <sessionId> [--port <n> | --any-port]");
+      const port = portArg === undefined ? undefined : validatePort(portArg);
+      console.log(JSON.stringify(await resumeCommand(sessionId, { port, anyPort })));
       break;
     }
     case "wait": {

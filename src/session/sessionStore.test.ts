@@ -16,6 +16,14 @@ describe("SessionStore", () => {
     await fs.rm(dataDir, { recursive: true, force: true });
   });
 
+  it("records the port and keeps it across load", async () => {
+    const store = SessionStore.create(repos, "s1", "test session", dataDir);
+    store.setPort(5555);
+    await store.persist();
+    const loaded = await SessionStore.load(path.join(dataDir, "s1.json"));
+    expect(loaded.snapshot.port).toBe(5555);
+  });
+
   it("an immediate (non-pending) user comment notifies right away", () => {
     const store = SessionStore.create(repos, "s1", "test session", dataDir);
     const thread = store.addThread({

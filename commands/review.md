@@ -208,7 +208,8 @@ Steps:
      `diff-viewer review <sessionId>` (it reads the saved comments from disk)
      and raise any threads that still have an unanswered user comment with
      the user here in the main conversation, since they can no longer see
-     your replies in the viewer.
+     your replies in the viewer. If the user wants to carry on in the viewer, resume
+     the session (step 8).
    The Monitor keeps running on its own after each notification — there is no
    need to re-arm it.
 5. If invoked via another workflow (e.g. `/code-review`) while a session for
@@ -231,3 +232,20 @@ Steps:
    current comments first, so nothing is lost either way.
 7. When finished with the session, `diff-viewer stop <sessionId>` shuts down
    its server, and `TaskStop` the Monitor started in step 3.
+8. To continue a session whose server has stopped (the user wants to pick a
+   review back up, or `sessions` no longer lists it), run
+   `diff-viewer resume <sessionId>` and then start a new `watch` Monitor as in
+   step 3. It restarts the session under the same id and URL, so the user's
+   open tab reconnects on its own and keeps their place; tell them so. If it
+   fails with:
+   - "no recorded port" — ask the user for the port in their viewer tab's
+     URL (`http://127.0.0.1:<port>/session/...`) and run
+     `diff-viewer resume <sessionId> --port <port>`. If the tab is closed,
+     use `--any-port`.
+   - "already in use" — tell the user their tab can't reconnect because
+     another program holds the port, and offer `--any-port`, which gives the
+     session a new URL to open.
+   - "already running" — the session is up; use the URL it prints.
+   - "no saved session" — the session file is gone; start a new session.
+   Use `start --import-session` only when the user wants a new session that
+   carries the old comments over.
